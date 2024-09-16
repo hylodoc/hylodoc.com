@@ -1,0 +1,28 @@
+{{ define "navbar" }}
+
+<div class="navbar">
+	<div class="container">
+		<!-- Logo/Brand -->
+		<div class="left">
+			<a href="/">Progstack</a>
+			<span>blogging for devs</span>
+		</div>
+
+		<!-- Navigation Links -->
+		<div class="right">
+			{{ if .Data.User }}
+				<a href="/logout">Logout</a>
+			{{ else }}
+				<a href="/login">Get started</a>
+			{{ end }}
+			<span id="icons">
+				<a href="https://discord.gg/yfx69tbhxQ">
+					<img src="/static/img/discord.svg" alt="Discord">
+				</a>
+			</span>
+
+		</div>
+	</div>
+</div>
+
+{{ end }}
