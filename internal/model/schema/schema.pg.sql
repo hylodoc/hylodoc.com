@@ -22,6 +22,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA progstack
 
 CREATE TABLE users (
 	id		SERIAL				PRIMARY KEY,
+	gh_user_id	BIGINT		NOT NULL,
 	email		VARCHAR(255)	NOT NULL	UNIQUE,				-- Github email
 	username	VARCHAR(255)	NOT NULL	UNIQUE,				-- GitHub username
 	access_tk	TEXT,								-- GitHubApp access token
@@ -34,16 +35,49 @@ CREATE TABLE sessions (
 	user_id		INTEGER 	NOT NULL,
 	active		BOOLEAN		NOT NULL			DEFAULT(true),
 	created_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
-	expires_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now() + INTERVAL '1 month'),
+	expires_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now() + INTERVAL '1 month'), -- XXX: set from configuration on creation
 
 	CONSTRAINT fk_user_id
-		FOREIGN KEY (user_id) REFERENCES users(id)
+		FOREIGN KEY (user_id)
+		REFERENCES users(id)
+		ON DELETE CASCADE -- delete sessions if user deleted
 );
 
 CREATE TABLE unauth_sessions (
 	id		SERIAL				PRIMARY KEY,
 	token		TEXT		NOT NULL	UNIQUE,
-	active		BOOLEAN		NOT NULL			DEFAULT(true),
 	created_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
-	expires_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now() + INTERVAL '7 days')
+	expires_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now() + INTERVAL '7 days'), -- XXX: set from configuration on creation
+	active		BOOLEAN		NOT NULL			DEFAULT(true)
+);
+
+CREATE TABLE installations (
+	id			SERIAL					PRIMARY KEY,
+	gh_installation_id	BIGINT			NOT NULL	UNIQUE,
+	user_id			INTEGER			NOT NULL,
+	active			BOOLEAN			NOT NULL			DEFAULT(true),
+	created_at		TIMESTAMPTZ		NOT NULL			DEFAULT(now()),
+	deleted_at		TIMESTAMPTZ,
+
+	CONSTRAINT fk_user_id
+		FOREIGN KEY (user_id)
+		REFERENCES users(id)
+		ON DELETE CASCADE -- delete installations if user deleted
+);
+
+CREATE TABLE repositories (
+	id 			SERIAL				PRIMARY KEY,
+	gh_repository_id	BIGINT		NOT NULL,
+	installation_id		INTEGER		NOT NULL,
+	name			VARCHAR(255)	NOT NULL,
+	url			VARCHAR(255)	NOT NULL,
+	owner			VARCHAR(255)	NOT NULL,
+	active			BOOLEAN		NOT NULL			DEFAULT(true),
+	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
+	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
+
+	CONSTRAINT fk_installation_id
+		FOREIGN KEY (installation_id)
+		REFERENCES installations(id)
+		ON DELETE CASCADE -- delete repositories when installation deleted
 );

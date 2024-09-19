@@ -1,0 +1,26 @@
+{{ define "repos" }}
+
+<div class="container">
+	<h5>Installations</h5>
+	{{range .Data.Installations }}
+	<div>
+		<h6>Installation Info</h6>
+		<p>Github ID: {{ .GithubID }}</p>
+		<p>Created At: {{ .CreatedAt.Format "2006-01-02 15:04:05" }}</p>
+		<h6>Blogs</h6>
+		<div class="row">
+			{{range .Repositories}}
+			<div class="col-six">
+				<div class="repo-item">
+					<strong>Name:</strong> {{.Name}}<br>
+					<strong>Owner:</strong> {{.Owner}}<br>
+					<strong>URL:</strong> <a href="{{.HtmlUrl}}">{{.HtmlUrl}}</a>
+				</div>
+			</div>
+			{{end}}
+		</div>
+	</div>
+	{{end}}
+</div>
+
+{{ end }}

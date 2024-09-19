@@ -1,12 +1,12 @@
 -- name: CreateUser :one
 INSERT INTO users (
-	email, username
+	gh_user_id, email, username
 ) VALUES (
-	$1, $2
+	$1, $2, $3
 )
 RETURNING *;
 
--- name: GetUserByEmail :one
+-- name: GetUserByGithubId :one
 SELECT * FROM users
-WHERE email = $1
+WHERE gh_user_id = $1
 LIMIT 1;

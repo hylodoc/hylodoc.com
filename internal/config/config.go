@@ -7,21 +7,25 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var Config struct {
+var Config Configuration
+
+type Configuration struct {
 	Progstack ProgstackParams `mapstructure:"progstack"`
 	Github    GithubParams    `mapstructure:"github"`
 	Db        DbParams        `mapstructure:"postgres"`
 }
 
 type ProgstackParams struct {
-	LoginRedirectUri string `mapstructure:"login_redirect_uri"`
+	RepositoriesPath string `mapstructure:"repositories_path"`
 }
 
 type GithubParams struct {
-	AppName       string `mapstructure:"app_name"`
-	ClientID      string `mapstructure:"client_id"`
-	ClientSecret  string `mapstructure:"client_secret"`
-	WebhookSecret string `mapstructure:"webhook_secret"`
+	AppID          int64  `mapstructure:"app_id"`
+	AppName        string `mapstructure:"app_name"`
+	ClientID       string `mapstructure:"client_id"`
+	ClientSecret   string `mapstructure:"client_secret"`
+	WebhookSecret  string `mapstructure:"webhook_secret"`
+	PrivateKeyPath string `mapstructure:"private_key_path"`
 }
 
 type DbParams struct {

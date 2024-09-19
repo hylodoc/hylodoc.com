@@ -2,4 +2,16 @@
 
 <p>Welcome {{ .Data.Username }}</p>
 
+<div class="container">
+	<h5>Install Our GitHub App</h5>
+	<p>To use our application, you need to install our GitHub App. Click the button below to proceed with the installation. You will be able to select which repositories or organizations the app should have access to.</p>
+	<a href="{{ .Data.GithubAppInstallUrl }}">Install GitHub App</a>
+</div>
+
+<br>
+
+<div class="container">
+	{{ template "repos" . }}
+</div>
+
 {{ template "footer" . }}

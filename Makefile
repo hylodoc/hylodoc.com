@@ -1,37 +1,53 @@
 BIN = bin
+REPOSITORIES = repositories
 PROGSTACK = $(BIN)/progstack
 
 DB = internal/model
 COMPOSE_FILE = docker-compose.yml
 
-.PHONY:
+.PHONY: $(PROGSTACK) $(REPOSITORIES) $(DB) $(BIN) 
 
-run: $(PROGSTACK)
+run: $(PROGSTACK) 
+	@echo 'running $(PROGSTACK)...'
 	@./$(PROGSTACK)
 
-$(PROGSTACK): $(BIN) $(DB)
-	@printf 'GO\tget\n'
+$(PROGSTACK): $(DB) $(REPOSITORIES) $(BIN)
+	@echo 'fetching go dependencies...'
 	@go get
-	@printf 'GO\tbuild\n'
+	@echo 'building $(PROGSTACK)...'
 	@go build -o $@
 
 $(DB): $(DB)/sqlc.yaml
-	@printf 'SQLC\t$<\n'
-	@sqlc generate -f $<
+	@echo 'generating SQLC files in $(DB)...'
+	@sqlc generate -f $(DB)/sqlc.yaml
 
 $(BIN):
+	@echo 'generating bin directory...'
+	@mkdir -p $@
+
+$(REPOSITORIES):
+	@echo 'generating repositories directory...'
 	@mkdir -p $@
 
 # Docker compose targets
-# Start containers in detached mode
 up:
+	@echo 'starting docker containers in detached mode...'
 	docker-compose -f $(COMPOSE_FILE) up -d
-# Stop and remove containers
+
 down:
+	@echo 'stopping docker containers...'
 	docker-compose -f $(COMPOSE_FILE) down
-# Clean up Docker-related resources
+
 docker-clean:
+	@echo 'cleaning up docker resources'
 	docker-compose -f $(COMPOSE_FILE) down --volumes --remove-orphans
 
+smee:
+	@echo 'forwarding Github events to http://localhost:7999/gh/installcallback...'
+	smee -u "https://smee.io/D9yWYTiYzjBhfU3O" --port 7999 -P "/gh/installcallback"
+
 clean:
+	@echo "removing bin directory..."
 	@rm -rf $(BIN)
+	@echo "removing all .gen.go files in $(DB)..."
+	@rm -f $(DB)/*.gen.go

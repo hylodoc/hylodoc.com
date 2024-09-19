@@ -36,20 +36,20 @@ func (ua *UnauthMiddleware) HandleUnauthSession(next http.Handler) http.Handler 
 		}
 		if user != nil {
 			/* user logged in, add userinfo to context */
-			r = r.WithContext(context.WithValue(r.Context(), "user", user))
+			r = r.WithContext(context.WithValue(r.Context(), CtxSessionKey, user))
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
-func handleUnauthSession(w http.ResponseWriter, r *http.Request, s *model.Store) (*User, error) {
+func handleUnauthSession(w http.ResponseWriter, r *http.Request, s *model.Store) (*Session, error) {
 	authCookie, err := r.Cookie(authCookieName)
 	if err == nil {
 		/* authCookie exists */
 		log.Println("authCookie exists")
-		u, err := validateAuthSessionId(authCookie.Value, w, s)
+		session, err := validateAuthSessionId(authCookie.Value, w, s)
 		if err == nil {
-			return u, nil
+			return session, nil
 		}
 		/* if error try do unauth */
 	}
