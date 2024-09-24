@@ -11,12 +11,12 @@ import (
 	"github.com/xr0-org/progstack/internal/util"
 )
 
-func downloadRepoTarball(c *http.Client, owner, repo, accessToken string) (string, error) {
+func downloadRepoTarball(c *http.Client, repoFullName, accessToken string) (string, error) {
 	log.Println("downloading repo tarball...")
-	url := fmt.Sprintf(ghRepositoriesTarballUrlTemplate, owner, repo)
 
 	/* build request */
-	req, err := util.NewRequestBuilder("GET", url).
+	tarballUrl := fmt.Sprintf(ghRepositoriesTarballUrlTemplate, repoFullName)
+	req, err := util.NewRequestBuilder("GET", tarballUrl).
 		WithHeader("Authorization", fmt.Sprintf("Bearer %s", accessToken)).
 		WithHeader("Accept", "application/vnd.github+json").
 		Build()
@@ -32,11 +32,11 @@ func downloadRepoTarball(c *http.Client, owner, repo, accessToken string) (strin
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download zip file: %s", resp.Status)
+		return "", fmt.Errorf("failed to download tar file: %s", resp.Status)
 	}
 
-	tmpName := fmt.Sprintf("repo-%s-%s*.tar.gz", owner, repo)
-	tmpFile, err := os.CreateTemp("", tmpName)
+	tmpSuffix := "*.tar.gz"
+	tmpFile, err := os.CreateTemp("", tmpSuffix)
 	if err != nil {
 		return "", err
 	}

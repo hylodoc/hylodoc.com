@@ -6,12 +6,17 @@ INSERT INTO installations (
 )
 RETURNING *;
 
--- name: GetInstallations :many
+-- name: GetInstallationWithGithubInstallationID :one
+SELECT *
+FROM installations
+WHERE gh_installation_id = $1 AND active = true;
+
+-- name: GetInstallationsForUser :many
 SELECT *
 FROM installations
 WHERE user_id = $1 AND active = true;
 
--- name: DeleteInstallationWithGithubId :exec
+-- name: DeleteInstallationWithGithubInstallationID :exec
 DELETE
 FROM installations
 WHERE gh_installation_id = $1;

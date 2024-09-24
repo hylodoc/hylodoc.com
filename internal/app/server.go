@@ -125,6 +125,7 @@ func index() http.HandlerFunc {
 
 func home(s *server) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("home handler...")
 		/* XXX: add metrics */
 
 		/* Get session */
@@ -171,12 +172,11 @@ type InstallationInfo struct {
 type RepositoryInfo struct {
 	Name    string
 	HtmlUrl string
-	Owner   string
 }
 
 func getInstallationsInfo(s *model.Store, userID int32) ([]InstallationInfo, error) {
 	/* get installations for user */
-	installations, err := s.GetInstallations(context.TODO(), userID)
+	installations, err := s.GetInstallationsForUser(context.TODO(), userID)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return []InstallationInfo{}, err
@@ -212,7 +212,6 @@ func getRepositoriesInfo(s *model.Store, ghInstallationID int64) ([]RepositoryIn
 		repositoryInfo := RepositoryInfo{
 			Name:    repo.Name,
 			HtmlUrl: repo.Url,
-			Owner:   repo.Owner,
 		}
 		info = append(info, repositoryInfo)
 	}

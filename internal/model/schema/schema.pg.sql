@@ -70,8 +70,8 @@ CREATE TABLE repositories (
 	gh_repository_id	BIGINT		NOT NULL,
 	installation_id		INTEGER		NOT NULL,
 	name			VARCHAR(255)	NOT NULL,
+	full_name		VARCHAR(255)	NOT NULL,			-- needed for path construction
 	url			VARCHAR(255)	NOT NULL,
-	owner			VARCHAR(255)	NOT NULL,
 	active			BOOLEAN		NOT NULL			DEFAULT(true),
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),

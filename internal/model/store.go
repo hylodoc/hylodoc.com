@@ -23,7 +23,6 @@ func (s *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 	if err != nil {
 		return err
 	}
-
 	q := New(tx)
 	if err = fn(q); err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
@@ -31,15 +30,14 @@ func (s *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 		}
 		return err
 	}
-
 	return tx.Commit()
 }
 
 type RepositoryTxParams struct {
 	GhRepositoryID int64
 	Name           string
+	FullName       string
 	Url            string
-	Owner          string
 }
 
 type InstallationTxParams struct {
@@ -63,8 +61,8 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 				InstallationID: installation.ID,
 				GhRepositoryID: repo.GhRepositoryID,
 				Name:           repo.Name,
+				FullName:       repo.FullName,
 				Url:            repo.Url,
-				Owner:          repo.Owner,
 			}
 			_, err := s.CreateRepository(ctx, createRepositoryArgs)
 			if err != nil {
