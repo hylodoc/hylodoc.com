@@ -1,24 +1,24 @@
--- name: CreateRepository :one
-INSERT INTO repositories (
+-- name: CreateBlog :one
+INSERT INTO blogs (
 	installation_id, gh_repository_id, name, full_name, url
 ) VALUES (
 	$1, $2, $3, $4, $5
 )
 RETURNING *;
 
--- name: GetRepositoryWithGithubRepositoryID :one
+-- name: GetBlogWithGithubRepositoryID :one
 SELECT *
-FROM repositories
+FROM blogs
 WHERE gh_repository_id = $1;
 
--- name: GetRepositoriesForInstallation :many
+-- name: GetBlogsForInstallation :many
 SELECT r.id, r.name, r.full_name, r.url
-FROM repositories r
+FROM blogs r
 INNER JOIN installations i
 ON r.installation_id = i.id
 WHERE i.gh_installation_id = $1 AND r.active = true;
 
--- name: DeleteRepositoryWithGithubRepositoryID :exec
+-- name: DeleteBlogWithGithubRepositoryID :exec
 DELETE
-FROM repositories
+FROM blogs
 WHERE gh_repository_id = $1;

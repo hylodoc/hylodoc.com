@@ -186,16 +186,16 @@ func buildCreateInstallationTxParams(installationID int64, userID int32, repos [
 	var iTxParams model.InstallationTxParams
 	iTxParams.InstallationID = installationID
 	iTxParams.UserID = userID
-	var reposTxParams []model.RepositoryTxParams
+	var blogsTxParams []model.BlogTxParams
 	for _, repo := range repos {
-		reposTxParams = append(reposTxParams, model.RepositoryTxParams{
+		blogsTxParams = append(blogsTxParams, model.BlogTxParams{
 			GhRepositoryID: repo.ID,
 			Name:           repo.Name,
 			FullName:       repo.FullName,
 			Url:            repo.HtmlUrl,
 		})
 	}
-	iTxParams.Repositories = reposTxParams
+	iTxParams.Blogs = blogsTxParams
 	return iTxParams
 }
 
@@ -261,7 +261,7 @@ func handleInstallationDeleted(c *http.Client, s *model.Store, ghInstallationID 
 
 	/* fetch repos associated with installation */
 	log.Printf("deleting installation %d for user %d...", ghInstallationID, userID)
-	repos, err := s.GetRepositoriesForInstallation(context.TODO(), ghInstallationID)
+	repos, err := s.GetBlogsForInstallation(context.TODO(), ghInstallationID)
 	if err != nil {
 		return fmt.Errorf("error getting repositories for installation %d: %w", ghInstallationID, err)
 	}
@@ -332,7 +332,7 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 
 	/* write repositories added to db */
 	for _, repo := range repos {
-		_, err := s.CreateRepository(context.TODO(), model.CreateRepositoryParams{
+		_, err := s.CreateBlog(context.TODO(), model.CreateBlogParams{
 			InstallationID: installation.ID,
 			GhRepositoryID: repo.ID,
 			Name:           repo.Name,
@@ -350,9 +350,9 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 func handleInstallationRepositoriesRemoved(c *http.Client, s *model.Store, ghInstallationID int64, repos []Repository) error {
 	log.Println("handling repositories removed event...")
 
-	/* delete repositories removed from db */
+	/* delete blogs removed from db */
 	for _, repo := range repos {
-		if err := s.DeleteRepositoryWithGithubRepositoryID(context.TODO(), repo.ID); err != nil {
+		if err := s.DeleteBlogWithGithubRepositoryID(context.TODO(), repo.ID); err != nil {
 			return fmt.Errorf("error deleting repository with ghRepositoryID `%d': %w", repo.ID, err)
 		}
 	}

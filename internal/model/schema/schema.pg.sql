@@ -65,7 +65,7 @@ CREATE TABLE installations (
 		ON DELETE CASCADE -- delete installations if user deleted
 );
 
-CREATE TABLE repositories (
+CREATE TABLE blogs (
 	id 			SERIAL				PRIMARY KEY,
 	gh_repository_id	BIGINT		NOT NULL,
 	installation_id		INTEGER		NOT NULL,

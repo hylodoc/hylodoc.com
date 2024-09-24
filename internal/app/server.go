@@ -164,12 +164,12 @@ func home(s *server) http.HandlerFunc {
 }
 
 type InstallationInfo struct {
-	GithubID     int64
-	CreatedAt    time.Time
-	Repositories []RepositoryInfo
+	GithubID  int64
+	CreatedAt time.Time
+	Blogs     []BlogInfo
 }
 
-type RepositoryInfo struct {
+type BlogInfo struct {
 	Name    string
 	HtmlUrl string
 }
@@ -187,33 +187,33 @@ func getInstallationsInfo(s *model.Store, userID int32) ([]InstallationInfo, err
 	/* populate the installation info get repositories */
 	var info []InstallationInfo
 	for _, dbInstallation := range installations {
-		repositoriesInfo, err := getRepositoriesInfo(s, dbInstallation.GhInstallationID)
+		blogsInfo, err := getBlogsInfo(s, dbInstallation.GhInstallationID)
 		if err != nil {
 			return []InstallationInfo{}, fmt.Errorf("error getting RepositoriesInfo: %w", err)
 		}
 		installationInfo := InstallationInfo{
-			GithubID:     dbInstallation.GhInstallationID,
-			CreatedAt:    dbInstallation.CreatedAt,
-			Repositories: repositoriesInfo,
+			GithubID:  dbInstallation.GhInstallationID,
+			CreatedAt: dbInstallation.CreatedAt,
+			Blogs:     blogsInfo,
 		}
 		info = append(info, installationInfo)
 	}
 	return info, nil
 }
 
-func getRepositoriesInfo(s *model.Store, ghInstallationID int64) ([]RepositoryInfo, error) {
-	repositories, err := s.GetRepositoriesForInstallation(context.TODO(), ghInstallationID)
+func getBlogsInfo(s *model.Store, ghInstallationID int64) ([]BlogInfo, error) {
+	blogs, err := s.GetBlogsForInstallation(context.TODO(), ghInstallationID)
 	if err != nil {
 		/* should not be possible to have an installation with no repositories */
-		return []RepositoryInfo{}, err
+		return []BlogInfo{}, err
 	}
-	var info []RepositoryInfo
-	for _, repo := range repositories {
-		repositoryInfo := RepositoryInfo{
-			Name:    repo.Name,
-			HtmlUrl: repo.Url,
+	var info []BlogInfo
+	for _, blog := range blogs {
+		blogInfo := BlogInfo{
+			Name:    blog.Name,
+			HtmlUrl: blog.Url,
 		}
-		info = append(info, repositoryInfo)
+		info = append(info, blogInfo)
 	}
 	return info, nil
 }

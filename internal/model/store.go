@@ -33,7 +33,7 @@ func (s *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 	return tx.Commit()
 }
 
-type RepositoryTxParams struct {
+type BlogTxParams struct {
 	GhRepositoryID int64
 	Name           string
 	FullName       string
@@ -43,7 +43,7 @@ type RepositoryTxParams struct {
 type InstallationTxParams struct {
 	InstallationID int64
 	UserID         int32
-	Repositories   []RepositoryTxParams
+	Blogs          []BlogTxParams
 }
 
 func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxParams) error {
@@ -56,15 +56,15 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 		if err != nil {
 			return err
 		}
-		for _, repo := range arg.Repositories {
-			createRepositoryArgs := CreateRepositoryParams{
+		for _, blog := range arg.Blogs {
+			createBlogArgs := CreateBlogParams{
 				InstallationID: installation.ID,
-				GhRepositoryID: repo.GhRepositoryID,
-				Name:           repo.Name,
-				FullName:       repo.FullName,
-				Url:            repo.Url,
+				GhRepositoryID: blog.GhRepositoryID,
+				Name:           blog.Name,
+				FullName:       blog.FullName,
+				Url:            blog.Url,
 			}
-			_, err := s.CreateRepository(ctx, createRepositoryArgs)
+			_, err := s.CreateBlog(ctx, createBlogArgs)
 			if err != nil {
 				return err
 			}
