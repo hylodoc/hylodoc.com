@@ -13,9 +13,12 @@ type Configuration struct {
 	Progstack ProgstackParams `mapstructure:"progstack"`
 	Github    GithubParams    `mapstructure:"github"`
 	Db        DbParams        `mapstructure:"postgres"`
+	Resend    ResendParams    `mapstructure:"resend"`
 }
 
 type ProgstackParams struct {
+	Protocol         string `mapstructure:"protocol"`
+	ServiceName      string `mapstructure:"service_name"`
 	RepositoriesPath string `mapstructure:"repositories_path"`
 }
 
@@ -34,6 +37,10 @@ type DbParams struct {
 	User     string `mapstructure:"user"`
 	Password string `mapstructure:"password"`
 	Port     int    `mapstructure:"port"`
+}
+
+type ResendParams struct {
+	ApiKey string `mapstructure:"resend_api_key"`
 }
 
 func (params DbParams) Connect() (*sql.DB, error) {

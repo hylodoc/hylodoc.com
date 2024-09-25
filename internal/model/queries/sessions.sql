@@ -13,4 +13,6 @@ FROM sessions AS s
 WHERE token = $1 AND active = true;
 
 -- name: EndSession :exec
-UPDATE sessions SET active = false WHERE token = $1;
+UPDATE sessions
+SET active = false
+WHERE token = $1;

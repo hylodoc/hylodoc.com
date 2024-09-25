@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/resend/resend-go/v2"
 	"github.com/spf13/viper"
 	"github.com/xr0-org/progstack/internal/auth"
+	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/installation"
 	"github.com/xr0-org/progstack/internal/model"
@@ -21,7 +23,6 @@ import (
 const (
 	Tmpldir = "web/templates"
 	Cssdir  = "web/static/css"
-	Hugodir = "web/static/hugo/public/"
 
 	listeningPort = 7999 /* XXX: make configurable */
 
@@ -31,8 +32,9 @@ const (
 )
 
 type server struct {
-	client *http.Client
-	store  *model.Store
+	client       *http.Client
+	store        *model.Store
+	resendClient *resend.Client
 }
 
 func init() {
@@ -46,8 +48,6 @@ func init() {
 		log.Fatalf("Error unmarshaling config: %s", err)
 	}
 	log.Printf("loaded config: %+v\n", config.Config)
-
-	/* build template paths */
 }
 
 func Serve() {
@@ -60,16 +60,19 @@ func Serve() {
 		Timeout: 10 * time.Second,
 	}
 	store := model.NewStore(db)
+	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
 	server := &server{
-		client: client,
-		store:  store,
+		client:       client,
+		store:        store,
+		resendClient: resendClient,
 	}
 
 	unauthMiddleware := auth.NewUnauthMiddleware(store)
 	authMiddleware := auth.NewAuthMiddleware(store)
 
 	authService := auth.NewAuthService(client, store, &config.Config.Github)
-	installService := installation.NewInstallationService(client, store, &config.Config)
+	installService := installation.NewInstallationService(client, resendClient, store, &config.Config)
+	blogService := blog.NewBlogService(store, resendClient)
 
 	r := mux.NewRouter()
 	r.Use(unauthMiddleware.HandleUnauthSession)
@@ -79,6 +82,9 @@ func Serve() {
 	r.HandleFunc("/login", authService.Login())
 	r.HandleFunc("/gh/oauthcallback", authService.OAuthCallback())
 	r.HandleFunc("/gh/installcallback", installService.InstallationCallback())
+
+	r.HandleFunc("/blogs/{blogID}/subscribe", blogService.SubscribeToBlog()).Methods("POST")
+	r.HandleFunc("/blogs/{blogID}/unsubscribe", blogService.UnsubscribeFromBlog()).Methods("POST")
 
 	/* authenticated routes */
 	authR := mux.NewRouter()
@@ -101,6 +107,7 @@ func Serve() {
 
 func index() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("index handler...")
 		/* XXX: add metrics */
 
 		/* get email/username from context */
@@ -176,7 +183,7 @@ type BlogInfo struct {
 
 func getInstallationsInfo(s *model.Store, userID int32) ([]InstallationInfo, error) {
 	/* get installations for user */
-	installations, err := s.GetInstallationsForUser(context.TODO(), userID)
+	installations, err := s.ListInstallationsForUser(context.TODO(), userID)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return []InstallationInfo{}, err
@@ -202,7 +209,7 @@ func getInstallationsInfo(s *model.Store, userID int32) ([]InstallationInfo, err
 }
 
 func getBlogsInfo(s *model.Store, ghInstallationID int64) ([]BlogInfo, error) {
-	blogs, err := s.GetBlogsForInstallation(context.TODO(), ghInstallationID)
+	blogs, err := s.ListBlogsForInstallation(context.TODO(), ghInstallationID)
 	if err != nil {
 		/* should not be possible to have an installation with no repositories */
 		return []BlogInfo{}, err
@@ -210,8 +217,8 @@ func getBlogsInfo(s *model.Store, ghInstallationID int64) ([]BlogInfo, error) {
 	var info []BlogInfo
 	for _, blog := range blogs {
 		blogInfo := BlogInfo{
-			Name:    blog.Name,
-			HtmlUrl: blog.Url,
+			Name:    blog.GhName,
+			HtmlUrl: blog.GhUrl,
 		}
 		info = append(info, blogInfo)
 	}

@@ -11,7 +11,7 @@ SELECT *
 FROM installations
 WHERE gh_installation_id = $1 AND active = true;
 
--- name: GetInstallationsForUser :many
+-- name: ListInstallationsForUser :many
 SELECT *
 FROM installations
 WHERE user_id = $1 AND active = true;

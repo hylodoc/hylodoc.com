@@ -1,11 +1,7 @@
 package installation
 
 import (
-	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -13,8 +9,10 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/util"
 )
@@ -28,47 +26,19 @@ const (
 )
 
 type InstallationService struct {
-	client *http.Client
-	store  *model.Store
-	config *config.Configuration
+	client       *http.Client
+	resendClient *resend.Client
+	store        *model.Store
+	config       *config.Configuration
 }
 
-func NewInstallationService(c *http.Client, s *model.Store, config *config.Configuration) *InstallationService {
+func NewInstallationService(c *http.Client, r *resend.Client, s *model.Store, config *config.Configuration) *InstallationService {
 	return &InstallationService{
-		client: c,
-		store:  s,
-		config: config,
+		client:       c,
+		resendClient: r,
+		store:        s,
+		config:       config,
 	}
-}
-
-func validateSignature(r *http.Request, secret string) error {
-	log.Println("validating github signature...")
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return fmt.Errorf("error reading body: %w", err)
-	}
-	defer r.Body.Close()
-
-	/* place back in request */
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-
-	signature := r.Header.Get("X-Hub-Signature-256")
-	if signature == "" {
-		return fmt.Errorf("missing X-Hub-Signature-256 header")
-	}
-
-	/* create a new HMAC using SHA-256 and the provided secret */
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
-	expectedMAC := mac.Sum(nil)
-
-	/* compare the received signature with the computed one */
-	expectedSignature := "sha256=" + hex.EncodeToString(expectedMAC)
-	ok := hmac.Equal([]byte(signature), []byte(expectedSignature))
-	if !ok {
-		return fmt.Errorf("expected signature: %s but got: %s", err)
-	}
-	return nil
 }
 
 func (i *InstallationService) InstallationCallback() http.HandlerFunc {
@@ -93,7 +63,6 @@ func (i *InstallationService) installationCallback(w http.ResponseWriter, r *htt
 		return fmt.Errorf("error validating github signature: %w", err)
 	}
 
-	/* XXX: validate that user actually called */
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return fmt.Errorf("error reading request body: %w", err)
@@ -107,7 +76,7 @@ func (i *InstallationService) installationCallback(w http.ResponseWriter, r *htt
 	case "installation_repositories":
 		return handleInstallationRepositories(i.client, i.store, body)
 	case "push":
-		return handlePush(i.client, i.store, body)
+		return handlePush(i.client, i.resendClient, i.store, body)
 	default:
 		log.Println("unhandled event type: %s", eventType)
 	}
@@ -116,6 +85,7 @@ func (i *InstallationService) installationCallback(w http.ResponseWriter, r *htt
 
 func handleInstallation(c *http.Client, s *model.Store, body []byte) error {
 	log.Println("handling installation event...")
+
 	var event InstallationEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		return err
@@ -124,8 +94,7 @@ func handleInstallation(c *http.Client, s *model.Store, body []byte) error {
 	log.Println("installation event: %s", str)
 
 	/* XXX: is this safe given that we validated the request with the
-	* webhook? also
-	* NOTE: can't use Installation ID to get user since installation not yet persisted */
+	* webhook? */
 	ghUserID := event.Sender.ID
 	user, err := s.GetUserByGithubId(context.TODO(), ghUserID)
 	if err != nil {
@@ -164,7 +133,6 @@ func handleInstallationCreated(c *http.Client, s *model.Store, ghInstallationID 
 	if err != nil {
 		return fmt.Errorf("error getting repositories: %w", err)
 	}
-
 	str, _ := eventToJSON(repos)
 	log.Println("repos: %s", str)
 
@@ -190,9 +158,11 @@ func buildCreateInstallationTxParams(installationID int64, userID int32, repos [
 	for _, repo := range repos {
 		blogsTxParams = append(blogsTxParams, model.BlogTxParams{
 			GhRepositoryID: repo.ID,
-			Name:           repo.Name,
-			FullName:       repo.FullName,
-			Url:            repo.HtmlUrl,
+			GhName:         repo.Name,
+			GhFullName:     repo.FullName,
+			GhUrl:          repo.HtmlUrl,
+			Subdomain:      repo.Name,                /* XXX: should be unique and configurable, hardcoding for now */
+			FromAddress:    "no-reply@on.resend.com", /* XXX: should be configurable by user, hardcoding for now */
 		})
 	}
 	iTxParams.Blogs = blogsTxParams
@@ -236,8 +206,9 @@ func getReposDetails(c *http.Client, accessToken string) ([]Repository, error) {
 
 /* this downloads all the repositories to disk int tmp folder then extracts them
 * to the configured destination on disk
-* NOTE: we need the repository owner to build the appropriate link to fetch, but
-* we should save it under /<userID>/<repoName>/ */
+*
+* NOTE: we use the Repository.GhFullName which is guaranteed to be
+* "<owner>/<name>" to build the repo path */
 func downloadReposToDisk(c *http.Client, repos []Repository, accessToken string) error {
 	log.Println("downloading repos to disk...")
 	for _, repo := range repos {
@@ -261,14 +232,14 @@ func handleInstallationDeleted(c *http.Client, s *model.Store, ghInstallationID 
 
 	/* fetch repos associated with installation */
 	log.Printf("deleting installation %d for user %d...", ghInstallationID, userID)
-	repos, err := s.GetBlogsForInstallation(context.TODO(), ghInstallationID)
+	repos, err := s.ListBlogsForInstallation(context.TODO(), ghInstallationID)
 	if err != nil {
 		return fmt.Errorf("error getting repositories for installation %d: %w", ghInstallationID, err)
 	}
 	/* delete the repos on disk */
 	log.Println("deleting repos from disk...")
 	for _, repo := range repos {
-		path := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, repo.FullName)
+		path := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, repo.GhFullName)
 		log.Printf("deleting repo at %s from disk...\n", path)
 		if err := os.RemoveAll(path); err != nil {
 			return fmt.Errorf("error deleting repo %s from disk: %w", err)
@@ -335,9 +306,11 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 		_, err := s.CreateBlog(context.TODO(), model.CreateBlogParams{
 			InstallationID: installation.ID,
 			GhRepositoryID: repo.ID,
-			Name:           repo.Name,
-			FullName:       repo.FullName,
-			Url:            repo.HtmlUrl,
+			GhName:         repo.Name,
+			GhFullName:     repo.FullName,
+			GhUrl:          repo.HtmlUrl,
+			Subdomain:      repo.Name,               /* XXX: must be unique and configurable, using name as default for now */
+			FromAddress:    "no-repy@on.resend.com", /* XXX: hardcoding for now */
 		})
 		if err != nil {
 			/* XXX: cleanup delete from disk */
@@ -352,7 +325,7 @@ func handleInstallationRepositoriesRemoved(c *http.Client, s *model.Store, ghIns
 
 	/* delete blogs removed from db */
 	for _, repo := range repos {
-		if err := s.DeleteBlogWithGithubRepositoryID(context.TODO(), repo.ID); err != nil {
+		if err := s.DeleteBlogWithGhRepositoryID(context.TODO(), repo.ID); err != nil {
 			return fmt.Errorf("error deleting repository with ghRepositoryID `%d': %w", repo.ID, err)
 		}
 	}
@@ -366,7 +339,7 @@ func handleInstallationRepositoriesRemoved(c *http.Client, s *model.Store, ghIns
 	return nil
 }
 
-func handlePush(c *http.Client, s *model.Store, body []byte) error {
+func handlePush(c *http.Client, resendClient *resend.Client, s *model.Store, body []byte) error {
 	log.Println("handling push event...")
 
 	var event PushEvent
@@ -403,5 +376,77 @@ func handlePush(c *http.Client, s *model.Store, body []byte) error {
 	if err = extractTarball(tmpFile, tmpDst); err != nil {
 		return fmt.Errorf("error extracting tarball to destination for /%s/: %w", repoFullName, err)
 	}
+
+	/* XXX: generate website afresh */
+
+	/* XXX: users should trigger emails manually on dashboard? how do we
+	* ensure that we send emails for the right post, since the posts are
+	* generated by the repository */
+	ghRepositoryID := event.Repository.ID
+	if err = sendNewPostUpdateEmailsForBlog(ghRepositoryID, resendClient, s); err != nil {
+		return fmt.Errorf("error sending post emails for repo `%d': %w", ghRepositoryID, err)
+	}
 	return nil
+}
+
+func sendNewPostUpdateEmailsForBlog(ghRepositoryID int64, c *resend.Client, s *model.Store) error {
+	/* build parameters */
+	paramsList, err := buildNewPostUpdateParamsList(ghRepositoryID, s)
+	if err != nil {
+		return fmt.Errorf("error building newPostUpdatesParamsList: %w", err)
+	}
+
+	/* send emails for all parameter */
+	for _, params := range paramsList {
+		err := email.SendNewPostUpdate(c, params)
+		if err != nil {
+			return fmt.Errorf("error sending new post update email: %w", err)
+		}
+	}
+	return nil
+}
+
+func buildNewPostUpdateParamsList(ghRepositoryID int64, s *model.Store) ([]email.NewPostUpdateParams, error) {
+	/* get blog */
+	blog, err := s.GetBlogWithGhRepositoryID(context.TODO(), ghRepositoryID)
+	if err != nil {
+		return []email.NewPostUpdateParams{}, fmt.Errorf("error getting blog with ghRepositoryID `%d': %w", ghRepositoryID, err)
+	}
+	log.Printf("sending new post update emails for blog with id: `%d'\n", blog.ID)
+
+	/* list active subscribers */
+	subscribers, err := s.ListActiveSubscribersForGhRepositoryID(context.TODO(), ghRepositoryID)
+	if err != nil {
+		return []email.NewPostUpdateParams{}, fmt.Errorf("error getting active subscriber list: %w", err)
+	}
+
+	/* build details */
+	var paramsList []email.NewPostUpdateParams
+	blogParams := email.BlogParams{
+		ID:        blog.ID,
+		From:      blog.FromAddress,
+		Subdomain: blog.Subdomain,
+	}
+	/* XXX: construct postParams from generated site, hardcoding for now */
+	postParams := email.PostParams{
+		Link:    fmt.Sprintf("https://%s.progstack.com/posts/1"),
+		Body:    "testing subscriber update emails in progstack",
+		Subject: "#1 progstack email functinality",
+	}
+	/* send each subscriber an email */
+	/* XXX: should prolly use their bulk API, does up to 100 per batch */
+	for _, subscriber := range subscribers {
+		subscriberParams := email.SubscriberParams{
+			To:               subscriber.Email,
+			UnsubscribeToken: subscriber.UnsubscribeToken,
+		}
+		log.Printf("sending email to subscriber: `%s'\n", subscriberParams.To)
+
+		paramsList = append(paramsList, email.NewPostUpdateParams{
+			Blog:       blogParams,
+			Subscriber: subscriberParams,
+			Post:       postParams,
+		})
+	}
+	return paramsList, nil
 }

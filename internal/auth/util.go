@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 )
 
-func generateToken() (string, error) {
+func GenerateToken() (string, error) {
 	b := make([]byte, 32) // 32 bytes = 256 bits
 	if _, err := rand.Read(b); err != nil {
 		return "", err

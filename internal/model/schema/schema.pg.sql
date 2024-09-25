@@ -68,10 +68,12 @@ CREATE TABLE installations (
 CREATE TABLE blogs (
 	id 			SERIAL				PRIMARY KEY,
 	gh_repository_id	BIGINT		NOT NULL,
+	gh_url			VARCHAR(255)	NOT NULL,
+	gh_name			VARCHAR(255)	NOT NULL,
+	gh_full_name		VARCHAR(255)	NOT NULL,			-- needed for path construction
 	installation_id		INTEGER		NOT NULL,
-	name			VARCHAR(255)	NOT NULL,
-	full_name		VARCHAR(255)	NOT NULL,			-- needed for path construction
-	url			VARCHAR(255)	NOT NULL,
+	subdomain		VARCHAR(255)	NOT NULL,			-- need some reasonable default passed in
+	from_address		VARCHAR(255)	NOT NULL,
 	active			BOOLEAN		NOT NULL			DEFAULT(true),
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
@@ -80,4 +82,22 @@ CREATE TABLE blogs (
 		FOREIGN KEY (installation_id)
 		REFERENCES installations(id)
 		ON DELETE CASCADE -- delete repositories when installation deleted
+);
+
+CREATE TYPE subscription_status AS ENUM ('active', 'unsubscribed');
+
+CREATE TABLE subscribers (
+	id			SERIAL					PRIMARY KEY,
+	blog_id			INTEGER			NOT NULL,
+	email			VARCHAR(255)		NOT NULL,
+	unsubscribe_token 	VARCHAR(255)		NOT NULL,
+	status			subscription_status	NOT NULL			DEFAULT('active'),
+
+	created_at		TIMESTAMPTZ		NOT NULL			DEFAULT(now()),
+	updated_at		TIMESTAMPTZ		NOT NULL			DEFAULT(now()),
+
+	CONSTRAINT fk_blog_id
+		FOREIGN KEY (blog_id)
+		REFERENCES blogs(id)
+		ON DELETE CASCADE -- delete subscribers when blog deleted
 );

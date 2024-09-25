@@ -288,7 +288,7 @@ func getUserInfo(c *http.Client, accessToken string) (User, error) {
 }
 
 func createAuthSession(userId int32, w http.ResponseWriter, s *model.Store) error {
-	sessionId, err := generateToken()
+	sessionId, err := GenerateToken()
 	if err != nil {
 		return fmt.Errorf("error generating sessionId: %w", err)
 	}

@@ -47,7 +47,9 @@ smee:
 	smee -u "https://smee.io/D9yWYTiYzjBhfU3O" --port 7999 -P "/gh/installcallback"
 
 clean:
-	@echo "removing bin directory..."
+	@echo 'removing bin directory...'
 	@rm -rf $(BIN)
-	@echo "removing all .gen.go files in $(DB)..."
+	@echo 'removing respositories on disk...'
+	@rm -rf $(REPOSITORIES)
+	@echo 'removing all .gen.go files in $(DB)...'
 	@rm -f $(DB)/*.gen.go

@@ -67,7 +67,7 @@ func handleUnauthSession(w http.ResponseWriter, r *http.Request, s *model.Store)
 
 func createUnauthSession(w http.ResponseWriter, s *model.Store) error {
 	/* generate unauthSessionId */
-	unauthSessionId, err := generateToken()
+	unauthSessionId, err := GenerateToken()
 	if err != nil {
 		return fmt.Errorf("error generating unauthSessionId: %w", err)
 	}
