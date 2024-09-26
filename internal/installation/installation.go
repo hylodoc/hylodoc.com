@@ -2,6 +2,7 @@ package installation
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -14,6 +15,7 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/sites"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -45,9 +47,8 @@ func (i *InstallationService) InstallationCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		/* XXX: metrics */
 
-		err := i.installationCallback(w, r)
-		if err != nil {
-			log.Printf("error in installation callback: %v", err)
+		if err := i.installationCallback(w, r); err != nil {
+			log.Printf("error in installation callback: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -122,6 +123,7 @@ func handleInstallationCreated(c *http.Client, s *model.Store, ghInstallationID 
 		c,
 		config.Config.Github.AppID,
 		ghInstallationID,
+
 		config.Config.Github.PrivateKeyPath,
 	)
 	if err != nil {
@@ -147,6 +149,11 @@ func handleInstallationCreated(c *http.Client, s *model.Store, ghInstallationID 
 		/* XXX: wipe relavant repos from disk */
 		return fmt.Errorf("error executing db transaction: %w", err)
 	}
+
+	/* launch blogs */
+	if err = launchBlogsForInstallation(ghInstallationID, s); err != nil {
+		return fmt.Errorf("error launching blogs for installation `%d': %w", ghInstallationID, err)
+	}
 	return nil
 }
 
@@ -167,6 +174,30 @@ func buildCreateInstallationTxParams(installationID int64, userID int32, repos [
 	}
 	iTxParams.Blogs = blogsTxParams
 	return iTxParams
+}
+
+func launchBlogsForInstallation(ghInstallationID int64, s *model.Store) error {
+	/* fetch repositories for installation */
+	blogs, err := s.ListBlogsForInstallationWithGhInstallationID(context.TODO(), ghInstallationID)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("error getting blogs for installation: %w", err)
+		}
+	}
+
+	for _, blog := range blogs {
+		if err = sites.LaunchUserBlog(buildLaunchUserBlogParams(blog)); err != nil {
+			return fmt.Errorf("error launching user site: %w", err)
+		}
+	}
+	return nil
+}
+
+func buildLaunchUserBlogParams(blog model.Blog) sites.LaunchUserBlogParams {
+	return sites.LaunchUserBlogParams{
+		blog.GhFullName,
+		blog.Subdomain,
+	}
 }
 
 type InstallationRepositoriesResponse struct {
@@ -232,7 +263,7 @@ func handleInstallationDeleted(c *http.Client, s *model.Store, ghInstallationID 
 
 	/* fetch repos associated with installation */
 	log.Printf("deleting installation %d for user %d...", ghInstallationID, userID)
-	repos, err := s.ListBlogsForInstallation(context.TODO(), ghInstallationID)
+	repos, err := s.ListBlogsForInstallationWithGhInstallationID(context.TODO(), ghInstallationID)
 	if err != nil {
 		return fmt.Errorf("error getting repositories for installation %d: %w", ghInstallationID, err)
 	}
@@ -240,9 +271,18 @@ func handleInstallationDeleted(c *http.Client, s *model.Store, ghInstallationID 
 	log.Println("deleting repos from disk...")
 	for _, repo := range repos {
 		path := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, repo.GhFullName)
-		log.Printf("deleting repo at %s from disk...\n", path)
+		log.Printf("deleting repo at `%s' from disk...\n", path)
 		if err := os.RemoveAll(path); err != nil {
-			return fmt.Errorf("error deleting repo %s from disk: %w", err)
+			return fmt.Errorf("error deleting repo `%s' from disk: %w", err)
+		}
+	}
+	/* delete generated websites */
+	log.Println("deleting generated websites from disk...")
+	for _, repo := range repos {
+		path := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, repo.Subdomain)
+		log.Printf("deleting website at `%s' from disk...\n", path)
+		if err := os.RemoveAll(path); err != nil {
+			return fmt.Errorf("error deleting website `%s' from disk: %w", err)
 		}
 	}
 	/* cascade delete the installation and associated repos */
@@ -297,7 +337,6 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 	/* get installationID */
 	installation, err := s.GetInstallationWithGithubInstallationID(context.TODO(), ghInstallationID)
 	if err != nil {
-		/* XXX: cleanup delete from disk */
 		return fmt.Errorf("error getting installation with ghInstallationID: %w", err)
 	}
 
@@ -317,23 +356,49 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 			return fmt.Errorf("error creating repository: %w", err)
 		}
 	}
+
+	/* launch websites for repositories added */
+	for _, repo := range repos {
+		params := sites.LaunchUserBlogParams{
+			repo.FullName,
+			repo.Name, /* XXX: we should make this configurable, maybe params in repo but we use name elsewhere */
+		}
+		if err := sites.LaunchUserBlog(params); err != nil {
+			return fmt.Errorf("error launching blog for GhRepositoryID `%d': %w", repo.ID, err)
+		}
+	}
+
 	return nil
 }
 
 func handleInstallationRepositoriesRemoved(c *http.Client, s *model.Store, ghInstallationID int64, repos []Repository) error {
 	log.Println("handling repositories removed event...")
 
-	/* delete blogs removed from db */
+	log.Println("deleting websites from disk...")
+	/* delete generated sites from disk, generated sites need subdomain */
 	for _, repo := range repos {
-		if err := s.DeleteBlogWithGhRepositoryID(context.TODO(), repo.ID); err != nil {
-			return fmt.Errorf("error deleting repository with ghRepositoryID `%d': %w", repo.ID, err)
+		blog, err := s.GetBlogWithGhRepositoryID(context.TODO(), repo.ID)
+		if err != nil {
+			return fmt.Errorf("error getting blog for ghRepositoryID `%s': %w", err)
+		}
+		path := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, blog.Subdomain)
+		if err := os.RemoveAll(path); err != nil {
+			return fmt.Errorf("error deleting repo `%s' from disk: %w", path, err)
 		}
 	}
+	log.Println("deleting repositories from disk...")
 	/* delete repostories removed from disk */
 	for _, repo := range repos {
 		path := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, repo.FullName)
 		if err := os.RemoveAll(path); err != nil {
-			return fmt.Errorf("error deleting repo %s from disk: %w", err)
+			return fmt.Errorf("error deleting repo `%s' from disk: %w", path, err)
+		}
+	}
+	log.Println("deleting blogs from db...")
+	/* delete blogs removed from db */
+	for _, repo := range repos {
+		if err := s.DeleteBlogWithGhRepositoryID(context.TODO(), repo.ID); err != nil {
+			return fmt.Errorf("error deleting repository with ghRepositoryID `%d': %w", repo.ID, err)
 		}
 	}
 	return nil

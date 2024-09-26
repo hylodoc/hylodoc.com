@@ -20,6 +20,7 @@ type ProgstackParams struct {
 	Protocol         string `mapstructure:"protocol"`
 	ServiceName      string `mapstructure:"service_name"`
 	RepositoriesPath string `mapstructure:"repositories_path"`
+	WebsitesPath     string `mapstructure:"websites_path"`
 }
 
 type GithubParams struct {
@@ -32,6 +33,7 @@ type GithubParams struct {
 }
 
 type DbParams struct {
+	Host     string `mapstructure:"host"`
 	Name     string `mapstructure:"name"`
 	Schema   string `mapstructure:"schema"`
 	User     string `mapstructure:"user"`
@@ -45,7 +47,8 @@ type ResendParams struct {
 
 func (params DbParams) Connect() (*sql.DB, error) {
 	connstr := fmt.Sprintf(
-		"user=%s password=%s port=%d dbname=%s sslmode=disable",
+		"host=%s user=%s password=%s port=%d dbname=%s sslmode=disable",
+		params.Host,
 		params.User,
 		params.Password,
 		params.Port,

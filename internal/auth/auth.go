@@ -46,6 +46,7 @@ func NewAuthMiddleware(s *model.Store) *AuthMiddleware {
 func (a *AuthMiddleware) ValidateAuthSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("running auth session middleware...")
+
 		session, err := validateAuthSession(w, r, a.store)
 		if err != nil {
 			http.Redirect(w, r, "/", http.StatusFound)

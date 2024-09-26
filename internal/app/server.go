@@ -18,6 +18,7 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/installation"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/sites"
 )
 
 const (
@@ -67,6 +68,7 @@ func Serve() {
 		resendClient: resendClient,
 	}
 
+	userWebsiteMiddleware := sites.NewUserWebsiteMiddleware(store)
 	unauthMiddleware := auth.NewUnauthMiddleware(store)
 	authMiddleware := auth.NewAuthMiddleware(store)
 
@@ -75,6 +77,10 @@ func Serve() {
 	blogService := blog.NewBlogService(store, resendClient)
 
 	r := mux.NewRouter()
+
+	/* NOTE: userWebsite middleware runs before main application */
+	r.Use(userWebsiteMiddleware.RouteToSubdomains)
+
 	r.Use(unauthMiddleware.HandleUnauthSession)
 
 	/* public routes */
@@ -209,7 +215,7 @@ func getInstallationsInfo(s *model.Store, userID int32) ([]InstallationInfo, err
 }
 
 func getBlogsInfo(s *model.Store, ghInstallationID int64) ([]BlogInfo, error) {
-	blogs, err := s.ListBlogsForInstallation(context.TODO(), ghInstallationID)
+	blogs, err := s.ListBlogsForInstallationWithGhInstallationID(context.TODO(), ghInstallationID)
 	if err != nil {
 		/* should not be possible to have an installation with no repositories */
 		return []BlogInfo{}, err

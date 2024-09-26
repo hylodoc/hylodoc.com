@@ -11,8 +11,8 @@ SELECT *
 FROM blogs
 WHERE gh_repository_id = $1;
 
--- name: ListBlogsForInstallation :many
-SELECT b.id, b.gh_name, b.gh_full_name, b.gh_url
+-- name: ListBlogsForInstallationWithGhInstallationID :many
+SELECT b.*
 FROM blogs b
 INNER JOIN installations i
 ON b.installation_id = i.id

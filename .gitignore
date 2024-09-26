@@ -1,5 +1,9 @@
 bin/
+app/
 repositories/
+websites/
+letsencrypt/
+.DS_Store
 conf.yaml
 *.swp
 *.pem
