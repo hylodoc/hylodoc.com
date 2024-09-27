@@ -7,7 +7,7 @@ INSERT INTO sessions (
 RETURNING *;
 
 -- name: GetSession :one
-SELECT s.user_id, u.email, u.username, s.token, s.expires_at
+SELECT *
 FROM sessions AS s
 	INNER JOIN users AS u ON s.user_id = u.id
 WHERE token = $1 AND active = true;

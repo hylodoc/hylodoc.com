@@ -33,6 +33,23 @@ func (s *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 	return tx.Commit()
 }
 
+func (s *Store) CreateUserWithGithubAccountTx(ctx context.Context, arg CreateGithubAccountParams) error {
+	err := s.execTx(ctx, func(q *Queries) error {
+		user, err := s.CreateUser(ctx, arg.GhEmail)
+		if err != nil {
+			return err
+		}
+		_, err = s.CreateGithubAccount(ctx, CreateGithubAccountParams{
+			UserID:     user.ID,
+			GhUserID:   arg.GhUserID,
+			GhEmail:    arg.GhEmail,
+			GhUsername: arg.GhUsername,
+		})
+		return err
+	})
+	return err
+}
+
 type BlogTxParams struct {
 	GhRepositoryID int64
 	GhName         string
@@ -75,10 +92,7 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 type CreateSubscriberTxParams struct {
@@ -103,7 +117,7 @@ func (s *Store) CreateSubscriberTx(ctx context.Context, arg CreateSubscriberTxPa
 		if sub.Email == arg.Email {
 			return fmt.Errorf("subscription already exists")
 		}
-		_, err = s.CreateSubscriberForBlog(ctx, CreateSubscriberForBlogParams{
+		_, err = s.CreateSubscriber(ctx, CreateSubscriberParams{
 			BlogID:           arg.BlogID,
 			Email:            arg.Email,
 			UnsubscribeToken: arg.UnsubscribeToken,

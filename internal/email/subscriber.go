@@ -23,7 +23,7 @@ Unsubscribe {{ .UnsubscribeLink }}`
 	 *	e.g. <http>://<localhost.com:7999>/blogs/<1>/unsubscribe
 	 *	e.g. <https>://<progstack.com>/blogs/<596>/unsubscribe
 	 */
-	unsubscribeLinkTemplate = "%s://%s.%s/blogs/%d/unsubscribe"
+	unsubscribeLinkTemplate = "%s://%s/blogs/%d/unsubscribe"
 )
 
 type NewPostUpdateParams struct {
@@ -60,14 +60,12 @@ func SendNewPostUpdate(client *resend.Client, params NewPostUpdateParams) error 
 		return fmt.Errorf("error building newPostUpdateText: %w", err)
 	}
 
-	request := &resend.SendEmailRequest{
+	sent, err := client.Emails.SendWithContext(context.TODO(), &resend.SendEmailRequest{
 		From:    from,
 		To:      []string{to},
 		Subject: subject,
 		Text:    text,
-	}
-
-	sent, err := client.Emails.SendWithContext(context.TODO(), request)
+	})
 	if err != nil {
 		log.Printf("email response: %v", sent)
 		return fmt.Errorf("error sending email to `%s: %w", to, err)
@@ -82,8 +80,8 @@ func newPostUpdateText(params NewPostUpdateParams) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error parsing newPostUpdateTemplate: %w", err)
 	}
-	var b strings.Builder
 
+	var b strings.Builder
 	unsubscribeLink, err := buildUnsubscribeLink(params.Blog.ID, params.Blog.Subdomain, params.Subscriber.UnsubscribeToken)
 	if err != nil {
 		return "", fmt.Errorf("error building unsubscribe link: %w", err)
@@ -111,7 +109,6 @@ func buildUnsubscribeLink(blogID int32, blogSubdomain, unsubscribeToken string) 
 	base := fmt.Sprintf(
 		unsubscribeLinkTemplate,
 		config.Config.Progstack.Protocol,
-		blogSubdomain,
 		config.Config.Progstack.ServiceName,
 		blogID,
 	)

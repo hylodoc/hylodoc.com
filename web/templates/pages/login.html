@@ -1,0 +1,24 @@
+{{ template "header" . }}
+
+<div class="auth-container">
+	<h2>Sign In</h2>
+
+	<!-- Log In with Magic Link -->
+	<form action="/magic/login" method="POST">
+		<label for="email">Email</label>
+		<input type="email" id="email" name="email" placeholder="Enter your email" required>
+
+		<button class="button" type="submit">Send Magic Link</button>
+	</form>
+
+	<p>or</p>
+
+	<!-- GitHub OAuth Log In -->
+	<form action="/gh/login" method="GET">
+		<button class="button github" type="submit">Log in with GitHub</button>
+	</form>
+
+	<p>Don't have an account? <a href="/register">Create an account</a></p>
+</div>
+
+{{ template "footer" . }}

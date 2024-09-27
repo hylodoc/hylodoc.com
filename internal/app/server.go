@@ -72,7 +72,7 @@ func Serve() {
 	unauthMiddleware := auth.NewUnauthMiddleware(store)
 	authMiddleware := auth.NewAuthMiddleware(store)
 
-	authService := auth.NewAuthService(client, store, &config.Config.Github)
+	authService := auth.NewAuthService(client, resendClient, store, &config.Config.Github)
 	installService := installation.NewInstallationService(client, resendClient, store, &config.Config)
 	blogService := blog.NewBlogService(store, resendClient)
 
@@ -85,18 +85,28 @@ func Serve() {
 
 	/* public routes */
 	r.HandleFunc("/", index())
-	r.HandleFunc("/login", authService.Login())
-	r.HandleFunc("/gh/oauthcallback", authService.OAuthCallback())
+	r.HandleFunc("/register", register())
+	r.HandleFunc("/login", login())
+
+	r.HandleFunc("/gh/login", authService.GithubLogin())
+	r.HandleFunc("/gh/oauthcallback", authService.GithubOAuthCallback())
+	r.HandleFunc("/gh/linkcallback", authService.GithubLinkCallback())
+	r.HandleFunc("/magic/register", authService.MagicRegister())
+	r.HandleFunc("/magic/registercallback", authService.MagicRegisterCallback())
+	r.HandleFunc("/magic/login", authService.MagicLogin())
+	r.HandleFunc("/magic/logincallback", authService.MagicLoginCallback())
+
 	r.HandleFunc("/gh/installcallback", installService.InstallationCallback())
 
 	r.HandleFunc("/blogs/{blogID}/subscribe", blogService.SubscribeToBlog()).Methods("POST")
-	r.HandleFunc("/blogs/{blogID}/unsubscribe", blogService.UnsubscribeFromBlog()).Methods("POST")
+	r.HandleFunc("/blogs/{blogID}/unsubscribe", blogService.UnsubscribeFromBlog())
 
 	/* authenticated routes */
 	authR := mux.NewRouter()
 	authR.Use(authMiddleware.ValidateAuthSession)
 	authR.HandleFunc("/home", home(server))
-	authR.HandleFunc("/logout", authService.Logout())
+	authR.HandleFunc("/gh/linkgithub", authService.LinkGithubAccount())
+	authR.HandleFunc("/auth/logout", authService.Logout())
 
 	/* serve static content */
 	r.PathPrefix("/static/css").Handler(http.StripPrefix("/static/css", http.FileServer(http.Dir("./web/static/css"))))
@@ -123,6 +133,56 @@ func index() http.HandlerFunc {
 		}
 
 		execTemplate(w, []string{"index.html"},
+			PageInfo{
+				Data: struct {
+					Title   string
+					Session *auth.Session
+				}{
+					Title:   "Progstack - blogging for devs",
+					Session: session,
+				},
+			},
+		)
+	}
+}
+
+func register() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("register handler...")
+		/* XXX: add metrics */
+
+		/* get email/username from context */
+		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		if session != nil {
+			http.Redirect(w, r, "/home", http.StatusSeeOther)
+		}
+
+		execTemplate(w, []string{"register.html"},
+			PageInfo{
+				Data: struct {
+					Title   string
+					Session *auth.Session
+				}{
+					Title:   "Progstack - blogging for devs",
+					Session: session,
+				},
+			},
+		)
+	}
+}
+
+func login() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("login handler...")
+		/* XXX: add metrics */
+
+		/* get email/username from context */
+		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		if session != nil {
+			http.Redirect(w, r, "/home", http.StatusSeeOther)
+		}
+
+		execTemplate(w, []string{"login.html"},
 			PageInfo{
 				Data: struct {
 					Title   string

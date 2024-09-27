@@ -97,9 +97,11 @@ func handleInstallation(c *http.Client, s *model.Store, body []byte) error {
 	/* XXX: is this safe given that we validated the request with the
 	* webhook? */
 	ghUserID := event.Sender.ID
-	user, err := s.GetUserByGithubId(context.TODO(), ghUserID)
+	user, err := s.GetGithubAccountByGhUserID(context.TODO(), ghUserID)
 	if err != nil {
-		return fmt.Errorf("error getting user from id `%s' in event: %w", ghUserID, err)
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("error getting user with ghUserID `%s' (in event) from db: %w", ghUserID, err)
+		}
 	}
 
 	ghInstallationID := event.Installation.ID
@@ -168,8 +170,8 @@ func buildCreateInstallationTxParams(installationID int64, userID int32, repos [
 			GhName:         repo.Name,
 			GhFullName:     repo.FullName,
 			GhUrl:          repo.HtmlUrl,
-			Subdomain:      repo.Name,                /* XXX: should be unique and configurable, hardcoding for now */
-			FromAddress:    "no-reply@on.resend.com", /* XXX: should be configurable by user, hardcoding for now */
+			Subdomain:      repo.Name,                         /* XXX: should be unique and configurable, hardcoding for now */
+			FromAddress:    config.Config.Progstack.FromEmail, /* XXX: should be configurable by user, hardcoding for now */
 		})
 	}
 	iTxParams.Blogs = blogsTxParams
@@ -348,8 +350,8 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 			GhName:         repo.Name,
 			GhFullName:     repo.FullName,
 			GhUrl:          repo.HtmlUrl,
-			Subdomain:      repo.Name,               /* XXX: must be unique and configurable, using name as default for now */
-			FromAddress:    "no-repy@on.resend.com", /* XXX: hardcoding for now */
+			Subdomain:      repo.Name,                         /* XXX: must be unique and configurable, using name as default for now */
+			FromAddress:    config.Config.Progstack.FromEmail, /* XXX: hardcoding for now */
 		})
 		if err != nil {
 			/* XXX: cleanup delete from disk */

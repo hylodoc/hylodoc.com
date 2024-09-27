@@ -11,9 +11,10 @@
 		<!-- Navigation Links -->
 		<div class="right">
 			{{ if .Data.Session }}
-				<a href="/logout">Logout</a>
+				<a href="/auth/logout">Logout</a>
 			{{ else }}
-				<a href="/login">Get started</a>
+				<a href="/login">Log in</a>
+				<a href="/register">Register</a>
 			{{ end }}
 			<span id="icons">
 				<a href="https://discord.gg/yfx69tbhxQ">

@@ -21,6 +21,7 @@ type ProgstackParams struct {
 	ServiceName      string `mapstructure:"service_name"`
 	RepositoriesPath string `mapstructure:"repositories_path"`
 	WebsitesPath     string `mapstructure:"websites_path"`
+	FromEmail        string `mapstructure:"from_email"`
 }
 
 type GithubParams struct {
@@ -30,6 +31,8 @@ type GithubParams struct {
 	ClientSecret   string `mapstructure:"client_secret"`
 	WebhookSecret  string `mapstructure:"webhook_secret"`
 	PrivateKeyPath string `mapstructure:"private_key_path"`
+	OAuthCallback  string `mapstructure:"oauth_callback"`
+	LinkCallback   string `mapstructure:"link_callback"`
 }
 
 type DbParams struct {

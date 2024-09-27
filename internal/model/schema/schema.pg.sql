@@ -22,10 +22,34 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA progstack
 
 CREATE TABLE users (
 	id		SERIAL				PRIMARY KEY,
-	gh_user_id	BIGINT		NOT NULL,
-	email		VARCHAR(255)	NOT NULL	UNIQUE,				-- Github email
-	username	VARCHAR(255)	NOT NULL	UNIQUE,				-- GitHub username
-	access_tk	TEXT,								-- GitHubApp access token
+	email		VARCHAR(255)	NOT NULL,					-- Login email
+	created_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now())
+);
+
+/* users can link github accounts */
+CREATE TABLE github_accounts (
+	id		SERIAL				PRIMARY KEY,
+	user_id		INTEGER		NOT NULL,
+	gh_user_id	BIGINT		NOT NULL	UNIQUE,				-- Github userID
+	gh_email	VARCHAR(255)	NOT NULL	UNIQUE,				-- Github email
+	gh_username	VARCHAR(255)	NOT NULL	UNIQUE,				-- GitHub username
+	created_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
+
+	CONSTRAINT fk_user_id
+		FOREIGN KEY (user_id)
+		REFERENCES users(id)
+		ON DELETE CASCADE -- delete github account info if user info deleted
+);
+
+/* magic links */
+CREATE TYPE link_type AS ENUM ('register', 'login');
+
+CREATE TABLE magic (
+	id		SERIAL				PRIMARY KEY,
+	token		TEXT		NOT NULL	UNIQUE,
+	email		VARCHAR(255)	NOT NULL,
+	link_type	link_type	NOT NULL,
+	active		BOOLEAN		NOT NULL			DEFAULT(true),
 	created_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now())
 );
 
@@ -84,6 +108,9 @@ CREATE TABLE blogs (
 		ON DELETE CASCADE -- delete repositories when installation deleted
 );
 
+
+/* blog subscriber lists */
+
 CREATE TYPE subscription_status AS ENUM ('active', 'unsubscribed');
 
 CREATE TABLE subscribers (
@@ -94,10 +121,14 @@ CREATE TABLE subscribers (
 	status			subscription_status	NOT NULL			DEFAULT('active'),
 
 	created_at		TIMESTAMPTZ		NOT NULL			DEFAULT(now()),
-	updated_at		TIMESTAMPTZ		NOT NULL			DEFAULT(now()),
 
 	CONSTRAINT fk_blog_id
 		FOREIGN KEY (blog_id)
 		REFERENCES blogs(id)
 		ON DELETE CASCADE -- delete subscribers when blog deleted
 );
+
+/* active subscriber emails should be unique */
+CREATE UNIQUE INDEX unique_active_subscriber_email
+	ON subscribers (email) 
+	WHERE status = 'active';

@@ -125,28 +125,14 @@ func (b *BlogService) unsubscribeFromBlog(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	blogID := vars["blogID"]
 
-	/* parse the request body to get unsubscribe token */
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return fmt.Errorf("error reading request body: %w", err)
-	}
-	defer r.Body.Close()
-
-	var req UnsubscribeRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		return fmt.Errorf("error invalid request body: %w", err)
-	}
-	if err = req.validate(); err != nil {
-		return fmt.Errorf("error invalid request body: %w", err)
-	}
-
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
 		return fmt.Errorf("error converting string path var to blogID: %w", err)
 	}
+	token := r.URL.Query().Get("token")
 	err = b.store.DeleteSubscriberForBlog(context.TODO(), model.DeleteSubscriberForBlogParams{
 		BlogID:           int32(intBlogID),
-		UnsubscribeToken: req.Token,
+		UnsubscribeToken: token,
 	})
 	if err != nil {
 		return fmt.Errorf("error writing subscriber for blog to db: %w", err)

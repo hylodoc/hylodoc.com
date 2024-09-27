@@ -1,4 +1,4 @@
--- name: CreateSubscriberForBlog :one
+-- name: CreateSubscriber :one
 INSERT INTO subscribers (
 	blog_id, email, unsubscribe_token
 ) VALUES (
