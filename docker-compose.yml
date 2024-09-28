@@ -1,26 +1,14 @@
-version: '3.8'
-
 services:
-  # main application
   progstack:
     container_name: progstack_container
     build:
       context: .
       dockerfile: Dockerfile
-    volumes:
-      - './app:/app'	                                # generated dir mapping
-      - './conf.yaml:/app/conf.yaml'	                # app specific config
-      - './web:/app/web'	      	                # /web dir for main application
-      - './progstack-dev.2024-09-20.private-key.pem:/app/progstack-dev.2024-09-20.private-key.pem'	# ghApp private key
-      - './usersite_template:/app/usersite_template'	# template for testing launching a user site server
-      - 'git_respositories:/app/repositories'	        # docker volume for downloaded repository tarballs
-      - 'generated_websites:/app/websites'	        # docker volume for generated websites
     ports:
-      - '7999:7999'	# expose port 7999
+      - '7999:7999'
     depends_on:
       - postgres
 
-  # db
   postgres:
     image: postgres:12-alpine
     container_name: postgres_container
@@ -32,7 +20,3 @@ services:
     volumes:
       - './internal/model/:/docker-entrypoint-initdb.d/'
     restart: unless-stopped
-
-volumes:
-  git_respositories:
-  generated_websites:

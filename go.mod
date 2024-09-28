@@ -4,6 +4,8 @@ go 1.23
 
 toolchain go1.23.1
 
+replace github.com/xr0-org/progstack-ssg => ../progstack-ssg
+
 require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.1
