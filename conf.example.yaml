@@ -1,0 +1,35 @@
+# conf.example.yaml
+
+# Progstack config
+progstack:
+  protocol: "http/https"
+  service_name: "progstack"
+  repositories_path: "./repositories"
+  websites_path: "./websites"
+
+# Github config
+github:
+  app_id: 999929
+  app_name: "progstack-dev"
+  client_id: "<ClientID>"
+  client_secret: "<ClientSecret>"
+  webhook_secret: "<WebhookSecret>"
+  private_key_path: "<PrivateKeyPath>"
+
+# Docker config
+docker:
+  container_name: "progstack_container"
+  postgres_image: "postgres:12-alpine"
+
+# Postgres config
+postgres:
+  host: "postgres"
+  name: "progstack_db"
+  user: "postgres"
+  schema: "progstack"
+  password: "<Secret>"
+  port: 5432
+
+# Resend config
+resend:
+  resend_api_key: "<ResendApiKey>"
