@@ -3,15 +3,15 @@
 # Docker resource management
 up:
 	@echo 'launching docker containers...'
-	@docker-compose up --build
+	@docker compose up --build
 
 down:
 	@echo 'stopping docker containers...'
-	docker-compose down
+	docker compose down
 
 clean:
 	@echo 'cleaning up docker resources'
-	docker-compose down --volumes --remove-orphans
+	docker compose down --volumes --remove-orphans
 
 smee:
 	@echo 'forwarding Github events to http://localhost:7999/gh/installcallback...'

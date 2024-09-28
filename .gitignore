@@ -7,3 +7,4 @@ letsencrypt/
 conf.yaml
 *.swp
 *.pem
+github-app-key.pem

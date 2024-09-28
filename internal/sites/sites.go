@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/xr0-org/progstack-ssg/pkg/ssg"
 	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/model"
@@ -81,28 +82,21 @@ type LaunchUserBlogParams struct {
 }
 
 func LaunchUserBlog(params LaunchUserBlogParams) error {
-	ghRepoFullName := params.GhRepoFullName
-	log.Printf("launching user website at `%s'...\n", ghRepoFullName)
-
-	/* XXX: generate website content and server from repository path */
-	/* repositoryPath is like: /repositories/<gh_user>/<gh_repository_name> on disk */
-	repositoryPath := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, ghRepoFullName)
-	/* for now we just check it exists */
-	log.Printf("repositoryPath: `%s'\n", repositoryPath)
-	_, err := os.Stat(repositoryPath)
-	if os.IsNotExist(err) {
-		log.Printf("repositoryPath does `%s' does not exist on disk: %v\n", repositoryPath, err)
-		return fmt.Errorf("repository does not exist on disk: %w", err)
+	repo := filepath.Join(
+		config.Config.Progstack.RepositoriesPath,
+		params.GhRepoFullName,
+	)
+	if _, err := os.Stat(repo); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("repository does not exist on disk: %w", err)
+		}
+		return err
 	}
-
-	/* XXX: for now before we have generation we just copy a template site
-	* and pretend it's generated */
-	websitePath := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, params.Subdomain)
-	if err := copyDir(usersiteTemplatePath, websitePath); err != nil {
-		log.Printf("error lcopying template from src `%s' to dst `%s': %v\n", repositoryPath, websitePath, err)
-		return fmt.Errorf("error copying template to site destination: %w", err)
-	}
-	return nil
+	site := filepath.Join(
+		config.Config.Progstack.WebsitesPath,
+		params.Subdomain,
+	)
+	return ssg.Generate(repo, site, "")
 }
 
 func copyDir(srcDir, dstDir string) error {
