@@ -186,7 +186,7 @@ func launchBlogsForInstallation(ghInstallationID int64, s *model.Store) error {
 	}
 
 	for _, blog := range blogs {
-		if err = sites.LaunchUserBlog(buildLaunchUserBlogParams(blog)); err != nil {
+		if err := sites.LaunchUserBlog(buildLaunchUserBlogParams(blog)); err != nil {
 			return fmt.Errorf("error launching user site: %w", err)
 		}
 	}
