@@ -94,9 +94,9 @@ CREATE TABLE blogs (
 	gh_repository_id	BIGINT		NOT NULL,
 	gh_url			VARCHAR(255)	NOT NULL,
 	gh_name			VARCHAR(255)	NOT NULL,
-	gh_full_name		VARCHAR(255)	NOT NULL,			-- needed for path construction
+	gh_full_name		VARCHAR(255)	NOT NULL,				-- needed for path construction
 	installation_id		INTEGER		NOT NULL,
-	subdomain		VARCHAR(255)	NOT NULL,			-- need some reasonable default passed in
+	subdomain		VARCHAR(255)	NOT NULL	UNIQUE,			-- need some reasonable default passed in
 	from_address		VARCHAR(255)	NOT NULL,
 	active			BOOLEAN		NOT NULL			DEFAULT(true),
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),

@@ -2,12 +2,16 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"path"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -105,6 +109,7 @@ func Serve() {
 	authR := mux.NewRouter()
 	authR.Use(authMiddleware.ValidateAuthSession)
 	authR.HandleFunc("/home", home(server))
+	authR.HandleFunc("/home/installation-sse", installationSSE(server))
 	authR.HandleFunc("/gh/linkgithub", authService.LinkGithubAccount())
 	authR.HandleFunc("/auth/logout", authService.Logout())
 
@@ -208,28 +213,19 @@ func home(s *server) http.HandlerFunc {
 			return
 		}
 
-		installationInfo, err := getInstallationsInfo(s.store, session.UserID)
-		if err != nil {
-			log.Printf("error getting installations info: %w", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-
 		ghInstallUrl := fmt.Sprintf(ghInstallUrlTemplate, config.Config.Github.AppName)
-		execTemplate(w, []string{"home.html", "repos.html"},
+		execTemplate(w, []string{"home.html"},
 			PageInfo{
 				Data: struct {
 					Title               string
 					Session             *auth.Session
 					Username            string
 					GithubAppInstallUrl string
-					Installations       []InstallationInfo
 				}{
 					Title:               "Home",
 					Session:             session,
 					Username:            session.Username,
 					GithubAppInstallUrl: ghInstallUrl,
-					Installations:       installationInfo,
 				},
 			},
 		)
@@ -237,14 +233,126 @@ func home(s *server) http.HandlerFunc {
 }
 
 type InstallationInfo struct {
-	GithubID  int64
-	CreatedAt time.Time
-	Blogs     []BlogInfo
+	GithubID  int64      `json:"github_id"`
+	CreatedAt time.Time  `json:"created_at"`
+	Blogs     []BlogInfo `json:"blogs"`
 }
 
 type BlogInfo struct {
-	Name    string
-	HtmlUrl string
+	Name    string `json:"name"`
+	HtmlUrl string `json:"html_url"`
+}
+
+/* consult map before sending SSE  */
+var userSSEHashes = make(map[int32]string) /* userID -> hash of data */
+
+/* handle concurrent access to map */
+var userHashesLock = sync.Mutex{}
+
+/* hash installations info */
+func hashInstallationsInfo(installations []InstallationInfo) string {
+	h := sha256.New()
+
+	/* build hash for installationsInfo */
+	for _, installation := range installations {
+		h.Write([]byte(fmt.Sprintf("%d%s", installation.GithubID, installation.CreatedAt)))
+
+		/* hash blogs */
+		for _, blog := range installation.Blogs {
+			h.Write([]byte(fmt.Sprintf("%s%s", blog.Name, blog.HtmlUrl)))
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+/* check if user's data has changed */
+func userInstallationsChanged(userID int32, newInfo []InstallationInfo) bool {
+	userHashesLock.Lock()
+	defer userHashesLock.Unlock()
+
+	newHash := hashInstallationsInfo(newInfo)
+	oldHash, exists := userSSEHashes[userID]
+
+	if !exists || oldHash != newHash {
+		userSSEHashes[userID] = newHash
+		return true
+	}
+	return false
+}
+
+func installationSSE(s *server) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		/* get session */
+		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		if !ok {
+			http.Error(w, "User not found", http.StatusUnauthorized)
+			return
+		}
+
+		/* cache headers for SSE */
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		/* sample data */
+		installationsInfo, err := getInstallationsInfo(s.store, session.UserID)
+		if err != nil {
+			log.Printf("error getting installations info: %v", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+		data, err := json.Marshal(installationsInfo)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Printf("user `%d' initial installations sse initial data: %s\n", session.UserID, string(data))
+
+		/* write event to response */
+		_, _ = w.Write([]byte("data: " + string(data) + "\n\n"))
+
+		/* flush the response to the client */
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+
+		/* Keep the connection alive and send updates every few seconds (for
+		* demonstration) */
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				/* fetch installations info from db */
+				installationsInfo, err := getInstallationsInfo(s.store, session.UserID)
+				if err != nil {
+					log.Printf("error getting installations info: %v\n", err)
+					http.Error(w, "", http.StatusInternalServerError)
+					return
+				}
+				/* check if anything changes before sending event */
+				if userInstallationsChanged(session.UserID, installationsInfo) {
+					data, err := json.Marshal(installationsInfo)
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
+					log.Printf("user `%d' updated installations sse data: %s\n", session.UserID, string(data))
+
+					/* write the event to the response */
+					_, _ = w.Write([]byte("data: " + string(data) + "\n\n"))
+					if flusher, ok := w.(http.Flusher); ok {
+						flusher.Flush()
+					}
+				}
+				/* wait some time before checking again */
+				time.Sleep(5 * time.Second)
+			case <-r.Context().Done():
+				return
+			}
+		}
+	}
 }
 
 func getInstallationsInfo(s *model.Store, userID int32) ([]InstallationInfo, error) {

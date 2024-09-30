@@ -81,7 +81,7 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 				GhRepositoryID: blog.GhRepositoryID,
 				GhName:         blog.GhName,
 				GhFullName:     blog.GhFullName,
-				GhUrl:          blog.GhUrl,
+				GhUrl:          fmt.Sprintf("https://github.com/%s", blog.GhFullName), /* ghUrl not always in events */
 				Subdomain:      blog.Subdomain,
 				FromAddress:    blog.FromAddress,
 			}

@@ -349,7 +349,7 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 			GhRepositoryID: repo.ID,
 			GhName:         repo.Name,
 			GhFullName:     repo.FullName,
-			GhUrl:          repo.HtmlUrl,
+			GhUrl:          fmt.Sprintf("http://github.com/%s", repo.FullName),
 			Subdomain:      repo.Name,                         /* XXX: must be unique and configurable, using name as default for now */
 			FromAddress:    config.Config.Progstack.FromEmail, /* XXX: hardcoding for now */
 		})

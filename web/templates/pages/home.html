@@ -17,7 +17,62 @@
 <br>
 
 <div class="container">
-	{{ template "repos" . }}
+	<div id="installation-info"></div>
 </div>
+
+<script>
+	const eventSource = new EventSource('/home/installation-sse');
+
+	eventSource.onmessage = function(event) {
+		if (event.data === null || event.data === '') {
+			console.error("No data received from the server");
+			return;
+		}
+
+		try {
+			const installations = JSON.parse(event.data);
+
+			/* validate installation array */
+			if (!installations || !Array.isArray(installations) || installations.length === 0) {
+				console.error("Invalid or empty installations array");
+				return;
+			}
+
+			const container = document.getElementById('installation-info');
+			let html = '';
+
+			/* iterate over each installation */
+			installations.forEach(installation => {
+				console.log(`Processing installation with GitHub ID: ${installation.github_id}`);
+				if (!installation.blogs || !Array.isArray(installation.blogs) || installation.blogs.length === 0) {
+					console.error(`No blogs found for installation with Github ID: ${installation.github_id}`);
+					return;
+				}
+
+				const blogsList = installation.blogs.map(blog => {
+					if (!blog.name || !blog.html_url) {
+						console.error(`Invalid blog data: ${JSON.stringify(blog)}`);
+						return '';
+					}
+					console.log(`Rendering blog: ${blog.name}, URL: ${blog.html_url}`);
+					return `<li><a href="${blog.html_url}">${blog.name}</a></li>`;
+				}).join('');
+
+				html += `<div class="installation">
+			<p>Github ID: ${installation.github_id}</p>
+			<p>Created At: ${new Date(installation.created_at).toLocaleString()}</p>
+			<h6>Blogs:</h6>
+			<ul>${blogsList}</ul>
+		     </div>`;
+			});
+
+			/* render */
+			container.innerHTML = html;
+		} catch (error) {
+			console.error("Error parsing event data:", error);
+		}
+	};
+
+</script>
 
 {{ template "footer" . }}

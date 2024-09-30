@@ -86,7 +86,6 @@ func (o *AuthService) GithubOAuthCallback() http.HandlerFunc {
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
-
 		http.Redirect(w, r, "/home", http.StatusTemporaryRedirect)
 	}
 }
