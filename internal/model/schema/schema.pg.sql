@@ -91,14 +91,14 @@ CREATE TABLE installations (
 
 CREATE TABLE blogs (
 	id 			SERIAL				PRIMARY KEY,
-	gh_repository_id	BIGINT		NOT NULL,
+	installation_id		INTEGER		NOT NULL,
+	gh_repository_id	BIGINT		NOT NULL	UNIQUE,
 	gh_url			VARCHAR(255)	NOT NULL,
 	gh_name			VARCHAR(255)	NOT NULL,
 	gh_full_name		VARCHAR(255)	NOT NULL,				-- needed for path construction
-	installation_id		INTEGER		NOT NULL,
-	subdomain		VARCHAR(255)	NOT NULL	UNIQUE,			-- need some reasonable default passed in
+	subdomain		VARCHAR(255)			UNIQUE,
 	from_address		VARCHAR(255)	NOT NULL,
-	active			BOOLEAN		NOT NULL			DEFAULT(true),
+	active			BOOLEAN		NOT NULL			DEFAULT(false),
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 
@@ -107,7 +107,6 @@ CREATE TABLE blogs (
 		REFERENCES installations(id)
 		ON DELETE CASCADE -- delete repositories when installation deleted
 );
-
 
 /* blog subscriber lists */
 

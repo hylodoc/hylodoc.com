@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
+
+	"github.com/xr0-org/progstack/internal/util"
 )
 
 type Store struct {
@@ -82,7 +85,6 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 				GhName:         blog.GhName,
 				GhFullName:     blog.GhFullName,
 				GhUrl:          fmt.Sprintf("https://github.com/%s", blog.GhFullName), /* ghUrl not always in events */
-				Subdomain:      blog.Subdomain,
 				FromAddress:    blog.FromAddress,
 			}
 			_, err := s.CreateBlog(ctx, createBlogArgs)
@@ -109,7 +111,7 @@ func (s *Store) CreateSubscriberTx(ctx context.Context, arg CreateSubscriberTxPa
 		})
 		if err != nil {
 			if err != sql.ErrNoRows {
-				return fmt.Errorf("error getting subscriber for blog")
+				return fmt.Errorf("error getting subscriber for blog: %w", err)
 			}
 			/* no subscription exists */
 		}
@@ -124,6 +126,45 @@ func (s *Store) CreateSubscriberTx(ctx context.Context, arg CreateSubscriberTxPa
 		})
 		if err != nil {
 			return fmt.Errorf("error writing subscriber for blog to db: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type CreateSubdomainTxParams struct {
+	BlogID    int32
+	Subdomain string
+}
+
+func (s *Store) CreateSubdomainTx(ctx context.Context, arg CreateSubdomainTxParams) error {
+	err := s.execTx(ctx, func(q *Queries) error {
+		nullSubdomain := sql.NullString{
+			Valid:  true,
+			String: arg.Subdomain,
+		}
+
+		/* check if exists */
+		exists, err := s.SubdomainExists(ctx, nullSubdomain)
+		if err != nil {
+			return fmt.Errorf("error checking if subdomain exists")
+		}
+		if exists {
+			return util.UserError{
+				Message: "subdomain already exists",
+				Code:    http.StatusTooManyRequests,
+			}
+		}
+		/* write new subdomain */
+		err = s.UpdateSubdomainByID(ctx, UpdateSubdomainByIDParams{
+			ID:        arg.BlogID,
+			Subdomain: nullSubdomain,
+		})
+		if err != nil {
+			return fmt.Errorf("error creating subdomain `%s' for blog `%d': %w", arg.Subdomain, arg.BlogID, err)
 		}
 		return nil
 	})

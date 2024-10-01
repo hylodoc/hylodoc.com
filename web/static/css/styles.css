@@ -5,3 +5,15 @@ body, body.libertinus {
 .substack-code {
 	font-size: 1.3em;
 }
+
+.toast {
+	position: fixed;
+	bottom: 20px;
+	right: 20px;
+	background-color: #4caf50;
+	color: white;
+	padding: 10px;
+	border-radius: 5px;
+	opacity: 0.9;
+	transition: opacity 0.5s;
+}

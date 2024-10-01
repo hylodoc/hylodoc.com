@@ -36,6 +36,7 @@ func (ua *UnauthMiddleware) HandleUnauthSession(next http.Handler) http.Handler 
 		}
 		if user != nil {
 			/* user logged in, add userinfo to context */
+			log.Println("adding userinfo to context...")
 			r = r.WithContext(context.WithValue(r.Context(), CtxSessionKey, user))
 		}
 		next.ServeHTTP(w, r)
@@ -49,6 +50,7 @@ func handleUnauthSession(w http.ResponseWriter, r *http.Request, s *model.Store)
 		log.Println("authCookie exists")
 		session, err := validateAuthSessionId(authCookie.Value, w, s)
 		if err == nil {
+			log.Println("authSession exists")
 			return session, nil
 		}
 		/* if error try do unauth */

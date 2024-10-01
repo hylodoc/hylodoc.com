@@ -1,0 +1,31 @@
+{{ define "blogs" }}
+
+<table class="u-full-width">
+	<h6>Blogs</h6>
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Repository Link</th>
+			<th>Website Link</th>
+			<th>Subdomain</th>
+			<th>Created At</th>
+			<th>Status</th>
+			<th>Configuration</th>
+		</tr>
+	</thead>
+	<tbody>
+		{{ range . }}
+		<tr>
+			<td>{{ .Name }}</td>
+			<td><a href="{{ .GithubUrl }}" target="_blank">GitHub Repo</a></td>
+			<td>{{ if .WebsiteUrl }}<a href="{{.WebsiteUrl}}" target="_blank">Website</a>{{ else }}Not generated{{ end }}</td>
+			<td>{{ .Subdomain }}</td>
+			<td>{{ .CreatedAt.Format "2006-01-02" }}</td>
+			<td>{{ if .Active }}Active{{ else }}Inactive{{ end }}</td>
+			<td><a href="/blogs/{{.ID}}/config" class="button-primary">Configure</a> </td>
+		</tr>
+		{{end}}
+	</tbody>
+</table>
+
+{{ end }}

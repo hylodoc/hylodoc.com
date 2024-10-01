@@ -43,7 +43,7 @@ func buildRegisterLink(token string) string {
 	return fmt.Sprintf("%s://%s/%s?token=%s",
 		config.Config.Progstack.Protocol,
 		config.Config.Progstack.ServiceName,
-		"/magic/registercallback",
+		"magic/registercallback",
 		token,
 	)
 }
@@ -72,7 +72,7 @@ func buildLoginLink(token string) string {
 	return fmt.Sprintf("%s://%s/%s?token=%s",
 		config.Config.Progstack.Protocol,
 		config.Config.Progstack.ServiceName,
-		"/magic/logincallback",
+		"magic/logincallback",
 		token,
 	)
 }

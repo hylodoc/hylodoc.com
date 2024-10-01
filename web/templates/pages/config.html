@@ -1,0 +1,132 @@
+{{ template "header" . }}
+
+<div id="toast" class="toast"></div>
+
+<h6>Configure subdomain and launch</h6>
+
+<!-- need these as templates so that multiple blogs can be setup at once -->
+<form id="subdomainForm" class="subdomain-checker" onsubmit="return false;">
+	<label for="subdomainInput">Choose your subdomain:</label>
+	<input type="text" id="subdomainInput" placeholder="Enter your subdomain" required />
+	<div id="availabilityMessage" class="availability-message"></div>
+	<button type="submit" id="submitBtn" disabled>Launch 🚀</button>
+</form>
+
+<script>
+	let debounceTimer;
+
+	/* initialize event listeners */
+	function init() {
+		const subdomainInput = document.getElementById('subdomainInput');
+		const subdomainForm = document.getElementById('subdomainForm');
+
+		subdomainInput.addEventListener('input', handleInput);
+		subdomainForm.addEventListener('submit', handleFormSubmit);
+	}
+
+	/* handle input event with debounce */
+	function handleInput() {
+		const subdomain = this.value.trim();
+		const messageElement = document.getElementById('availabilityMessage');
+		const submitBtn = document.getElementById('submitBtn');
+
+		clearTimeout(debounceTimer); /* clear previous timer */
+
+		if (subdomain.length > 0) {
+			updateMessage(messageElement, 'Checking availability...', 'loading');
+		} else {
+			resetMessage(messageElement, submitBtn); /* Clear message if input is empty */
+			return;
+		}
+
+		debounceTimer = setTimeout(() => {
+			checkSubdomainAvailability(subdomain, messageElement, submitBtn);
+		}, 300); /* 300ms debounce delay */
+	}
+
+	/* Check subdomain availability */
+	function checkSubdomainAvailability(subdomain, messageElement, submitBtn) {
+		fetch('subdomain/check', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ subdomain })
+		})
+			.then(response => response.json())
+			.then(data => {
+				if (data.available) {
+					updateMessage(messageElement, '✅ This subdomain is available!', 'available');
+					submitBtn.disabled = false;
+				} else {
+					updateMessage(messageElement, '❌ ' + data.message, 'unavailable');
+					submitBtn.disabled = true;
+				}
+			})
+			.catch(error => handleError(error, messageElement, submitBtn));
+	}
+
+	/* Handle form submission */
+	function handleFormSubmit(event) {
+		event.preventDefault(); /* Prevent default form submission */
+
+		const subdomain = document.getElementById('subdomainInput').value.trim();
+		submitSubdomain(subdomain);
+	}
+
+	/* Submit the subdomain to the server */
+	function submitSubdomain(subdomain) {
+		fetch('subdomain/submit', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ subdomain })
+		})
+			.then(response => {
+				if (!response.ok) {
+					return response.json().then(errorData => {
+						showToast(errorData.message);
+						throw new Error(errorData.message);
+					});
+				}
+				return response.json();
+			})
+			.then(data => {
+				console.log("Success: ", data.message);
+				showToast("Subdomain successfully registered!");
+			})
+			.catch(error => console.error("Error submitting subdomain:", error));
+	}
+
+	/* Update the availability message */
+	function updateMessage(element, message, status) {
+		element.textContent = message;
+		element.className = `availability-message ${status}`;
+	}
+
+	/* Reset the message and disable submit button */
+	function resetMessage(messageElement, submitBtn) {
+		messageElement.textContent = ''; /* Clear message */
+		submitBtn.disabled = true; /* Disable submit button */
+	}
+
+	/* Handle fetch errors */
+	function handleError(error, messageElement, submitBtn) {
+		console.error('Error checking subdomain:', error);
+		updateMessage(messageElement, '⚠️ An error occurred while checking availability.', 'unavailable');
+		submitBtn.disabled = true; /* Disable submit button on error */
+	}
+
+	/* Show a toast message */
+	function showToast(message) {
+		const toast = document.getElementById('toast');
+		toast.textContent = message;
+		toast.style.display = 'block';
+
+		setTimeout(() => {
+			toast.style.display = 'none';
+		}, 3000); // Hide after 3 seconds
+	}
+
+	/* Initialize the script on page load */
+	document.addEventListener('DOMContentLoaded', init);
+</script>
+
+{{ template "footer". }}

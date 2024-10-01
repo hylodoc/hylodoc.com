@@ -9,7 +9,7 @@ RETURNING *;
 -- name: GetSession :one
 SELECT *
 FROM sessions AS s
-	INNER JOIN users AS u ON s.user_id = u.id
+INNER JOIN users AS u ON s.user_id = u.id
 WHERE token = $1 AND active = true;
 
 -- name: EndSession :exec

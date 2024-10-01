@@ -15,7 +15,6 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/sites"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -151,11 +150,6 @@ func handleInstallationCreated(c *http.Client, s *model.Store, ghInstallationID 
 		/* XXX: wipe relavant repos from disk */
 		return fmt.Errorf("error executing db transaction: %w", err)
 	}
-
-	/* launch blogs */
-	if err = launchBlogsForInstallation(ghInstallationID, s); err != nil {
-		return fmt.Errorf("error launching blogs for installation `%d': %w", ghInstallationID, err)
-	}
 	return nil
 }
 
@@ -176,30 +170,6 @@ func buildCreateInstallationTxParams(installationID int64, userID int32, repos [
 	}
 	iTxParams.Blogs = blogsTxParams
 	return iTxParams
-}
-
-func launchBlogsForInstallation(ghInstallationID int64, s *model.Store) error {
-	/* fetch repositories for installation */
-	blogs, err := s.ListBlogsForInstallationWithGhInstallationID(context.TODO(), ghInstallationID)
-	if err != nil {
-		if err != sql.ErrNoRows {
-			return fmt.Errorf("error getting blogs for installation: %w", err)
-		}
-	}
-
-	for _, blog := range blogs {
-		if err := sites.LaunchUserBlog(buildLaunchUserBlogParams(blog)); err != nil {
-			return fmt.Errorf("error launching user site: %w", err)
-		}
-	}
-	return nil
-}
-
-func buildLaunchUserBlogParams(blog model.Blog) sites.LaunchUserBlogParams {
-	return sites.LaunchUserBlogParams{
-		blog.GhFullName,
-		blog.Subdomain,
-	}
 }
 
 type InstallationRepositoriesResponse struct {
@@ -265,7 +235,7 @@ func handleInstallationDeleted(c *http.Client, s *model.Store, ghInstallationID 
 
 	/* fetch repos associated with installation */
 	log.Printf("deleting installation %d for user %d...", ghInstallationID, userID)
-	repos, err := s.ListBlogsForInstallationWithGhInstallationID(context.TODO(), ghInstallationID)
+	repos, err := s.ListBlogsForInstallationByGhInstallationID(context.TODO(), ghInstallationID)
 	if err != nil {
 		return fmt.Errorf("error getting repositories for installation %d: %w", ghInstallationID, err)
 	}
@@ -349,24 +319,12 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 			GhRepositoryID: repo.ID,
 			GhName:         repo.Name,
 			GhFullName:     repo.FullName,
-			GhUrl:          fmt.Sprintf("http://github.com/%s", repo.FullName),
-			Subdomain:      repo.Name,                         /* XXX: must be unique and configurable, using name as default for now */
+			GhUrl:          fmt.Sprintf("https://github.com/%s", repo.FullName),
 			FromAddress:    config.Config.Progstack.FromEmail, /* XXX: hardcoding for now */
 		})
 		if err != nil {
 			/* XXX: cleanup delete from disk */
 			return fmt.Errorf("error creating repository: %w", err)
-		}
-	}
-
-	/* launch websites for repositories added */
-	for _, repo := range repos {
-		params := sites.LaunchUserBlogParams{
-			repo.FullName,
-			repo.Name, /* XXX: we should make this configurable, maybe params in repo but we use name elsewhere */
-		}
-		if err := sites.LaunchUserBlog(params); err != nil {
-			return fmt.Errorf("error launching blog for GhRepositoryID `%d': %w", repo.ID, err)
 		}
 	}
 
@@ -379,11 +337,7 @@ func handleInstallationRepositoriesRemoved(c *http.Client, s *model.Store, ghIns
 	log.Println("deleting websites from disk...")
 	/* delete generated sites from disk, generated sites need subdomain */
 	for _, repo := range repos {
-		blog, err := s.GetBlogWithGhRepositoryID(context.TODO(), repo.ID)
-		if err != nil {
-			return fmt.Errorf("error getting blog for ghRepositoryID `%s': %w", err)
-		}
-		path := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, blog.Subdomain)
+		path := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, repo.FullName)
 		if err := os.RemoveAll(path); err != nil {
 			return fmt.Errorf("error deleting repo `%s' from disk: %w", path, err)
 		}
@@ -475,7 +429,7 @@ func sendNewPostUpdateEmailsForBlog(ghRepositoryID int64, c *resend.Client, s *m
 
 func buildNewPostUpdateParamsList(ghRepositoryID int64, s *model.Store) ([]email.NewPostUpdateParams, error) {
 	/* get blog */
-	blog, err := s.GetBlogWithGhRepositoryID(context.TODO(), ghRepositoryID)
+	blog, err := s.GetBlogByGhRepositoryID(context.TODO(), ghRepositoryID)
 	if err != nil {
 		return []email.NewPostUpdateParams{}, fmt.Errorf("error getting blog with ghRepositoryID `%d': %w", ghRepositoryID, err)
 	}
@@ -487,16 +441,20 @@ func buildNewPostUpdateParamsList(ghRepositoryID int64, s *model.Store) ([]email
 		return []email.NewPostUpdateParams{}, fmt.Errorf("error getting active subscriber list: %w", err)
 	}
 
+	if !blog.Subdomain.Valid {
+		return []email.NewPostUpdateParams{}, fmt.Errorf("error missing subdomain value")
+	}
+
 	/* build details */
 	var paramsList []email.NewPostUpdateParams
 	blogParams := email.BlogParams{
 		ID:        blog.ID,
 		From:      blog.FromAddress,
-		Subdomain: blog.Subdomain,
+		Subdomain: blog.Subdomain.String,
 	}
 	/* XXX: construct postParams from generated site, hardcoding for now */
 	postParams := email.PostParams{
-		Link:    fmt.Sprintf("https://%s.progstack.com/posts/1"),
+		Link:    fmt.Sprintf("https://%s.progstack.com/posts/1", blog.Subdomain.String),
 		Body:    "testing subscriber update emails in progstack",
 		Subject: "#1 progstack email functinality",
 	}

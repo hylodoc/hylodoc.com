@@ -1,0 +1,18 @@
+{{ define "installations" }}
+
+<div class="container">
+	<table class="u-full-width">
+		<tbody>
+			{{ range .Data.Installations }}
+			<h6>Installation {{ .GithubID }}</h6>
+			<table>
+				<tbody>
+					{{ template "blogs" .Blogs }}
+				</tbody>
+			</table>
+			{{ end }}
+		</tbody>
+	</table>
+</div>
+
+{{ end }}
