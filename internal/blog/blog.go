@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/resend/resend-go/v2"
+	"github.com/xr0-org/progstack-ssg/pkg/ssg"
 	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/model"
@@ -346,109 +346,81 @@ type LaunchBlogParams struct {
 	Subdomain      string
 }
 
-func (b *BlogService) LaunchBlog() http.HandlerFunc {
+type LaunchDemoBlogResponse struct {
+	Url     string `json:"demo_site_url"`
+	Message string `json:"message"`
+}
+
+func (b *BlogService) LaunchDemoBlog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("launch blog handler...")
 
-		if err := b.launchBlog(w, r); err != nil {
-			log.Println("error submiting subdomain")
-			if userErr, ok := err.(util.UserError); ok {
-				log.Printf("user error: %v\n", userErr)
-				/* user error */
-				w.WriteHeader(userErr.Code)
-				response := map[string]string{"message": userErr.Message}
-				json.NewEncoder(w).Encode(response)
-				return
-			}
+		url, err := b.launchDemoBlog(w, r)
+		if err != nil {
 			log.Printf("server error: %v\n", err)
-			/* generic error */
-			w.WriteHeader(http.StatusInternalServerError)
-			response := map[string]string{"message": "An unexpected error occurred"}
-			json.NewEncoder(w).Encode(response)
+			http.Error(w, "An unexpected error occurred", http.StatusInternalServerError)
 			return
 		}
-		/* success */
-		w.WriteHeader(http.StatusOK)
-		response := map[string]string{"message": "Blog successfully launched!"}
-		json.NewEncoder(w).Encode(response)
+		response := LaunchDemoBlogResponse{
+			Url:     url,
+			Message: "Blog successfully launched!",
+		}
+		/* set response header and encode JSON response */
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("error encoding response: %v\n", err)
+			http.Error(w, "An unexpected error occurred", http.StatusInternalServerError)
+		}
 	}
 }
 
-func (b *BlogService) launchBlog(w http.ResponseWriter, r *http.Request) error {
+func (b *BlogService) launchDemoBlog(w http.ResponseWriter, r *http.Request) (string, error) {
 	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
-		return fmt.Errorf("error converting string path var to blogID: %w", err)
+		return "", fmt.Errorf("error converting string path var to blogID: %w", err)
 	}
-
 	blog, err := b.store.GetBlogByID(context.TODO(), int32(intBlogID))
 	if err != nil {
-		return fmt.Errorf("error getting blog: %w", err)
+		return "", fmt.Errorf("error getting blog: %w", err)
 	}
 
-	ghRepoFullName := blog.GhFullName
-	log.Printf("launching user website at `%s'...\n", ghRepoFullName)
-
-	/* XXX: generate website content and server from repository path */
-	/* repositoryPath is like: /repositories/<gh_user>/<gh_repository_name> on disk */
-	repositoryPath := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, ghRepoFullName)
-	/* for now we just check it exists */
-	log.Printf("repositoryPath: `%s'\n", repositoryPath)
-	_, err = os.Stat(repositoryPath)
-	if os.IsNotExist(err) {
-		log.Printf("repositoryPath does `%s' does not exist on disk: %v\n", repositoryPath, err)
-		return fmt.Errorf("repository does not exist on disk: %w", err)
+	if !blog.DemoSubdomain.Valid {
+		return "", fmt.Errorf("error no valid demo subdomain\n")
 	}
-
-	/* XXX: for now before we have generation we just copy a template site
-	* and pretend it's generated */
-	websitePath := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, blog.Subdomain)
-	if err := copyDir(usersiteTemplatePath, websitePath); err != nil {
-		log.Printf("error lcopying template from src `%s' to dst `%s': %v\n", repositoryPath, websitePath, err)
-		return fmt.Errorf("error copying template to site destination: %w", err)
+	err = LaunchUserBlog(LaunchUserBlogParams{
+		GhRepoFullName: blog.GhFullName,
+		Subdomain:      blog.DemoSubdomain.String,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error launching demo site: %w", err)
 	}
-	return nil
+	return buildDemoUrl(blog.DemoSubdomain.String), nil
 }
 
-func copyDir(srcDir, dstDir string) error {
-	entries, err := os.ReadDir(srcDir)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dstDir, os.ModePerm); err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		srcPath := filepath.Join(srcDir, entry.Name())
-		dstPath := filepath.Join(dstDir, entry.Name())
-		if entry.IsDir() {
-			/* if dir recurse */
-			if err := copyDir(srcPath, dstPath); err != nil {
-				return err
-			}
-		} else {
-			/* if file copy */
-			if err := copyFile(srcPath, dstPath); err != nil {
-				return err
-			}
+func buildDemoUrl(subdomain string) string {
+	return fmt.Sprintf("%s://%s.%s", config.Config.Progstack.Protocol, subdomain, config.Config.Progstack.ServiceName)
+}
+
+type LaunchUserBlogParams struct {
+	GhRepoFullName string
+	Subdomain      string
+}
+
+func LaunchUserBlog(params LaunchUserBlogParams) error {
+	repo := filepath.Join(
+		config.Config.Progstack.RepositoriesPath,
+		params.GhRepoFullName,
+	)
+	if _, err := os.Stat(repo); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("repository does not exist on disk: %w", err)
 		}
-	}
-	return nil
-}
-
-func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
-	if err != nil {
 		return err
 	}
-	defer sourceFile.Close()
-
-	destFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, sourceFile)
-	return err
+	site := filepath.Join(
+		config.Config.Progstack.WebsitesPath,
+		params.Subdomain,
+	)
+	return ssg.Generate(repo, site, "")
 }

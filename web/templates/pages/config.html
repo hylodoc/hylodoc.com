@@ -2,6 +2,13 @@
 
 <div id="toast" class="toast"></div>
 
+<div id="demoSiteSection">
+    <h6>Preview Your Demo Site</h6>
+    <p>Click the button below to generate a demo site based on your Git repository.</p>
+    <button id="previewDemoBtn">Preview Demo Site</button>
+    <div id="demoSiteMessage" style="margin-top: 10px;"></div>
+</div>
+
 <h6>Configure subdomain and launch</h6>
 
 <!-- need these as templates so that multiple blogs can be setup at once -->
@@ -17,23 +24,25 @@
 
 	/* initialize event listeners */
 	function init() {
-		const subdomainInput = document.getElementById('subdomainInput');
-		const subdomainForm = document.getElementById('subdomainForm');
+		const subdomainInput = document.getElementById("subdomainInput");
+		const subdomainForm = document.getElementById("subdomainForm");
+		const previewDemoBtn = document.getElementById("previewDemoBtn")
 
-		subdomainInput.addEventListener('input', handleInput);
-		subdomainForm.addEventListener('submit', handleFormSubmit);
+		subdomainInput.addEventListener("input", handleInput);
+		subdomainForm.addEventListener("submit", handleFormSubmit);
+		previewDemoBtn.addEventListener("click", generateDemoSite);
 	}
 
 	/* handle input event with debounce */
 	function handleInput() {
 		const subdomain = this.value.trim();
-		const messageElement = document.getElementById('availabilityMessage');
-		const submitBtn = document.getElementById('submitBtn');
+		const messageElement = document.getElementById("availabilityMessage");
+		const submitBtn = document.getElementById("submitBtn");
 
 		clearTimeout(debounceTimer); /* clear previous timer */
 
 		if (subdomain.length > 0) {
-			updateMessage(messageElement, 'Checking availability...', 'loading');
+			updateMessage(messageElement, "Checking availability...", "loading");
 		} else {
 			resetMessage(messageElement, submitBtn); /* Clear message if input is empty */
 			return;
@@ -46,18 +55,18 @@
 
 	/* Check subdomain availability */
 	function checkSubdomainAvailability(subdomain, messageElement, submitBtn) {
-		fetch('subdomain/check', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+		fetch("subdomain/check", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ subdomain })
 		})
 			.then(response => response.json())
 			.then(data => {
 				if (data.available) {
-					updateMessage(messageElement, '✅ This subdomain is available!', 'available');
+					updateMessage(messageElement, "✅ This subdomain is available!", "available");
 					submitBtn.disabled = false;
 				} else {
-					updateMessage(messageElement, '❌ ' + data.message, 'unavailable');
+					updateMessage(messageElement, "❌ " + data.message, "unavailable");
 					submitBtn.disabled = true;
 				}
 			})
@@ -68,15 +77,15 @@
 	function handleFormSubmit(event) {
 		event.preventDefault(); /* Prevent default form submission */
 
-		const subdomain = document.getElementById('subdomainInput').value.trim();
+		const subdomain = document.getElementById("subdomainInput").value.trim();
 		submitSubdomain(subdomain);
 	}
 
 	/* Submit the subdomain to the server */
 	function submitSubdomain(subdomain) {
-		fetch('subdomain/submit', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+		fetch("subdomain/submit", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ subdomain })
 		})
 			.then(response => {
@@ -110,8 +119,37 @@
 	/* Handle fetch errors */
 	function handleError(error, messageElement, submitBtn) {
 		console.error('Error checking subdomain:', error);
-		updateMessage(messageElement, '⚠️ An error occurred while checking availability.', 'unavailable');
+		updateMessage(messageElement, "⚠️ An error occurred while checking availability.", "unavailable");
 		submitBtn.disabled = true; /* Disable submit button on error */
+	}
+
+	/* Generate the demo site */
+	function generateDemoSite() {
+		const messageElement = document.getElementById('demoSiteMessage');
+		showToast("Generating demo site, please wait...");
+
+		fetch("demo-generate", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+		})
+		.then(response => {
+			if (!response.ok) {
+				throw new Error('Failed to generate demo site');
+			}
+			return response.json();
+		})
+		.then(data => {
+			/* Redirect to the demo site or show a link */
+			console.log(`redirecting to ${data.demo_site_url}`)
+			window.open(data.demo_site_url, '_blank');
+			showToast("Demo site generated successfully!");
+		})
+		.catch(error => {
+			console.error('Error generating demo site:', error);
+			showToast("Error generating demo site. Please try again.");
+		});
 	}
 
 	/* Show a toast message */

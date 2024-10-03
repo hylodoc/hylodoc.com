@@ -1,8 +1,8 @@
 -- name: CreateBlog :one
 INSERT INTO blogs (
-	installation_id, gh_repository_id, gh_name, gh_full_name, gh_url, subdomain, from_address
+	installation_id, gh_repository_id, gh_name, gh_full_name, gh_url, subdomain, demo_subdomain, from_address
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7
+	$1, $2, $3, $4, $5, $6, $7, $8
 )
 RETURNING *;
 

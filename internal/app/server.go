@@ -112,6 +112,7 @@ func Serve() {
 	blogR.HandleFunc("/config", blogService.Config())
 	blogR.HandleFunc("/subdomain/check", blogService.SubdomainCheck())
 	blogR.HandleFunc("/subdomain/submit", blogService.SubdomainSubmit())
+	blogR.HandleFunc("/demo-generate", blogService.LaunchDemoBlog())
 
 	/* serve static content */
 	r.PathPrefix("/static/css").Handler(http.StripPrefix("/static/css", http.FileServer(http.Dir("./web/static/css"))))
@@ -337,7 +338,7 @@ func getBlogsInfo(s *model.Store, ghInstallationID int64) ([]BlogInfo, error) {
 			ID:         blog.ID,
 			Name:       blog.GhName,
 			GithubUrl:  blog.GhUrl,
-			WebsiteUrl: "", /* XXX: how to accurately track this since website is generated from repos */
+			WebsiteUrl: fmt.Sprintf("http://%s.localhost:7999", blog.DemoSubdomain), /* XXX: how to accurately track this since website is generated from repos */
 			Subdomain:  subdomain,
 			Active:     blog.Active,
 			CreatedAt:  blog.CreatedAt,

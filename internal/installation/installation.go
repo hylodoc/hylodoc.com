@@ -15,6 +15,7 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/subdomain"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -150,6 +151,7 @@ func handleInstallationCreated(c *http.Client, s *model.Store, ghInstallationID 
 		/* XXX: wipe relavant repos from disk */
 		return fmt.Errorf("error executing db transaction: %w", err)
 	}
+
 	return nil
 }
 
@@ -164,8 +166,10 @@ func buildCreateInstallationTxParams(installationID int64, userID int32, repos [
 			GhName:         repo.Name,
 			GhFullName:     repo.FullName,
 			GhUrl:          repo.HtmlUrl,
-			Subdomain:      repo.Name,                         /* XXX: should be unique and configurable, hardcoding for now */
+			Subdomain:      repo.Name,
 			FromAddress:    config.Config.Progstack.FromEmail, /* XXX: should be configurable by user, hardcoding for now */
+
+			DemoSubdomain: subdomain.GenerateDemoSubdomain(),
 		})
 	}
 	iTxParams.Blogs = blogsTxParams
@@ -313,6 +317,7 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 	}
 
 	/* write repositories added to db */
+
 	for _, repo := range repos {
 		_, err := s.CreateBlog(context.TODO(), model.CreateBlogParams{
 			InstallationID: installation.ID,
@@ -321,12 +326,18 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 			GhFullName:     repo.FullName,
 			GhUrl:          fmt.Sprintf("https://github.com/%s", repo.FullName),
 			FromAddress:    config.Config.Progstack.FromEmail, /* XXX: hardcoding for now */
+			DemoSubdomain: sql.NullString{
+				Valid:  true,
+				String: subdomain.GenerateDemoSubdomain(),
+			},
 		})
 		if err != nil {
 			/* XXX: cleanup delete from disk */
 			return fmt.Errorf("error creating repository: %w", err)
 		}
 	}
+
+	/* launch blog */
 
 	return nil
 }

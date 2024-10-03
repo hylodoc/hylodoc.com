@@ -97,6 +97,7 @@ CREATE TABLE blogs (
 	gh_name			VARCHAR(255)	NOT NULL,
 	gh_full_name		VARCHAR(255)	NOT NULL,				-- needed for path construction
 	subdomain		VARCHAR(255)			UNIQUE,
+	demo_subdomain		VARCHAR(255)			UNIQUE,
 	from_address		VARCHAR(255)	NOT NULL,
 	active			BOOLEAN		NOT NULL			DEFAULT(false),
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
