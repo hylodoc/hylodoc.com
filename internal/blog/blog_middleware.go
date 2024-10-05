@@ -52,7 +52,7 @@ func (bm *BlogMiddleware) AuthoriseBlog(next http.Handler) http.Handler {
 		}
 		if !userOwnsBlog {
 			log.Printf("user `%d' does not own blog `%d'\n", userID, blogID)
-			http.Error(w, "Forbidden: You do not own this blog", http.StatusForbidden)
+			http.Error(w, "", http.StatusNotFound)
 			return
 		}
 		next.ServeHTTP(w, r)

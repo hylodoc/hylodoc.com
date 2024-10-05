@@ -22,7 +22,7 @@
 			<td>{{ .Subdomain }}</td>
 			<td>{{ .CreatedAt.Format "2006-01-02" }}</td>
 			<td>{{ if .Active }}Active{{ else }}Inactive{{ end }}</td>
-			<td><a href="/blogs/{{.ID}}/config" class="button-primary">Configure</a> </td>
+			<td><a href="/user/blogs/{{.ID}}/config" class="button-primary">Configure</a> </td>
 		</tr>
 		{{end}}
 	</tbody>

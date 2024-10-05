@@ -100,7 +100,7 @@ func Serve() {
 	r.HandleFunc("/blogs/{blogID}/unsubscribe", blogService.UnsubscribeFromBlog())
 
 	/* authenticated routes */
-	authR := mux.NewRouter()
+	authR := r.PathPrefix("/user").Subrouter()
 	authR.Use(authMiddleware.ValidateAuthSession)
 	authR.HandleFunc("/auth/logout", authService.Logout())
 	authR.HandleFunc("/home", home(server))
@@ -112,7 +112,8 @@ func Serve() {
 	blogR.HandleFunc("/config", blogService.Config())
 	blogR.HandleFunc("/subdomain/check", blogService.SubdomainCheck())
 	blogR.HandleFunc("/subdomain/submit", blogService.SubdomainSubmit())
-	blogR.HandleFunc("/demo-generate", blogService.LaunchDemoBlog())
+	blogR.HandleFunc("/generate-demo", blogService.LaunchDemoBlog())
+	blogR.HandleFunc("/dashboard", blogService.SubscriberMetrics())
 
 	/* serve static content */
 	r.PathPrefix("/static/css").Handler(http.StripPrefix("/static/css", http.FileServer(http.Dir("./web/static/css"))))
@@ -135,7 +136,7 @@ func index() http.HandlerFunc {
 		/* get email/username from context */
 		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
 		if session != nil {
-			http.Redirect(w, r, "/home", http.StatusSeeOther)
+			http.Redirect(w, r, "/user/home", http.StatusSeeOther)
 		}
 
 		util.ExecTemplate(w, []string{"index.html"},
@@ -160,7 +161,7 @@ func register() http.HandlerFunc {
 		/* get email/username from context */
 		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
 		if session != nil {
-			http.Redirect(w, r, "/home", http.StatusSeeOther)
+			http.Redirect(w, r, "/user/home", http.StatusSeeOther)
 		}
 
 		util.ExecTemplate(w, []string{"register.html"},
@@ -185,7 +186,7 @@ func login() http.HandlerFunc {
 		/* get email/username from context */
 		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
 		if session != nil {
-			http.Redirect(w, r, "/home", http.StatusSeeOther)
+			http.Redirect(w, r, "/user/home", http.StatusSeeOther)
 		}
 
 		util.ExecTemplate(w, []string{"login.html"},
@@ -239,7 +240,7 @@ func homecallback(s *server) http.HandlerFunc {
 			break
 		}
 		/* found installation info */
-		http.Redirect(w, r, "/home", http.StatusSeeOther)
+		http.Redirect(w, r, "/user/home", http.StatusSeeOther)
 	}
 }
 

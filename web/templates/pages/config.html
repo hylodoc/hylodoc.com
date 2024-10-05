@@ -3,21 +3,28 @@
 <div id="toast" class="toast"></div>
 
 <div id="demoSiteSection">
-    <h6>Preview Your Demo Site</h6>
-    <p>Click the button below to generate a demo site based on your Git repository.</p>
-    <button id="previewDemoBtn">Preview Demo Site</button>
-    <div id="demoSiteMessage" style="margin-top: 10px;"></div>
+	<h6>Preview your demo blog</h6>
+	<p>Click the button below to generate a demo site based on your Git repository.</p>
+	<button id="previewDemoBtn">Preview Demo Site</button>
+	<div id="demoSiteMessage" style="margin-top: 10px;"></div>
 </div>
 
-<h6>Configure subdomain and launch</h6>
+<div>
+	<h6>View blog metrics</h6>
+	<p>Click here to navigate to your blog metrics</p>
+	<a href="dashboard">metrics</a>
+</div>
 
-<!-- need these as templates so that multiple blogs can be setup at once -->
-<form id="subdomainForm" class="subdomain-checker" onsubmit="return false;">
-	<label for="subdomainInput">Choose your subdomain:</label>
-	<input type="text" id="subdomainInput" placeholder="Enter your subdomain" required />
-	<div id="availabilityMessage" class="availability-message"></div>
-	<button type="submit" id="submitBtn" disabled>Launch 🚀</button>
-</form>
+<div>
+	<h6>Configure subdomain and launch</h6>
+	<!-- need these as templates so that multiple blogs can be setup at once -->
+	<form id="subdomainForm" class="subdomain-checker" onsubmit="return false;">
+		<label for="subdomainInput">Choose your subdomain:</label>
+		<input type="text" id="subdomainInput" placeholder="Enter your subdomain" required />
+		<div id="availabilityMessage" class="availability-message"></div>
+		<button type="submit" id="submitBtn" disabled>Launch 🚀</button>
+	</form>
+</div>
 
 <script>
 	let debounceTimer;
@@ -60,17 +67,17 @@
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ subdomain })
 		})
-			.then(response => response.json())
-			.then(data => {
-				if (data.available) {
-					updateMessage(messageElement, "✅ This subdomain is available!", "available");
-					submitBtn.disabled = false;
-				} else {
-					updateMessage(messageElement, "❌ " + data.message, "unavailable");
-					submitBtn.disabled = true;
-				}
-			})
-			.catch(error => handleError(error, messageElement, submitBtn));
+		.then(response => response.json())
+		.then(data => {
+			if (data.available) {
+				updateMessage(messageElement, "✅ This subdomain is available!", "available");
+				submitBtn.disabled = false;
+			} else {
+				updateMessage(messageElement, "❌ " + data.message, "unavailable");
+				submitBtn.disabled = true;
+			}
+		})
+		.catch(error => handleError(error, messageElement, submitBtn));
 	}
 
 	/* Handle form submission */
@@ -88,20 +95,20 @@
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ subdomain })
 		})
-			.then(response => {
-				if (!response.ok) {
-					return response.json().then(errorData => {
-						showToast(errorData.message);
-						throw new Error(errorData.message);
-					});
-				}
-				return response.json();
-			})
-			.then(data => {
-				console.log("Success: ", data.message);
-				showToast("Subdomain successfully registered!");
-			})
-			.catch(error => console.error("Error submitting subdomain:", error));
+		.then(response => {
+			if (!response.ok) {
+				return response.json().then(errorData => {
+					showToast(errorData.message);
+					throw new Error(errorData.message);
+				});
+			}
+			return response.json();
+		})
+		.then(data => {
+			console.log("Success: ", data.message);
+			showToast("Subdomain successfully registered!");
+		})
+		.catch(error => console.error("Error submitting subdomain:", error));
 	}
 
 	/* Update the availability message */
@@ -128,7 +135,7 @@
 		const messageElement = document.getElementById('demoSiteMessage');
 		showToast("Generating demo site, please wait...");
 
-		fetch("demo-generate", {
+		fetch("generate-demo", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
