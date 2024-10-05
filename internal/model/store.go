@@ -37,7 +37,7 @@ func (s *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 }
 
 func (s *Store) CreateUserWithGithubAccountTx(ctx context.Context, arg CreateGithubAccountParams) error {
-	err := s.execTx(ctx, func(q *Queries) error {
+	return s.execTx(ctx, func(q *Queries) error {
 		user, err := s.CreateUser(ctx, arg.GhEmail)
 		if err != nil {
 			return err
@@ -50,7 +50,6 @@ func (s *Store) CreateUserWithGithubAccountTx(ctx context.Context, arg CreateGit
 		})
 		return err
 	})
-	return err
 }
 
 type BlogTxParams struct {
@@ -70,7 +69,7 @@ type InstallationTxParams struct {
 }
 
 func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxParams) error {
-	err := s.execTx(ctx, func(q *Queries) error {
+	return s.execTx(ctx, func(q *Queries) error {
 		createInstallationArgs := CreateInstallationParams{
 			GhInstallationID: arg.InstallationID,
 			UserID:           arg.UserID,
@@ -98,7 +97,6 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 		}
 		return nil
 	})
-	return err
 }
 
 type CreateSubscriberTxParams struct {
@@ -108,7 +106,7 @@ type CreateSubscriberTxParams struct {
 }
 
 func (s *Store) CreateSubscriberTx(ctx context.Context, arg CreateSubscriberTxParams) error {
-	err := s.execTx(ctx, func(q *Queries) error {
+	return s.execTx(ctx, func(q *Queries) error {
 		sub, err := s.GetSubscriberForBlog(ctx, GetSubscriberForBlogParams{
 			BlogID: arg.BlogID,
 			Email:  arg.Email,
@@ -133,10 +131,6 @@ func (s *Store) CreateSubscriberTx(ctx context.Context, arg CreateSubscriberTxPa
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 type CreateSubdomainTxParams struct {
@@ -145,9 +139,8 @@ type CreateSubdomainTxParams struct {
 }
 
 func (s *Store) CreateSubdomainTx(ctx context.Context, arg CreateSubdomainTxParams) error {
-	err := s.execTx(ctx, func(q *Queries) error {
-		nullSubdomain := sql.NullString{
-			Valid:  true,
+	return s.execTx(ctx, func(q *Queries) error {
+		nullSubdomain := sql.NullString{Valid: true,
 			String: arg.Subdomain,
 		}
 
@@ -172,8 +165,4 @@ func (s *Store) CreateSubdomainTx(ctx context.Context, arg CreateSubdomainTxPara
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }

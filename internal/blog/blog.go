@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -167,20 +168,30 @@ func (b *BlogService) Config() http.HandlerFunc {
 			return
 		}
 
-		util.ExecTemplate(w, []string{"config.html"},
+		util.ExecTemplate(w, []string{"config.html", "subscription_product.html"},
 			util.PageInfo{
 				Data: struct {
 					Title   string
 					Session *auth.Session
 					ID      int32
+					Plans   []config.Plan
 				}{
 					Title:   "Blog Setup",
 					Session: session,
 					ID:      int32(intBlogID),
+					Plans:   config.Config.Stripe.Plans,
 				},
+			},
+			template.FuncMap{
+				"centsToDollars": ConvertCentsToDollars,
 			},
 		)
 	}
+}
+
+func ConvertCentsToDollars(cents int64) string {
+	dollars := float64(cents) / 100.0
+	return fmt.Sprintf("$%.2f", dollars)
 }
 
 type SubdomainRequest struct {

@@ -21,12 +21,14 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA progstack
 	GRANT ALL PRIVILEGES ON SEQUENCES to progstack_user;
 
 CREATE TABLE users (
-	id		SERIAL				PRIMARY KEY,
-	email		VARCHAR(255)	NOT NULL,					-- Login email
-	created_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now())
+	id			SERIAL				PRIMARY KEY,
+	email			VARCHAR(255)	NOT NULL	UNIQUE,		-- Login email
+	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
+	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now())
 );
 
-/* users can link github accounts */
+-- users can link github accounts
+
 CREATE TABLE github_accounts (
 	id		SERIAL				PRIMARY KEY,
 	user_id		INTEGER		NOT NULL,
@@ -41,7 +43,8 @@ CREATE TABLE github_accounts (
 		ON DELETE CASCADE -- delete github account info if user info deleted
 );
 
-/* magic links */
+-- magic links
+
 CREATE TYPE link_type AS ENUM ('register', 'login');
 
 CREATE TABLE magic (
@@ -109,7 +112,7 @@ CREATE TABLE blogs (
 		ON DELETE CASCADE -- delete repositories when installation deleted
 );
 
-/* blog subscriber lists */
+-- blog subscriber lists
 
 CREATE TYPE subscription_status AS ENUM ('active', 'unsubscribed');
 
@@ -128,7 +131,37 @@ CREATE TABLE subscribers (
 		ON DELETE CASCADE -- delete subscribers when blog deleted
 );
 
-/* active subscriber emails should be unique */
+--  active subscriber emails should be unique
 CREATE UNIQUE INDEX unique_active_subscriber_email
 	ON subscribers (email) 
 	WHERE status = 'active';
+
+-- stripe integration
+
+CREATE TYPE checkout_session_status AS ENUM ('pending', 'completed');
+
+CREATE TABLE stripe_checkout_sessions (
+	stripe_session_id	VARCHAR(255)		NOT NULL	PRIMARY KEY,
+	user_id			INTEGER			NOT NULL,
+	status			checkout_session_status	NOT NULL	DEFAULT('pending'),
+	created_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
+	updated_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
+
+	CONSTRAINT fk_user_id
+		FOREIGN KEY (user_id)
+		REFERENCES users(id)
+		ON DELETE CASCADE -- delete checkout sessions when user deleted
+);
+
+CREATE TABLE stripe_subscriptions (
+	id			SERIAL						PRIMARY KEY,
+	user_id			INTEGER				NOT NULL,
+	stripe_subscription_id	VARCHAR(255)			NOT NULL	UNIQUE,
+	stripe_customer_id	VARCHAR(255)			NOT NULL,
+	stripe_price_id		VARCHAR(255)			NOT NULL,
+	status			VARCHAR(255)			NOT NULL,
+	current_period_start	TIMESTAMPTZ			NOT NULL,
+	current_period_end	TIMESTAMPTZ			NOT NULL,
+	created_at		TIMESTAMPTZ			NOT NULL	DEFAULT(now()),
+	updated_at		TIMESTAMPTZ			NOT NULL	DEFAULT(now())
+);

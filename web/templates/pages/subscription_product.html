@@ -1,0 +1,15 @@
+{{ define "subscription_product" }}
+
+<form action="/user/stripe/create-checkout-session" method="POST" id="subscription-form">
+	{{ with . }}
+		<h6>{{ .Name }}</h6>
+		{{ range .Prices }}
+			<input type="radio" id="{{ .PriceID }}" name="plan" value="{{ .PriceID }}" required />
+			<label for="{{ .PriceID }}">{{ centsToDollars .Amount }} /month</label>
+			<br>
+		{{ end }}
+		<button type="submit">Subscribe</button>
+	{{ end }}
+</form>
+
+{{ end }}

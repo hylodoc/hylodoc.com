@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"text/template"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/resend/resend-go/v2"
 	"github.com/spf13/viper"
 	"github.com/xr0-org/progstack/internal/auth"
+	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/installation"
@@ -54,11 +56,11 @@ func Serve() {
 	if err != nil {
 		log.Fatal("could not connect to db: %w", err)
 	}
-
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 	store := model.NewStore(db)
+
 	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
 	server := &server{
 		client:       client,
@@ -70,6 +72,7 @@ func Serve() {
 	unauthMiddleware := auth.NewUnauthMiddleware(store)
 	authMiddleware := auth.NewAuthMiddleware(store)
 	blogMiddleware := blog.NewBlogMiddleware(store)
+	billingService := billing.NewBillingService(store)
 
 	authService := auth.NewAuthService(client, resendClient, store, &config.Config.Github)
 	installService := installation.NewInstallationService(client, resendClient, store, &config.Config)
@@ -94,6 +97,7 @@ func Serve() {
 	r.HandleFunc("/magic/login", authService.MagicLogin())
 	r.HandleFunc("/magic/logincallback", authService.MagicLoginCallback())
 	r.HandleFunc("/gh/installcallback", installService.InstallationCallback())
+	r.HandleFunc("/stripe/webhook", billingService.StripeWebhook())
 
 	/* XXX: should operate on subdomain since we route with that, then we can get the associated blog info */
 	r.HandleFunc("/blogs/{blogID}/subscribe", blogService.SubscribeToBlog()).Methods("POST")
@@ -106,6 +110,9 @@ func Serve() {
 	authR.HandleFunc("/home", home(server))
 	authR.HandleFunc("/home/callback", homecallback(server))
 	authR.HandleFunc("/gh/linkgithub", authService.LinkGithubAccount())
+	authR.HandleFunc("/stripe/create-checkout-session", billingService.CreateCheckoutSession()).Methods("POST")
+	authR.HandleFunc("/stripe/success", billingService.Success())
+	authR.HandleFunc("/stripe/cancel", billingService.Cancel())
 
 	blogR := authR.PathPrefix("/blogs/{blogID}").Subrouter()
 	blogR.Use(blogMiddleware.AuthoriseBlog)
@@ -149,6 +156,7 @@ func index() http.HandlerFunc {
 					Session: session,
 				},
 			},
+			template.FuncMap{},
 		)
 	}
 }
@@ -174,6 +182,7 @@ func register() http.HandlerFunc {
 					Session: session,
 				},
 			},
+			template.FuncMap{},
 		)
 	}
 }
@@ -199,6 +208,7 @@ func login() http.HandlerFunc {
 					Session: session,
 				},
 			},
+			template.FuncMap{},
 		)
 	}
 }
@@ -280,6 +290,7 @@ func home(s *server) http.HandlerFunc {
 					Installations:       installationsInfo,
 				},
 			},
+			template.FuncMap{},
 		)
 	}
 }

@@ -9,7 +9,8 @@ services:
     volumes:
       - './repositories:/app/repositories'
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:12-alpine
@@ -19,6 +20,10 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secret
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 5
     volumes:
       - './internal/model/:/docker-entrypoint-initdb.d/'
     restart: unless-stopped

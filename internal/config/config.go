@@ -14,6 +14,7 @@ type Configuration struct {
 	Github    GithubParams    `mapstructure:"github"`
 	Db        DbParams        `mapstructure:"postgres"`
 	Resend    ResendParams    `mapstructure:"resend"`
+	Stripe    StripeParams    `mapstructure:"stripe"`
 }
 
 type ProgstackParams struct {
@@ -22,6 +23,7 @@ type ProgstackParams struct {
 	RepositoriesPath string `mapstructure:"repositories_path"`
 	WebsitesPath     string `mapstructure:"websites_path"`
 	FromEmail        string `mapstructure:"from_email"`
+	AccountsEmail    string `mapstructure:"accounts_email"`
 }
 
 type GithubParams struct {
@@ -46,6 +48,26 @@ type DbParams struct {
 
 type ResendParams struct {
 	ApiKey string `mapstructure:"resend_api_key"`
+}
+
+type StripeParams struct {
+	PublishableKey       string `mapstructure:"publishable_key"`
+	SecretKey            string `mapstructure:"secret_key"`
+	WebhookSigningSecret string `mapstructure:"webhook_signing_secret"`
+	Plans                []Plan `mapstructure:"plans"`
+}
+
+type Plan struct {
+	ProductID string  `mapstructure:"product_id"`
+	Name      string  `mapstructure:"name"`
+	Currency  string  `mapstructure:"currency"`
+	Prices    []Price `mapstructure:"prices"`
+}
+
+type Price struct {
+	PriceID  string `mapstructure:"price_id"`
+	Amount   int64  `mapstructure:"amount"`
+	Interval string `mapstructure:"interval"`
 }
 
 func (params DbParams) Connect() (*sql.DB, error) {

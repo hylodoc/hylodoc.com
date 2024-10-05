@@ -31,8 +31,8 @@ type PageInfo struct {
 	NewUpdates bool
 }
 
-func ExecTemplate(w http.ResponseWriter, names []string, info PageInfo) {
-	tmpl, err := template.New(names[0]).ParseFiles(
+func ExecTemplate(w http.ResponseWriter, names []string, info PageInfo, funcMap template.FuncMap) {
+	tmpl, err := template.New(names[0]).Funcs(funcMap).ParseFiles(
 		append(
 			prependDir(names, "pages"),
 			prependDir(pageTemplates, "partials")...,

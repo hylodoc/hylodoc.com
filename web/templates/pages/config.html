@@ -26,6 +26,13 @@
 	</form>
 </div>
 
+<div class="subscription-plans">
+	<h6>Select a Subscription Plan</h6>
+	{{ range .Data.Plans }}
+		{{ template "subscription_product" . }}
+	{{ end }}
+</div>
+
 <script>
 	let debounceTimer;
 

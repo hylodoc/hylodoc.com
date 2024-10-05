@@ -58,6 +58,7 @@ func (b *BlogService) SubscriberMetrics() http.HandlerFunc {
 					SubscriberData: data,
 				},
 			},
+			template.FuncMap{},
 		)
 	}
 }

@@ -2,19 +2,24 @@
 
 # Progstack config
 progstack:
-  protocol: "http/https"
-  service_name: "progstack"
+  protocol: "http"
+  service_name: "localhost:7999"
+  domain: "localhost"
   repositories_path: "./repositories"
   websites_path: "./websites"
+  from_email: "no-reply@lbnz.dev"	# update email
+  accounts_email: "accounts@lbnz.dev"	# billing query email
 
 # Github config
 github:
   app_id: 999929
   app_name: "progstack-dev"
-  client_id: "<ClientID>"
-  client_secret: "<ClientSecret>"
-  webhook_secret: "<WebhookSecret>"
-  private_key_path: "<PrivateKeyPath>"
+  client_id: "<GithubClientID>"
+  client_secret: "<GithubClientSecret>"
+  webhook_secret: "<GithubWebhookSecret>"
+  private_key_path: "/path/to/private/key/private-key.pem"
+  oauth_callback: "http://localhost:7999/gh/oauthcallback"
+  link_callback: "http://localhost:7999/gh/linkcallback"
 
 # Docker config
 docker:
@@ -30,6 +35,23 @@ postgres:
   password: "<Secret>"
   port: 5432
 
-# Resend config
+# Resend config ab@lbnz.dev
 resend:
-  resend_api_key: "<ResendApiKey>"
+  resend_api_key: "<ResendAPIKey>"
+
+# Stripe config
+stripe:
+  publishable_key: "<StripePublishableKey>"
+  secret_key: "<StripeSecretKey>"
+  webhook_signing_secret: "<StripeWebhookKey>"
+  plans: # configured in stripe
+    - product_id: "<StripeProductID>"
+      name: "basic"
+      currency: "usd"
+      prices: # configured in stripe
+        - price_id: "<StripeMonthlyPriceID>"
+          interval: "monthly"
+          amount: 1000 # in cents ($10)
+        - price_id: "<StripeYearlyPriceID>"
+          interval: "yearly"
+          amount: 10000 # in cents ($100)
