@@ -22,6 +22,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA progstack
 
 CREATE TABLE users (
 	id			SERIAL				PRIMARY KEY,
+	username		VARCHAR(255)	NOT NULL	UNIQUE,
 	email			VARCHAR(255)	NOT NULL	UNIQUE,		-- Login email
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now())
@@ -160,6 +161,7 @@ CREATE TABLE stripe_subscriptions (
 	stripe_customer_id	VARCHAR(255)			NOT NULL,
 	stripe_price_id		VARCHAR(255)			NOT NULL,
 	status			VARCHAR(255)			NOT NULL,
+	amount			BIGINT				NOT NULL,
 	current_period_start	TIMESTAMPTZ			NOT NULL,
 	current_period_end	TIMESTAMPTZ			NOT NULL,
 	created_at		TIMESTAMPTZ			NOT NULL	DEFAULT(now()),

@@ -99,6 +99,7 @@ func handleCheckoutSessionCompleted(s *model.Store, e *stripe.Event) error {
 	/* fetch subscription since Expandable and not included in event */
 	params := &stripe.CheckoutSessionParams{}
 	params.AddExpand("subscription")
+	params.AddExpand("line_items")
 	expandedSession, err := session.Get(checkoutSessionID, params)
 	if err != nil {
 		log.Fatalf("Failed to retrieve checkout session: %v", err)
@@ -114,6 +115,7 @@ func handleCheckoutSessionCompleted(s *model.Store, e *stripe.Event) error {
 		StripeSubscriptionID: sub.ID,
 		StripeCustomerID:     sub.Customer.ID,
 		StripePriceID:        sub.Plan.ID,
+		Amount:               sub.Plan.Amount,
 		Status:               string(sub.Status),
 		CurrentPeriodStart:   time.Unix(sub.CurrentPeriodStart, 0),
 		CurrentPeriodEnd:     time.Unix(sub.CurrentPeriodEnd, 0),
@@ -135,6 +137,9 @@ func handleCheckoutSessionCompleted(s *model.Store, e *stripe.Event) error {
 
 func handleCheckoutSessionExpired(s *model.Store, e *stripe.Event) error {
 	log.Println("checkout.session.expired event...")
+
+	/* XXX: handle*/
+
 	return nil
 }
 
@@ -147,11 +152,16 @@ func handleCustomerSubscriptionCreated(s *model.Store, e *stripe.Event) error {
 	}
 	log.Printf("customer.subscription.created event: %v", sub)
 
+	/* XXX: we handle this on the checkout session completed event */
+
 	return nil
 }
 
 func handleCustomerSubscriptionDeleted(s *model.Store, e *stripe.Event) error {
 	log.Println("customer.subscription.deleted event...")
+
+	/* handle subscription deleted */
+
 	return nil
 }
 
@@ -168,6 +178,7 @@ func handleCustomerSubscriptionUpdated(s *model.Store, e *stripe.Event) error {
 		StripeSubscriptionID: sub.ID,
 		StripePriceID:        sub.Plan.ID,
 		Status:               string(sub.Status),
+		Amount:               sub.Plan.Amount,
 		CurrentPeriodStart:   time.Unix(sub.CurrentPeriodStart, 0),
 		CurrentPeriodEnd:     time.Unix(sub.CurrentPeriodEnd, 0),
 	})

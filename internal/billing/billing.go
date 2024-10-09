@@ -13,7 +13,8 @@ import (
 	"github.com/xr0-org/progstack/internal/util"
 
 	"github.com/stripe/stripe-go/v72"
-	"github.com/stripe/stripe-go/v72/checkout/session"
+	bSession "github.com/stripe/stripe-go/v72/billingportal/session"
+	cSession "github.com/stripe/stripe-go/v72/checkout/session"
 )
 
 type BillingService struct {
@@ -24,6 +25,41 @@ func NewBillingService(s *model.Store) *BillingService {
 	return &BillingService{
 		store: s,
 	}
+}
+
+func (b *BillingService) Subscriptions() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("subscriptions...")
+
+		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		if !ok {
+			log.Println("user not found")
+			http.Error(w, "user not found", http.StatusUnauthorized)
+			return
+		}
+
+		util.ExecTemplate(w, []string{"subscriptions.html", "subscription_product.html"},
+			util.PageInfo{
+				Data: struct {
+					Title   string
+					Session *auth.Session
+					Plans   []config.Plan
+				}{
+					Title:   "Subscriptions",
+					Session: session,
+					Plans:   config.Config.Stripe.Plans,
+				},
+			},
+			template.FuncMap{
+				"centsToDollars": ConvertCentsToDollars,
+			},
+		)
+	}
+}
+
+func ConvertCentsToDollars(cents int64) string {
+	dollars := float64(cents) / 100.0
+	return fmt.Sprintf("$%.2f", dollars)
 }
 
 func (b *BillingService) CreateCheckoutSession() http.HandlerFunc {
@@ -64,7 +100,7 @@ func (b *BillingService) createCheckoutSession(w http.ResponseWriter, r *http.Re
 
 	/* set private key for stripe client */
 	stripe.Key = config.Config.Stripe.SecretKey
-	checkoutSession, err := session.New(params)
+	checkoutSession, err := cSession.New(params)
 	if err != nil {
 		return "", fmt.Errorf("error creating stripe checkout session: %w", err)
 	}
@@ -157,4 +193,45 @@ func (b *BillingService) Cancel() http.HandlerFunc {
 			template.FuncMap{},
 		)
 	}
+}
+
+func (b *BillingService) BillingPortal() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("choose subscription...")
+
+		url, err := b.billingPortal(w, r)
+		if err != nil {
+			log.Printf("error redirecting to billing portal: %v", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+
+		log.Println("redirecting user to billing portal...")
+		http.Redirect(w, r, url, http.StatusSeeOther)
+	}
+}
+
+func (b *BillingService) billingPortal(w http.ResponseWriter, r *http.Request) (string, error) {
+	userSession, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+	if !ok {
+		return "", fmt.Errorf("error getting session")
+	}
+
+	sub, err := b.store.GetStripeSubscriptionByUserID(context.TODO(), userSession.UserID)
+	if err != nil {
+		return "", fmt.Errorf("could not get subcription for user: %w", err)
+	}
+
+	params := &stripe.BillingPortalSessionParams{
+		Customer:  stripe.String(sub.StripeCustomerID),
+		ReturnURL: stripe.String(fmt.Sprintf("%s://%s/user/account", config.Config.Progstack.Protocol, config.Config.Progstack.ServiceName)),
+	}
+
+	/* set private key for stripe client */
+	stripe.Key = config.Config.Stripe.SecretKey
+	portalSession, err := bSession.New(params)
+	if err != nil {
+		return "", err
+	}
+	return portalSession.URL, nil
 }

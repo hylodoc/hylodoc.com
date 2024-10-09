@@ -29,6 +29,7 @@ func (a *AuthMiddleware) ValidateAuthSession(next http.Handler) http.Handler {
 
 		session, err := validateAuthSession(w, r, a.store)
 		if err != nil {
+			log.Printf("error in validateAuthSession: %v", err)
 			http.Redirect(w, r, "/", http.StatusFound)
 			return
 		}
@@ -39,32 +40,33 @@ func (a *AuthMiddleware) ValidateAuthSession(next http.Handler) http.Handler {
 
 func validateAuthSession(w http.ResponseWriter, r *http.Request, s *model.Store) (*Session, error) {
 	cookie, err := r.Cookie(authCookieName)
-	authSessionId := cookie.Value
-	if err != nil || authSessionId == "" {
+	authSessionID := cookie.Value
+	if err != nil || authSessionID == "" {
 		return nil, fmt.Errorf("error reading auth cookie")
 	}
-	session, err := validateAuthSessionId(authSessionId, w, s)
+	session, err := validateAuthSessionId(authSessionID, w, s)
 	if err != nil {
-		log.Println("error validating authSessionId: ", err)
-		return nil, fmt.Errorf("error validating auth session id: %w", err)
+		return nil, fmt.Errorf("error validating cookie authSessionID `%s': %w", authSessionID, err)
 	}
 	return session, nil
 }
 
 type Session struct {
-	UserID   int32  `json:"user_id"`
-	Email    string `json:"email"`
-	Username string `json:"login"`
+	UserID      int32  `json:"user_id"`
+	Email       string `json:"email"`
+	Username    string `json:"login"`
+	Linked      bool   `json:"linked"`
+	GithubEmail string `json:"github_email"`
 }
 
-func validateAuthSessionId(sessionId string, w http.ResponseWriter, s *model.Store) (*Session, error) {
-	session, err := s.GetSession(context.TODO(), sessionId)
+func validateAuthSessionId(dbSessionId string, w http.ResponseWriter, s *model.Store) (*Session, error) {
+	dbSession, err := s.GetSession(context.TODO(), dbSessionId)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			/* db error */
 			return nil, err
 		}
-		/* no auth session exists, delete auth cookie */
+		/* no auth dbSession exists, delete auth cookie */
 		http.SetCookie(w, &http.Cookie{
 			Name:    authCookieName,
 			Value:   "",
@@ -74,10 +76,10 @@ func validateAuthSessionId(sessionId string, w http.ResponseWriter, s *model.Sto
 		})
 		return nil, err
 	}
-	if session.ExpiresAt.Before(time.Now()) {
+	if dbSession.ExpiresAt.Before(time.Now()) {
 		log.Println("auth token expired")
-		/* expired session in db */
-		err := s.EndSession(context.TODO(), sessionId)
+		/* expired dbSession in db */
+		err := s.EndSession(context.TODO(), dbSessionId)
 		if err != nil {
 			return nil, err
 		}
@@ -89,9 +91,13 @@ func validateAuthSessionId(sessionId string, w http.ResponseWriter, s *model.Sto
 			Expires: time.Unix(0, 0),
 			MaxAge:  -1,
 		})
-		return nil, fmt.Errorf("session expired")
+		return nil, fmt.Errorf("dbSession expired")
 	}
-	return &Session{
-		UserID: session.UserID,
-	}, nil
+	session := Session{
+		UserID:   dbSession.UserID,
+		Email:    dbSession.Email,
+		Username: dbSession.Username,
+	}
+	log.Printf("authSession: %v\n", session)
+	return &session, nil
 }

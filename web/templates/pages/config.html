@@ -21,19 +21,11 @@
 		<!-- need these as templates so that multiple blogs can be setup at once -->
 		<form id="subdomainForm" class="subdomain-checker" onsubmit="return false;">
 			<label for="subdomainInput">Choose your subdomain:</label>
-			<input type="text" id="subdomainInput" placeholder="Enter your subdomain" required />
+			<input type="text" id="subdomainInput" placeholder="Enter your subdomain"/>
 			<div id="availabilityMessage" class="availability-message"></div>
 			<button type="submit" id="submitBtn" disabled>Launch 🚀</button>
 		</form>
 	</div>
-
-	<div class="subscription-plans">
-		<h6>Select a Subscription Plan</h6>
-		{{ range .Data.Plans }}
-		{{ template "subscription_product" . }}
-		{{ end }}
-	</div>
-
 </div>
 
 <script>
@@ -90,7 +82,7 @@
 		.catch(error => handleError(error, messageElement, submitBtn));
 	}
 
-	/* Handle form submission */
+	/* Handle subdomain form submission */
 	function handleFormSubmit(event) {
 		event.preventDefault(); /* Prevent default form submission */
 

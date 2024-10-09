@@ -1,8 +1,6 @@
 package server
 
 import (
-	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -19,6 +17,7 @@ import (
 	"github.com/xr0-org/progstack/internal/installation"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/subdomain"
+	"github.com/xr0-org/progstack/internal/user"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -52,6 +51,7 @@ func init() {
 }
 
 func Serve() {
+	/* init dependencies */
 	db, err := config.Config.Db.Connect()
 	if err != nil {
 		log.Fatal("could not connect to db: %w", err)
@@ -60,24 +60,22 @@ func Serve() {
 		Timeout: 10 * time.Second,
 	}
 	store := model.NewStore(db)
-
 	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
-	server := &server{
-		client:       client,
-		store:        store,
-		resendClient: resendClient,
-	}
 
+	/* init middleware */
 	subdomainMiddleware := subdomain.NewSubdomainMiddleware(store)
 	unauthMiddleware := auth.NewUnauthMiddleware(store)
 	authMiddleware := auth.NewAuthMiddleware(store)
 	blogMiddleware := blog.NewBlogMiddleware(store)
 	billingService := billing.NewBillingService(store)
 
+	/* init services */
 	authService := auth.NewAuthService(client, resendClient, store, &config.Config.Github)
+	userService := user.NewUserService(store)
 	installService := installation.NewInstallationService(client, resendClient, store, &config.Config)
 	blogService := blog.NewBlogService(store, resendClient)
 
+	/* routes */
 	r := mux.NewRouter()
 
 	/* NOTE: userWebsite middleware currently runs before main application */
@@ -107,12 +105,16 @@ func Serve() {
 	authR := r.PathPrefix("/user").Subrouter()
 	authR.Use(authMiddleware.ValidateAuthSession)
 	authR.HandleFunc("/auth/logout", authService.Logout())
-	authR.HandleFunc("/home", home(server))
-	authR.HandleFunc("/home/callback", homecallback(server))
 	authR.HandleFunc("/gh/linkgithub", authService.LinkGithubAccount())
-	authR.HandleFunc("/stripe/create-checkout-session", billingService.CreateCheckoutSession()).Methods("POST")
+	authR.HandleFunc("/account", userService.Account())
+	authR.HandleFunc("/delete", userService.Delete())
+	authR.HandleFunc("/home", userService.Home())
+	authR.HandleFunc("/home/callback", userService.HomeCallback())
+	authR.HandleFunc("/stripe/subscriptions", billingService.Subscriptions())
+	authR.HandleFunc("/stripe/create-checkout-session", billingService.CreateCheckoutSession())
 	authR.HandleFunc("/stripe/success", billingService.Success())
 	authR.HandleFunc("/stripe/cancel", billingService.Cancel())
+	authR.HandleFunc("/stripe/billing-portal", billingService.BillingPortal())
 
 	blogR := authR.PathPrefix("/blogs/{blogID}").Subrouter()
 	blogR.Use(blogMiddleware.AuthoriseBlog)
@@ -211,151 +213,4 @@ func login() http.HandlerFunc {
 			template.FuncMap{},
 		)
 	}
-}
-
-func homecallback(s *server) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("homecallback handler...")
-
-		/* get session */
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
-		if !ok {
-			http.Error(w, "User not found", http.StatusUnauthorized)
-			return
-		}
-
-		start := time.Now()
-		for {
-			duration := time.Since(start)
-			log.Printf("duration: %s\n", duration.String())
-			if duration > 10*time.Second {
-				log.Printf("homecallback handler timed out for user `%s'\n", session.UserID)
-				http.Error(w, "callback timed out", http.StatusRequestTimeout)
-				return
-			}
-
-			/* get installation info */
-			_, err := getInstallationsInfo(s.store, session.UserID)
-			if err != nil {
-				if err != sql.ErrNoRows {
-					log.Printf("error fetching installations info for user `%d': %v\n", session.UserID, err)
-					http.Error(w, "", http.StatusInternalServerError)
-					return
-				}
-				/* not found, wait for event to be processed */
-				time.Sleep(2 * time.Second)
-				continue
-			}
-			/* got installation info */
-			break
-		}
-		/* found installation info */
-		http.Redirect(w, r, "/user/home", http.StatusSeeOther)
-	}
-}
-
-func home(s *server) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("home handler...")
-		/* XXX: add metrics */
-
-		/* get session */
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
-		if !ok {
-			http.Error(w, "User not found", http.StatusUnauthorized)
-			return
-		}
-
-		installationsInfo, err := getInstallationsInfo(s.store, session.UserID)
-		if err != nil {
-			log.Printf("could not get Installations info for user `%d': %v", session.UserID, err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-
-		ghInstallUrl := fmt.Sprintf(ghInstallUrlTemplate, config.Config.Github.AppName)
-		util.ExecTemplate(w, []string{"home.html", "installations.html", "blogs.html"},
-			util.PageInfo{
-				Data: struct {
-					Title               string
-					Session             *auth.Session
-					Username            string
-					GithubAppInstallUrl string
-					Installations       []InstallationInfo
-				}{
-					Title:               "Home",
-					Session:             session,
-					Username:            session.Username,
-					GithubAppInstallUrl: ghInstallUrl,
-					Installations:       installationsInfo,
-				},
-			},
-			template.FuncMap{},
-		)
-	}
-}
-
-type InstallationInfo struct {
-	GithubID  int64      `json:"github_id"`
-	CreatedAt time.Time  `json:"created_at"`
-	Blogs     []BlogInfo `json:"blogs"`
-}
-
-type BlogInfo struct {
-	ID         int32     `json:"ID"`
-	Name       string    `json:"name"`
-	GithubUrl  string    `json:"html_url"`
-	WebsiteUrl string    `json:"website_url"`
-	Subdomain  string    `json:"subdomain"`
-	Active     bool      `json:"active"`
-	CreatedAt  time.Time `json:"created_at"`
-}
-
-func getInstallationsInfo(s *model.Store, userID int32) ([]InstallationInfo, error) {
-	/* get installations for user */
-	installations, err := s.ListInstallationsForUser(context.TODO(), userID)
-	if err != nil {
-		return []InstallationInfo{}, err
-	}
-	/* populate the installation info get repositories */
-	var info []InstallationInfo
-	for _, dbInstallation := range installations {
-		blogsInfo, err := getBlogsInfo(s, dbInstallation.GhInstallationID)
-		if err != nil {
-			return []InstallationInfo{}, fmt.Errorf("error getting RepositoriesInfo: %w", err)
-		}
-		installationInfo := InstallationInfo{
-			GithubID:  dbInstallation.GhInstallationID,
-			CreatedAt: dbInstallation.CreatedAt,
-			Blogs:     blogsInfo,
-		}
-		info = append(info, installationInfo)
-	}
-	return info, nil
-}
-
-func getBlogsInfo(s *model.Store, ghInstallationID int64) ([]BlogInfo, error) {
-	blogs, err := s.ListBlogsForInstallationByGhInstallationID(context.TODO(), ghInstallationID)
-	if err != nil {
-		/* should not be possible to have an installation with no repositories */
-		return []BlogInfo{}, err
-	}
-	var info []BlogInfo
-	for _, blog := range blogs {
-		subdomain := "Not configured"
-		if blog.Subdomain.Valid {
-			subdomain = blog.Subdomain.String
-		}
-		blogInfo := BlogInfo{
-			ID:         blog.ID,
-			Name:       blog.GhName,
-			GithubUrl:  blog.GhUrl,
-			WebsiteUrl: fmt.Sprintf("http://%s.localhost:7999", blog.DemoSubdomain), /* XXX: how to accurately track this since website is generated from repos */
-			Subdomain:  subdomain,
-			Active:     blog.Active,
-			CreatedAt:  blog.CreatedAt,
-		}
-		info = append(info, blogInfo)
-	}
-	return info, nil
 }

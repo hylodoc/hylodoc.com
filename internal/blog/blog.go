@@ -182,9 +182,7 @@ func (b *BlogService) Config() http.HandlerFunc {
 					Plans:   config.Config.Stripe.Plans,
 				},
 			},
-			template.FuncMap{
-				"centsToDollars": ConvertCentsToDollars,
-			},
+			template.FuncMap{},
 		)
 	}
 }

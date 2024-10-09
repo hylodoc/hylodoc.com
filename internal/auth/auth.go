@@ -269,7 +269,7 @@ func (o *AuthService) githubLinkCallback(w http.ResponseWriter, r *http.Request)
 		GhUsername: ghUser.Username,
 	})
 	if err != nil {
-		return fmt.Errorf("error linking github account to user with ID `%d': %w", err)
+		return fmt.Errorf("error linking github account to user with ID `%d': %w", userID, err)
 	}
 	return nil
 }
@@ -477,7 +477,10 @@ func (o *AuthService) magicRegisterCallback(w http.ResponseWriter, r *http.Reque
 	}
 
 	/* create user */
-	u, err := o.store.CreateUser(context.TODO(), magic.Email)
+	u, err := o.store.CreateUser(context.TODO(), model.CreateUserParams{
+		Email:    magic.Email,
+		Username: GenerateUsername(),
+	})
 	if err != nil {
 		return fmt.Errorf("error creating user: %w", err)
 	}

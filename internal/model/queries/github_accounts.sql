@@ -6,6 +6,11 @@ INSERT INTO github_accounts (
 )
 RETURNING *;
 
+-- name: GetGithubAccountByUserID :one
+SELECT *
+FROM github_accounts
+WHERE user_id = $1;
+
 -- name: GetGithubAccountByGhUserID :one
 SELECT *
 FROM github_accounts

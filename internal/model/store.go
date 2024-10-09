@@ -38,7 +38,11 @@ func (s *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 
 func (s *Store) CreateUserWithGithubAccountTx(ctx context.Context, arg CreateGithubAccountParams) error {
 	return s.execTx(ctx, func(q *Queries) error {
-		user, err := s.CreateUser(ctx, arg.GhEmail)
+		/* for ghAccount we can just use github username */
+		user, err := s.CreateUser(ctx, CreateUserParams{
+			Email:    arg.GhEmail,
+			Username: arg.GhUsername,
+		})
 		if err != nil {
 			return err
 		}

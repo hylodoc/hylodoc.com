@@ -16,15 +16,13 @@
 .navbar .u-pull-left h4 {
 	font-size: 0.9em;
 	margin-left: 10px;
-	color: #666;
 }
 
 /* Style for navigation links */
 .navbar .u-pull-right a {
-	margin-left: 20px;
+	margin: 10px;
 	font-size: 1em;
 	text-decoration: none;
-	color: #333;
 }
 
 .navbar .u-pull-right a:hover {
@@ -34,12 +32,11 @@
 /* Style for the Discord icon */
 .navbar img {
 	vertical-align: middle;
-	height: 1.5em;
-	width: 1.5em;
+	height: 1.2em;
+	width: 1.2em;
 }
 
 /* Remove underline by default */
 .navbar a {
 	text-decoration: none;
-	color: #333;
 }

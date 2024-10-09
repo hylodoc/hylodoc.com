@@ -1,0 +1,40 @@
+{{ template "header" . }}
+
+<section>
+	<div class="container">
+		<h3>Account Details</h3>
+		<p>Username: {{ .Data.AccountDetails.Username }}</p>
+		<p>Email: {{ .Data.AccountDetails.Email }}</p>
+		{{ if .Data.AccountDetails.IsLinked }}
+			<p>Linked GitHub Email: {{ .Data.AccountDetails.GithubEmail }}
+		{{ else }}
+			<a href="gh/linkgithub">Link your GithHub account</a>
+		{{ end }}
+	</div>
+</section>
+
+<section>
+	<div class="container">
+		<h3>Subscription</h3>
+		{{ if .Data.AccountDetails.Subscription.IsSubscribed }}
+			<p>Plan: {{ .Data.AccountDetails.Subscription.Plan }}
+			<p>Billing Started On: {{ .Data.AccountDetails.Subscription.CurrentPeriodStart }}</p>
+			<p>Next Billing Date: {{ .Data.AccountDetails.Subscription.CurrentPeriodEnd }}</p>
+			<p>Billing Amount: {{ .Data.AccountDetails.Subscription.Amount }}
+			<p>To manage your subscription, <a href="/user/stripe/billing-portal">click here</a></p>
+			<br>
+		{{ else }}
+			<p>To subscribe, <a href="/user/stripe/subscriptions">click here</a></p>
+		{{ end }}
+	</div>
+</section>
+
+<section>
+	<div class="container">
+		<h3>Actions</h3>
+		<p>To logout, <a href="/user/auth/logout">click here</a></p>
+		<p>To delete your account, <a href="/user/delete">click here</a></p>
+	</div>
+</section>
+
+{{ template "footer" . }}

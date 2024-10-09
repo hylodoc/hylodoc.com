@@ -12,6 +12,8 @@
 			<!-- Navigation Links -->
 			<div class="u-pull-right">
 				{{ if .Data.Session }}
+					<a href="/user/account">{{ .Data.Session.Username }}</a>
+					<span class="separator">~</span>
 					<a href="/user/auth/logout">Logout</a>
 				{{ else }}
 					<a href="/login">Log in</a>

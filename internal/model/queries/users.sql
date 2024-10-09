@@ -1,8 +1,8 @@
 -- name: CreateUser :one
 INSERT INTO users (
-	email
+	email, username
 ) VALUES (
-	$1
+	$1, $2
 )
 RETURNING *;
 
@@ -21,3 +21,8 @@ SELECT *
 FROM users u
 JOIN installations i ON u.id = i.user_id
 WHERE i.gh_installation_id = $1 AND i.active = true;
+
+-- name: DeleteUserByUserID :exec
+DELETE
+FROM users
+WHERE id = $1;
