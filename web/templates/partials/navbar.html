@@ -2,26 +2,25 @@
 
 <div class="navbar">
 	<div class="container">
-		<!-- Logo/Brand -->
-		<div class="left">
-			<a href="/">Progstack</a>
-			<span>blogging for devs</span>
-		</div>
+		<div class="row">
+			<!-- Logo/Brand -->
+			<div class="u-pull-left">
+				<h2><a href="/">Progstack</a></h2>
+				<h4>blogging for devs</h4>
+			</div>
 
-		<!-- Navigation Links -->
-		<div class="right">
-			{{ if .Data.Session }}
-				<a href="/user/auth/logout">Logout</a>
-			{{ else }}
-				<a href="/login">Log in</a>
-				<a href="/register">Register</a>
-			{{ end }}
-			<span id="icons">
+			<!-- Navigation Links -->
+			<div class="u-pull-right">
+				{{ if .Data.Session }}
+					<a href="/user/auth/logout">Logout</a>
+				{{ else }}
+					<a href="/login">Log in</a>
+					<a href="/register">Register</a>
+				{{ end }}
 				<a href="https://discord.gg/yfx69tbhxQ">
 					<img src="/static/img/discord.svg" alt="Discord">
 				</a>
-			</span>
-
+			</div>
 		</div>
 	</div>
 </div>

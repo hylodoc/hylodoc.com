@@ -2,35 +2,38 @@
 
 <div id="toast" class="toast"></div>
 
-<div id="demoSiteSection">
-	<h6>Preview your demo blog</h6>
-	<p>Click the button below to generate a demo site based on your Git repository.</p>
-	<button id="previewDemoBtn">Preview Demo Site</button>
-	<div id="demoSiteMessage" style="margin-top: 10px;"></div>
-</div>
+<div class="container">
+	<div id="demoSiteSection">
+		<h6>Preview your demo blog</h6>
+		<p>Click the button below to generate a demo site based on your Git repository.</p>
+		<button id="previewDemoBtn">Preview Demo Site</button>
+		<div id="demoSiteMessage" style="margin-top: 10px;"></div>
+	</div>
 
-<div>
-	<h6>View blog metrics</h6>
-	<p>Click here to navigate to your blog metrics</p>
-	<a href="dashboard">metrics</a>
-</div>
+	<div>
+		<h6>View blog metrics</h6>
+		<p>Click here to navigate to your blog metrics</p>
+		<a href="dashboard">metrics</a>
+	</div>
 
-<div>
-	<h6>Configure subdomain and launch</h6>
-	<!-- need these as templates so that multiple blogs can be setup at once -->
-	<form id="subdomainForm" class="subdomain-checker" onsubmit="return false;">
-		<label for="subdomainInput">Choose your subdomain:</label>
-		<input type="text" id="subdomainInput" placeholder="Enter your subdomain" required />
-		<div id="availabilityMessage" class="availability-message"></div>
-		<button type="submit" id="submitBtn" disabled>Launch 🚀</button>
-	</form>
-</div>
+	<div>
+		<h6>Configure subdomain and launch</h6>
+		<!-- need these as templates so that multiple blogs can be setup at once -->
+		<form id="subdomainForm" class="subdomain-checker" onsubmit="return false;">
+			<label for="subdomainInput">Choose your subdomain:</label>
+			<input type="text" id="subdomainInput" placeholder="Enter your subdomain" required />
+			<div id="availabilityMessage" class="availability-message"></div>
+			<button type="submit" id="submitBtn" disabled>Launch 🚀</button>
+		</form>
+	</div>
 
-<div class="subscription-plans">
-	<h6>Select a Subscription Plan</h6>
-	{{ range .Data.Plans }}
+	<div class="subscription-plans">
+		<h6>Select a Subscription Plan</h6>
+		{{ range .Data.Plans }}
 		{{ template "subscription_product" . }}
-	{{ end }}
+		{{ end }}
+	</div>
+
 </div>
 
 <script>

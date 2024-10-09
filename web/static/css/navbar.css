@@ -1,39 +1,45 @@
-.navbar {
-	padding: 10px 0;
+/* Align everything in the row vertically centered */
+.navbar .row {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    padding: 1em 0;
 }
 
-.navbar .container {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
+/* Style for the brand/logo section */
+.navbar .u-pull-left h2,
+.navbar .u-pull-left h4 {
+	display: inline-block;
+	margin: 0;
 }
 
-.navbar a {
+.navbar .u-pull-left h4 {
+	font-size: 0.9em;
+	margin-left: 10px;
+	color: #666;
+}
+
+/* Style for navigation links */
+.navbar .u-pull-right a {
+	margin-left: 20px;
+	font-size: 1em;
 	text-decoration: none;
-	margin: 0 10px;
+	color: #333;
 }
 
-.navbar a:hover {
+.navbar .u-pull-right a:hover {
 	text-decoration: underline;
 }
 
-.navbar .left {
-	display: flex;
-	align-items: center;
+/* Style for the Discord icon */
+.navbar img {
+	vertical-align: middle;
+	height: 1.5em;
+	width: 1.5em;
 }
 
-.navbar .left a {
-	display: flex;
-	align-items: center;
-	font-size: 1.5em;
-}
-
-.navbar .right {
-	display: flex;
-	align-items: center;
-}
-
-.navbar .right #icons img {
-	height: 1.3em;
-	width: 1.3em;
+/* Remove underline by default */
+.navbar a {
+	text-decoration: none;
+	color: #333;
 }
