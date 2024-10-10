@@ -109,7 +109,6 @@ func Serve() {
 	authR.HandleFunc("/account", userService.Account())
 	authR.HandleFunc("/delete", userService.Delete())
 	authR.HandleFunc("/home", userService.Home())
-	authR.HandleFunc("/home/callback", userService.HomeCallback())
 	authR.HandleFunc("/stripe/subscriptions", billingService.Subscriptions())
 	authR.HandleFunc("/stripe/create-checkout-session", billingService.CreateCheckoutSession())
 	authR.HandleFunc("/stripe/success", billingService.Success())
@@ -122,7 +121,7 @@ func Serve() {
 	blogR.HandleFunc("/subdomain/check", blogService.SubdomainCheck())
 	blogR.HandleFunc("/subdomain/submit", blogService.SubdomainSubmit())
 	blogR.HandleFunc("/generate-demo", blogService.LaunchDemoBlog())
-	blogR.HandleFunc("/dashboard", blogService.SubscriberMetrics())
+	blogR.HandleFunc("/subscribers", blogService.SubscriberMetrics())
 
 	/* serve static content */
 	r.PathPrefix("/static/css").Handler(http.StripPrefix("/static/css", http.FileServer(http.Dir("./web/static/css"))))

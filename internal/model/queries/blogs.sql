@@ -1,8 +1,17 @@
 -- name: CreateBlog :one
 INSERT INTO blogs (
-	installation_id, gh_repository_id, gh_name, gh_full_name, gh_url, subdomain, demo_subdomain, from_address
+	user_id,
+	installation_id,
+	gh_repository_id,
+	gh_url,
+	gh_name,
+	gh_full_name,
+	subdomain,
+	demo_subdomain,
+	from_address,
+	blog_type
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 )
 RETURNING *;
 
@@ -36,6 +45,11 @@ WHERE id = $1;
 SELECT *
 FROM blogs
 WHERE gh_repository_id = $1;
+
+-- name: ListBlogsByUserID :many
+SELECT *
+FROM blogs
+WHERE user_id = $1;
 
 -- name: ListBlogsForInstallationByGhInstallationID :many
 SELECT *

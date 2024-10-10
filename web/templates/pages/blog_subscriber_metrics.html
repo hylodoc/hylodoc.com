@@ -1,21 +1,24 @@
 {{ template "header" . }}
 
-<div class='dashboard'>
-	<h6>Subscriber Dashboard</h6>
-	<div class='total-subscribers'>
-		Total Subscribers: <span id='totalSubscribersCount'>{{ .Data.SubscriberData.Count }}</span>
+<div class="container">
+	<div class="dashboard">
+		<h6>Subscriber Dashboard</h6>
+		<div class="total-subscribers">
+			Total Subscribers: <span id="totalSubscribersCount">{{ .Data.SubscriberData.Count }}</span>
+		</div>
+		<canvas id="subscriberMetrics"></canvas>
 	</div>
-	<canvas id='subscriberMetrics'></canvas> </div>
+</div>
 
 <script>
 	function renderChart() {
-		const ctx = document.getElementById('subscriberMetrics');
+		const ctx = document.getElementById("subscriberMetrics");
 		const metrics = {{ .Data.SubscriberData.CumulativeCounts }};
 		new Chart(ctx, {
-			type: 'line',
+			type: "line",
 			data: {
 				datasets: [{
-					label: 'Number of subscribers',
+					label: "Number of subscribers",
 					data: metrics.map(
 						item => ({
 							x: item.timestamp,
@@ -27,13 +30,13 @@
 			options: {
 				scales: {
 					x: {
-						type: 'time',
+						type: "time",
 						time: {
-							unit: 'month'
+							unit: "month"
 						},
 						title: {
 							display: true,
-							text: 'Months'
+							text: "Months"
 						}
 					},
 					y: {

@@ -168,18 +168,16 @@ func (b *BlogService) Config() http.HandlerFunc {
 			return
 		}
 
-		util.ExecTemplate(w, []string{"config.html", "subscription_product.html"},
+		util.ExecTemplate(w, []string{"blog_config.html"},
 			util.PageInfo{
 				Data: struct {
 					Title   string
 					Session *auth.Session
 					ID      int32
-					Plans   []config.Plan
 				}{
 					Title:   "Blog Setup",
 					Session: session,
 					ID:      int32(intBlogID),
-					Plans:   config.Config.Stripe.Plans,
 				},
 			},
 			template.FuncMap{},
@@ -219,7 +217,6 @@ func (b *BlogService) SubdomainCheck() http.HandlerFunc {
 			available = false
 			message = userErr.Message
 		}
-		/* build response object */
 
 		w.WriteHeader(http.StatusOK)
 		err = json.NewEncoder(w).Encode(SubdomainCheckResponse{
@@ -249,7 +246,6 @@ func (b *BlogService) subdomainCheck(w http.ResponseWriter, r *http.Request) err
 			Message: "subdomain already exists",
 		}
 	}
-	/* check if valid subdomain */
 	if err = validateSubdomain(req.Subdomain); err != nil {
 		return err
 	}
@@ -277,7 +273,6 @@ func validateSubdomain(subdomain string) error {
 				Message: "Subdomain can only contain letters, numbers, and hyphens.",
 			}
 		}
-
 		/* check for consecutive hyphens */
 		if r == '-' && previousChar == '-' {
 			return util.UserError{
@@ -394,17 +389,14 @@ func (b *BlogService) launchDemoBlog(w http.ResponseWriter, r *http.Request) (st
 		return "", fmt.Errorf("error getting blog: %w", err)
 	}
 
-	if !blog.DemoSubdomain.Valid {
-		return "", fmt.Errorf("error no valid demo subdomain\n")
-	}
 	err = LaunchUserBlog(LaunchUserBlogParams{
 		GhRepoFullName: blog.GhFullName,
-		Subdomain:      blog.DemoSubdomain.String,
+		Subdomain:      blog.DemoSubdomain,
 	})
 	if err != nil {
 		return "", fmt.Errorf("error launching demo site: %w", err)
 	}
-	return buildDemoUrl(blog.DemoSubdomain.String), nil
+	return buildDemoUrl(blog.DemoSubdomain), nil
 }
 
 func buildDemoUrl(subdomain string) string {

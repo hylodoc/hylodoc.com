@@ -166,7 +166,6 @@ func buildCreateInstallationTxParams(installationID int64, userID int32, repos [
 			GhName:         repo.Name,
 			GhFullName:     repo.FullName,
 			GhUrl:          repo.HtmlUrl,
-			Subdomain:      repo.Name,
 			FromAddress:    config.Config.Progstack.FromEmail, /* XXX: should be configurable by user, hardcoding for now */
 
 			DemoSubdomain: subdomain.GenerateDemoSubdomain(),
@@ -279,10 +278,18 @@ func handleInstallationRepositories(c *http.Client, s *model.Store, body []byte)
 	str, _ := eventToJSON(event)
 	log.Printf("installationRepositoriesEvent: %s", str)
 
+	ghUserID := event.Sender.ID
+	user, err := s.GetGithubAccountByGhUserID(context.TODO(), ghUserID)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("error getting user with ghUserID `%s' (in event) from db: %w", ghUserID, err)
+		}
+	}
+
 	ghInstallationID := event.Installation.ID
 	switch event.Action {
 	case "added":
-		return handleInstallationRepositoriesAdded(c, s, ghInstallationID, event.RepositoriesAdded)
+		return handleInstallationRepositoriesAdded(c, s, ghInstallationID, event.RepositoriesAdded, user.ID)
 	case "removed":
 		return handleInstallationRepositoriesRemoved(c, s, ghInstallationID, event.RepositoriesRemoved)
 	default:
@@ -292,7 +299,7 @@ func handleInstallationRepositories(c *http.Client, s *model.Store, body []byte)
 	return nil
 }
 
-func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInstallationID int64, repos []Repository) error {
+func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInstallationID int64, repos []Repository, userID int32) error {
 	log.Println("handling repositories added event...")
 
 	/* get access token */
@@ -316,20 +323,17 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 		return fmt.Errorf("error getting installation with ghInstallationID: %w", err)
 	}
 
-	/* write repositories added to db */
-
 	for _, repo := range repos {
 		_, err := s.CreateBlog(context.TODO(), model.CreateBlogParams{
+			UserID:         userID,
 			InstallationID: installation.ID,
 			GhRepositoryID: repo.ID,
 			GhName:         repo.Name,
 			GhFullName:     repo.FullName,
+			BlogType:       model.BlogTypeRepository,
 			GhUrl:          fmt.Sprintf("https://github.com/%s", repo.FullName),
 			FromAddress:    config.Config.Progstack.FromEmail, /* XXX: hardcoding for now */
-			DemoSubdomain: sql.NullString{
-				Valid:  true,
-				String: subdomain.GenerateDemoSubdomain(),
-			},
+			DemoSubdomain:  subdomain.GenerateDemoSubdomain(),
 		})
 		if err != nil {
 			/* XXX: cleanup delete from disk */

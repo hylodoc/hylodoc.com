@@ -46,7 +46,7 @@ func (b *BlogService) SubscriberMetrics() http.HandlerFunc {
 		}
 		log.Printf("subscribers: %s\n", data)
 
-		util.ExecTemplate(w, []string{"dashboard.html"},
+		util.ExecTemplate(w, []string{"blog_subscriber_metrics.html"},
 			util.PageInfo{
 				Data: struct {
 					Title          string

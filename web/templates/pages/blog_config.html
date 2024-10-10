@@ -4,26 +4,27 @@
 
 <div class="container">
 	<div id="demoSiteSection">
-		<h6>Preview your demo blog</h6>
-		<p>Click the button below to generate a demo site based on your Git repository.</p>
+		<h4>Preview your demo blog</h4>
+		<p>To generate a temporary site based on your repo. Press the
+		button below</p>
 		<button id="previewDemoBtn">Preview Demo Site</button>
 		<div id="demoSiteMessage" style="margin-top: 10px;"></div>
 	</div>
 
 	<div>
-		<h6>View blog metrics</h6>
-		<p>Click here to navigate to your blog metrics</p>
-		<a href="dashboard">metrics</a>
+		<h4>View blog subscriber metrics</h4>
+		<p>To view your site metrics <a href="subscribers">Click here</a></p>
+		
 	</div>
 
 	<div>
-		<h6>Configure subdomain and launch</h6>
+		<h4>Configure subdomain</h4>
 		<!-- need these as templates so that multiple blogs can be setup at once -->
 		<form id="subdomainForm" class="subdomain-checker" onsubmit="return false;">
 			<label for="subdomainInput">Choose your subdomain:</label>
 			<input type="text" id="subdomainInput" placeholder="Enter your subdomain"/>
 			<div id="availabilityMessage" class="availability-message"></div>
-			<button type="submit" id="submitBtn" disabled>Launch 🚀</button>
+			<button type="submit" id="submitBtn" disabled>Save</button>
 		</form>
 	</div>
 </div>

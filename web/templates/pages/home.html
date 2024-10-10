@@ -1,19 +1,43 @@
 {{ template "header" . }}
 
-<div class="container">
-	<h5>Launch a Progstack</h5>
-	<h6>1. Link Github account</h6>
-	<p>If you did not register with a github account and you wish to blog
-	link it now.</p>
-	<a href="/user/gh/linkgithub">Link your GitHub Account</a>
-	<br><br>
+<!-- Link Github Account -->
+{{ if not .Data.AccountDetails.IsLinked }}
+<section>
+	<div class="container">
+		<h4>Link Github account</h4>
+		<p>
+			To create a repository based site, you need to link a Github Account.
+			<a href="gh/linkgithub">Link GitHub Account</a>
+		</p>
+	</div>
+</section>
+{{ end }}
 
-	<h6>2. Install Our GitHub App</h6>
-	<p>To use our application, you need to install our GitHub App. Click the button below to proceed with the installation. You will be able to select which repositories or organizations the app should have access to.</p>
-	<a href="{{.Data.GithubAppInstallUrl}}">Install GitHub App</a>
-</div>
+<!-- Install/Manage GithubApp -->
+<section>
+	<div class="container">
+		{{ if not .Data.AccountDetails.HasInstallation }}
+			<h4>Install Our GitHub App</h4>
+			<p>
+				To use our application, you need to install our GitHub App. You
+				will be able to select which repositories or organizations the
+				app should have access to.
+				<a href="{{.Data.GithubInstallAppUrl}}">Install GitHub App</a>
+			</p>
+		{{ else }}
+			<h4>Manage your installations</h4>
+			<p>
+				To manage your Github Installations, add/remove repositories.
+				<a href="{{.Data.GithubInstallAppUrl}}">Manage Installations</a>
+			</p>
+		{{ end }}
+	</div>
+</section>
 
-{{ template "installations" . }}
+<!-- Installations -->
+<section>
+	{{ template "blogs" .Data.Blogs }}
+</section>
 
 <br>
 

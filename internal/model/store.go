@@ -84,16 +84,16 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 		}
 		for _, blog := range arg.Blogs {
 			_, err := s.CreateBlog(ctx, CreateBlogParams{
+				UserID:         arg.UserID,
 				InstallationID: installation.ID,
 				GhRepositoryID: blog.GhRepositoryID,
 				GhName:         blog.GhName,
 				GhFullName:     blog.GhFullName,
 				GhUrl:          fmt.Sprintf("https://github.com/%s", blog.GhFullName), /* ghUrl not always in events */
-				FromAddress:    blog.FromAddress,
-				DemoSubdomain: sql.NullString{
-					Valid:  true,
-					String: blog.DemoSubdomain,
-				},
+
+				BlogType:      BlogTypeRepository,
+				FromAddress:   blog.FromAddress,
+				DemoSubdomain: blog.DemoSubdomain,
 			})
 			if err != nil {
 				return err

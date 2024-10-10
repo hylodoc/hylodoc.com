@@ -6,6 +6,13 @@ INSERT INTO installations (
 )
 RETURNING *;
 
+-- name: InstallationExistsForUserID :one
+SELECT EXISTS (
+	SELECT 1
+	FROM installations
+	WHERE user_id = $1
+) AS installation_exists;
+
 -- name: GetInstallationWithGithubInstallationID :one
 SELECT *
 FROM installations

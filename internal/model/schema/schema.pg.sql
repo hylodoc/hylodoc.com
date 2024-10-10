@@ -93,19 +93,29 @@ CREATE TABLE installations (
 		ON DELETE CASCADE -- delete installations if user deleted
 );
 
+CREATE TYPE blog_status AS ENUM ('live', 'offline');
+CREATE TYPE blog_type AS ENUM ('repository', 'folder');
+
 CREATE TABLE blogs (
 	id 			SERIAL				PRIMARY KEY,
+	user_id			INTEGER		NOT NULL,
 	installation_id		INTEGER		NOT NULL,
 	gh_repository_id	BIGINT		NOT NULL	UNIQUE,
 	gh_url			VARCHAR(255)	NOT NULL,
 	gh_name			VARCHAR(255)	NOT NULL,
 	gh_full_name		VARCHAR(255)	NOT NULL,				-- needed for path construction
 	subdomain		VARCHAR(255)			UNIQUE,
-	demo_subdomain		VARCHAR(255)			UNIQUE,
+	demo_subdomain		VARCHAR(255)	NOT NULL	UNIQUE,
 	from_address		VARCHAR(255)	NOT NULL,
-	active			BOOLEAN		NOT NULL			DEFAULT(false),
+	blog_type		blog_type	NOT NULL,
+	status			blog_status	NOT NULL			DEFAULT('offline'),
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
+
+	CONSTRAINT fk_user_id
+		FOREIGN KEY (user_id)
+		REFERENCES users(id)
+		ON DELETE CASCADE, -- delete repositories when installation deleted
 
 	CONSTRAINT fk_installation_id
 		FOREIGN KEY (installation_id)

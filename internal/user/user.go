@@ -30,47 +30,6 @@ func NewUserService(s *model.Store) *UserService {
 	}
 }
 
-func (u *UserService) HomeCallback() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("homecallback handler...")
-
-		/* get session */
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
-		if !ok {
-			http.Error(w, "User not found", http.StatusUnauthorized)
-			return
-		}
-
-		start := time.Now()
-		for {
-			duration := time.Since(start)
-			log.Printf("duration: %s\n", duration.String())
-			if duration > 10*time.Second {
-				log.Printf("homecallback handler timed out for user `%s'\n", session.UserID)
-				http.Error(w, "callback timed out", http.StatusRequestTimeout)
-				return
-			}
-
-			/* get installation info */
-			_, err := getInstallationsInfo(u.store, session.UserID)
-			if err != nil {
-				if err != sql.ErrNoRows {
-					log.Printf("error fetching installations info for user `%d': %v\n", session.UserID, err)
-					http.Error(w, "", http.StatusInternalServerError)
-					return
-				}
-				/* not found, wait for event to be processed */
-				time.Sleep(2 * time.Second)
-				continue
-			}
-			/* got installation info */
-			break
-		}
-		/* found installation info */
-		http.Redirect(w, r, "/user/home", http.StatusSeeOther)
-	}
-}
-
 func (u *UserService) Home() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("home handler...")
@@ -83,26 +42,36 @@ func (u *UserService) Home() http.HandlerFunc {
 			return
 		}
 
-		installationsInfo, err := getInstallationsInfo(u.store, session.UserID)
+		/* get account details */
+		details, err := u.accountDetails(w, r, session)
+		if err != nil {
+			log.Printf("error getting acount details: %v", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+
+		blogs, err := getBlogsInfo(u.store, session.UserID)
 		if err != nil {
 			log.Printf("could not get Installations info for user `%d': %v", session.UserID, err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
 
-		ghInstallUrl := fmt.Sprintf(ghInstallUrlTemplate, config.Config.Github.AppName)
-		util.ExecTemplate(w, []string{"home.html", "installations.html", "blogs.html"},
+		githubInstallAppUrl := fmt.Sprintf(ghInstallUrlTemplate, config.Config.Github.AppName)
+		util.ExecTemplate(w, []string{"home.html", "blogs.html"},
 			util.PageInfo{
 				Data: struct {
 					Title               string
 					Session             *auth.Session
-					GithubAppInstallUrl string
-					Installations       []InstallationInfo
+					GithubInstallAppUrl string
+					AccountDetails      AccountDetails
+					Blogs               []BlogInfo
 				}{
 					Title:               "Home",
 					Session:             session,
-					GithubAppInstallUrl: ghInstallUrl,
-					Installations:       installationsInfo,
+					GithubInstallAppUrl: githubInstallAppUrl,
+					AccountDetails:      details,
+					Blogs:               blogs,
 				},
 			},
 			template.FuncMap{},
@@ -110,77 +79,100 @@ func (u *UserService) Home() http.HandlerFunc {
 	}
 }
 
-type InstallationInfo struct {
-	GithubID  int64      `json:"github_id"`
-	CreatedAt time.Time  `json:"created_at"`
-	Blogs     []BlogInfo `json:"blogs"`
-}
-
 type BlogInfo struct {
-	ID         int32     `json:"ID"`
-	Name       string    `json:"name"`
-	GithubUrl  string    `json:"html_url"`
-	WebsiteUrl string    `json:"website_url"`
-	Subdomain  string    `json:"subdomain"`
-	Active     bool      `json:"active"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID             int32
+	Domain         string
+	DomainUrl      string
+	RepositoryUrl  string
+	SubscribersUrl string
+	MetricsUrl     string
+	Type           string
+	Status         string
+	UpdatedAt      time.Time
+	IsRepository   bool
+	IsLive         bool
 }
 
-func getInstallationsInfo(s *model.Store, userID int32) ([]InstallationInfo, error) {
-	/* get installations for user */
-	installations, err := s.ListInstallationsForUser(context.TODO(), userID)
-	if err != nil {
-		return []InstallationInfo{}, err
-	}
-	/* populate the installation info get repositories */
-	var info []InstallationInfo
-	for _, dbInstallation := range installations {
-		blogsInfo, err := getBlogsInfo(s, dbInstallation.GhInstallationID)
-		if err != nil {
-			return []InstallationInfo{}, fmt.Errorf("error getting RepositoriesInfo: %w", err)
-		}
-		installationInfo := InstallationInfo{
-			GithubID:  dbInstallation.GhInstallationID,
-			CreatedAt: dbInstallation.CreatedAt,
-			Blogs:     blogsInfo,
-		}
-		info = append(info, installationInfo)
-	}
-	return info, nil
-}
-
-func getBlogsInfo(s *model.Store, ghInstallationID int64) ([]BlogInfo, error) {
-	blogs, err := s.ListBlogsForInstallationByGhInstallationID(context.TODO(), ghInstallationID)
+func getBlogsInfo(s *model.Store, userID int32) ([]BlogInfo, error) {
+	blogs, err := s.ListBlogsByUserID(context.TODO(), userID)
 	if err != nil {
 		/* should not be possible to have an installation with no repositories */
 		return []BlogInfo{}, err
 	}
 	var info []BlogInfo
 	for _, blog := range blogs {
-		subdomain := "Not configured"
+		subdomain := blog.DemoSubdomain
 		if blog.Subdomain.Valid {
 			subdomain = blog.Subdomain.String
 		}
+		isRepository := false
+		if blog.BlogType == model.BlogTypeRepository {
+			isRepository = true
+		}
+		isLive := false
+		if blog.Status == model.BlogStatusLive {
+			isLive = true
+		}
 		blogInfo := BlogInfo{
-			ID:         blog.ID,
-			Name:       blog.GhName,
-			GithubUrl:  blog.GhUrl,
-			WebsiteUrl: fmt.Sprintf("http://%s.localhost:7999", blog.DemoSubdomain), /* XXX: how to accurately track this since website is generated from repos */
-			Subdomain:  subdomain,
-			Active:     blog.Active,
-			CreatedAt:  blog.CreatedAt,
+			ID:             blog.ID,
+			Domain:         buildDomain(subdomain),
+			DomainUrl:      buildDomainUrl(subdomain),
+			RepositoryUrl:  blog.GhUrl,
+			SubscribersUrl: buildSubscribersUrl(blog.ID),
+			MetricsUrl:     buildMetricsUrl(blog.ID),
+			Type:           string(blog.BlogType),
+			Status:         string(blog.Status),
+			UpdatedAt:      blog.UpdatedAt,
+			IsRepository:   isRepository,
+			IsLive:         isLive,
 		}
 		info = append(info, blogInfo)
 	}
 	return info, nil
 }
 
+func buildDomain(subdomain string) string {
+	return fmt.Sprintf(
+		"%s.%s",
+		subdomain,
+		config.Config.Progstack.ServiceName,
+	)
+}
+
+func buildDomainUrl(subdomain string) string {
+	return fmt.Sprintf(
+		"%s://%s.%s",
+		config.Config.Progstack.Protocol,
+		subdomain,
+		config.Config.Progstack.ServiceName,
+	)
+}
+
+func buildSubscribersUrl(blogID int32) string {
+	return fmt.Sprintf(
+		"%s://%s/user/blogs/%d/subscribers",
+		config.Config.Progstack.Protocol,
+		config.Config.Progstack.ServiceName,
+		blogID,
+	)
+}
+
+func buildMetricsUrl(blogID int32) string {
+	return fmt.Sprintf(
+		"%s://%s/user/blogs/%d/metrics",
+		config.Config.Progstack.Protocol,
+		config.Config.Progstack.ServiceName,
+		blogID,
+	)
+}
+
 type AccountDetails struct {
-	Username     string
-	Email        string
-	IsLinked     bool
-	GithubEmail  string
-	Subscription Subscription
+	Username        string
+	Email           string
+	IsLinked        bool
+	HasInstallation bool
+	GithubEmail     string
+	Subscription    Subscription
 }
 
 type Subscription struct {
@@ -229,10 +221,11 @@ func (u *UserService) Account() http.HandlerFunc {
 func (u *UserService) accountDetails(w http.ResponseWriter, r *http.Request, session *auth.Session) (AccountDetails, error) {
 	/* get github info */
 	accountDetails := AccountDetails{
-		Username:    session.Username,
-		Email:       session.Email,
-		IsLinked:    false,
-		GithubEmail: "",
+		Username:        session.Username,
+		Email:           session.Email,
+		IsLinked:        false,
+		HasInstallation: false,
+		GithubEmail:     "",
 	}
 	linked := true
 	ghAccount, err := u.store.GetGithubAccountByUserID(context.TODO(), session.UserID)
@@ -246,6 +239,14 @@ func (u *UserService) accountDetails(w http.ResponseWriter, r *http.Request, ses
 	if linked {
 		accountDetails.IsLinked = true
 		accountDetails.GithubEmail = ghAccount.GhEmail
+	}
+
+	hasInstallation, err := u.store.InstallationExistsForUserID(context.TODO(), session.UserID)
+	if err != nil {
+		return AccountDetails{}, fmt.Errorf("error checking if user has installation: %w", err)
+	}
+	if hasInstallation {
+		accountDetails.HasInstallation = true
 	}
 
 	/* get stripe subscription */
@@ -268,7 +269,7 @@ func (u *UserService) accountDetails(w http.ResponseWriter, r *http.Request, ses
 		subscription.Plan = "basic" /* XXX: fix */
 		subscription.CurrentPeriodStart = sub.CurrentPeriodStart.Format("Jan 02 2006 03:04PM")
 		subscription.CurrentPeriodEnd = sub.CurrentPeriodEnd.Format("Jan 02 2006 03:04PM")
-		subscription.Amount = billing.ConvertCentsToDollars(sub.Amount) /* XXX: fix */
+		subscription.Amount = billing.ConvertCentsToDollars(sub.Amount)
 	}
 	accountDetails.Subscription = subscription
 	return accountDetails, nil
