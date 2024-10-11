@@ -7,11 +7,12 @@ INSERT INTO blogs (
 	gh_name,
 	gh_full_name,
 	subdomain,
+	custom_domain,
 	demo_subdomain,
 	from_address,
 	blog_type
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
 RETURNING *;
 
@@ -57,6 +58,24 @@ FROM blogs b
 INNER JOIN installations i
 ON b.installation_id = i.id
 WHERE i.gh_installation_id = $1;
+
+-- name: SetTestBranchByID :exec
+UPDATE blogs
+SET
+	test_branch = $1
+WHERE id = $2;
+
+-- name: SetLiveBranchByID :exec
+UPDATE blogs
+SET
+	live_branch = $1
+WHERE id = $2;
+
+-- name: SetBlogStatusByID :exec
+UPDATE blogs
+SET
+	status = $1
+WHERE id = $2;
 
 -- name: DeleteBlogWithGhRepositoryID :exec
 DELETE

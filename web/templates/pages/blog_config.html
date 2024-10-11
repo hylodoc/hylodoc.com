@@ -2,70 +2,151 @@
 
 <div id="toast" class="toast"></div>
 
-<div class="container">
-	<div id="demoSiteSection">
-		<h4>Preview your demo blog</h4>
-		<p>To generate a temporary site based on your repo. Press the
-		button below</p>
-		<button id="previewDemoBtn">Preview Demo Site</button>
-		<div id="demoSiteMessage" style="margin-top: 10px;"></div>
+<!-- Basic info-->
+<section>
+	<div class="container">
+		<h3>Blog Configuration</p>
 	</div>
+</section>
 
-	<div>
-		<h4>View blog subscriber metrics</h4>
-		<p>To view your site metrics <a href="subscribers">Click here</a></p>
-		
-	</div>
-
-	<div>
-		<h4>Configure subdomain</h4>
+<!-- Configure domains and subdomain -->
+<section>
+	<div class="container">
+		<h4>Domain</h4>
 		<!-- need these as templates so that multiple blogs can be setup at once -->
-		<form id="subdomainForm" class="subdomain-checker" onsubmit="return false;">
-			<label for="subdomainInput">Choose your subdomain:</label>
-			<input type="text" id="subdomainInput" placeholder="Enter your subdomain"/>
+		<form id="subdomainForm" onsubmit="return false;">
+			<label for="subdomainInput">Configure subdomain</label>
+			<div class="row">
+				<div class="four columns">
+					<input
+						class="u-full-width"
+						type="text"
+						id="subdomainInput"
+						placeholder= "{{ if .Data.Blog.Subdomain }}{{ .Data.Blog.Subdomain }}{{else}}Enter your subdomain{{ end }}"
+					/>
+				</div>
+				<div class="three columns u-pull-left">
+					<button type="submit" id="submitSubdomainBtn" disabled>Save</button>
+				</div>
+			</div>
 			<div id="availabilityMessage" class="availability-message"></div>
-			<button type="submit" id="submitBtn" disabled>Save</button>
 		</form>
 	</div>
-</div>
+</section>
+
+<!-- Configure git -->
+<section>
+	<div class="container">
+		<h4>Git</h4>
+
+		<!-- Submit git branch for test builds -->
+		<form id="test-branch-form" onsubmit="return false;">
+			<label for="testBranch">Set git branch for test site generation</label>
+			<div class="row">
+				<div class="four columns">
+					<input
+						class="u-full-width"
+						type="text"
+						id="testBranch"
+						placeholder="{{ if .Data.Blog.TestBranch }}{{ .Data.Blog.TestBranch }}{{ else }}Enter test-build branch{{ end }}"
+					/>
+				</div>
+				<div class="three columns u-pull-left">
+					<button type="submit">Save</button>
+				</div>
+			</div>
+		</form>
+
+		<!-- Submit git branch for live builds -->
+		<form id="live-branch-form" onsubmit="return false;">
+			<label for="liveBranch">Set git branch for live builds</label>
+			<div class="row">
+				<div class="four columns">
+					<input
+						class="u-full-width"
+						type="text"
+						id="liveBranch"
+						placeholder="{{ if .Data.Blog.LiveBranch }}{{ .Data.Blog.LiveBranch }}{{ else }}Enter live-build branch{{ end }}"
+					/>
+				</div>
+				<div class="three columns u-pull-left">
+					<button type="submit">Save</button>
+				</div>
+			</div>
+		</form>
+	</div>
+</section>
+
+<!-- Toggle site between live/offline -->
+<section>
+	<div class="container">
+		<h4>Site</h4>
+		<form id="status-form">
+			<label for="statusInput">Set status</label>
+			<div class="row">
+				<div class="two columns">
+					<label>
+						<input type="radio" name="status" value="live" {{ if eq .Data.Blog.Status "live" }}checked{{ end }}>Live
+					</label>
+				</div>
+				<div class="two columns">
+					<label>
+						<input type="radio" name="status" value="offline" {{ if eq .Data.Blog.Status "offline" }}checked{{ end }}>Offline
+					</label>
+				</div>
+				<div class="two columns">
+					<button type="submit">Save</button>
+				</div>
+			</div>
+		</form>
+	</div>
+</section>
+
+<section>
+</section>
 
 <script>
 	let debounceTimer;
 
 	/* initialize event listeners */
 	function init() {
+		/* domain config */
 		const subdomainInput = document.getElementById("subdomainInput");
 		const subdomainForm = document.getElementById("subdomainForm");
-		const previewDemoBtn = document.getElementById("previewDemoBtn")
+		const testBranchInputForm = document.getElementById("test-branch-form")
+		const liveBranchInputForm = document.getElementById("live-branch-form")
+		const statusForm = document.getElementById("status-form")
 
 		subdomainInput.addEventListener("input", handleInput);
-		subdomainForm.addEventListener("submit", handleFormSubmit);
-		previewDemoBtn.addEventListener("click", generateDemoSite);
+		subdomainForm.addEventListener("submit", handleSubdomainFormSubmit);
+		testBranchInputForm.addEventListener("submit", handleTestBranchFormSubmit)
+		liveBranchInputForm.addEventListener("submit", handleLiveBranchFormSubmit)
+		statusForm.addEventListener("submit", handleStatusFormSubmit)
 	}
 
 	/* handle input event with debounce */
 	function handleInput() {
 		const subdomain = this.value.trim();
 		const messageElement = document.getElementById("availabilityMessage");
-		const submitBtn = document.getElementById("submitBtn");
+		const submitSubdomainBtn = document.getElementById("submitSubdomainBtn");
 
 		clearTimeout(debounceTimer); /* clear previous timer */
 
 		if (subdomain.length > 0) {
 			updateMessage(messageElement, "Checking availability...", "loading");
 		} else {
-			resetMessage(messageElement, submitBtn); /* Clear message if input is empty */
+			resetMessage(messageElement, submitSubdomainBtn); /* Clear message if input is empty */
 			return;
 		}
 
 		debounceTimer = setTimeout(() => {
-			checkSubdomainAvailability(subdomain, messageElement, submitBtn);
+			checkSubdomainAvailability(subdomain, messageElement, submitSubdomainBtn);
 		}, 300); /* 300ms debounce delay */
 	}
 
 	/* Check subdomain availability */
-	function checkSubdomainAvailability(subdomain, messageElement, submitBtn) {
-		fetch("subdomain/check", {
+	function checkSubdomainAvailability(subdomain, messageElement, submitSubdomainBtn) {
+		fetch("subdomain-check", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ subdomain })
@@ -74,17 +155,17 @@
 		.then(data => {
 			if (data.available) {
 				updateMessage(messageElement, "✅ This subdomain is available!", "available");
-				submitBtn.disabled = false;
+				submitSubdomainBtn.disabled = false;
 			} else {
 				updateMessage(messageElement, "❌ " + data.message, "unavailable");
-				submitBtn.disabled = true;
+				submitSubdomainBtn.disabled = true;
 			}
 		})
-		.catch(error => handleError(error, messageElement, submitBtn));
+		.catch(error => handleError(error, messageElement, submitSubdomainBtn));
 	}
 
 	/* Handle subdomain form submission */
-	function handleFormSubmit(event) {
+	function handleSubdomainFormSubmit(event) {
 		event.preventDefault(); /* Prevent default form submission */
 
 		const subdomain = document.getElementById("subdomainInput").value.trim();
@@ -93,7 +174,7 @@
 
 	/* Submit the subdomain to the server */
 	function submitSubdomain(subdomain) {
-		fetch("subdomain/submit", {
+		fetch("subdomain-submit", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ subdomain })
@@ -109,7 +190,7 @@
 		})
 		.then(data => {
 			console.log("Success: ", data.message);
-			showToast("Subdomain successfully registered!");
+			showToast(data.message);
 		})
 		.catch(error => console.error("Error submitting subdomain:", error));
 	}
@@ -121,60 +202,123 @@
 	}
 
 	/* Reset the message and disable submit button */
-	function resetMessage(messageElement, submitBtn) {
-		messageElement.textContent = ''; /* Clear message */
-		submitBtn.disabled = true; /* Disable submit button */
+	function resetMessage(messageElement, submitSubdomainBtn) {
+		messageElement.textContent = ""; /* Clear message */
+		submitSubdomainBtn.disabled = true; /* Disable submit button */
 	}
 
 	/* Handle fetch errors */
-	function handleError(error, messageElement, submitBtn) {
-		console.error('Error checking subdomain:', error);
+	function handleError(error, messageElement, submitSubdomainBtn) {
+		console.error("Error checking subdomain:", error);
 		updateMessage(messageElement, "⚠️ An error occurred while checking availability.", "unavailable");
-		submitBtn.disabled = true; /* Disable submit button on error */
+		submitSubdomainBtn.disabled = true; /* Disable submit button on error */
 	}
 
-	/* Generate the demo site */
-	function generateDemoSite() {
-		const messageElement = document.getElementById('demoSiteMessage');
-		showToast("Generating demo site, please wait...");
+	function handleTestBranchFormSubmit(event) {
+		event.preventDefault(); /* Prevent default form submission */
 
-		fetch("generate-demo", {
+		const testBranch = document.getElementById("testBranch").value.trim();
+		submitTestBranch(testBranch);
+	}
+
+	/* Submit the test branch to the server */
+	function submitTestBranch(testBranch) {
+		fetch("set-test-branch", {
 			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-			},
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ branch: testBranch }),
 		})
 		.then(response => {
 			if (!response.ok) {
-				throw new Error('Failed to generate demo site');
+				return response.json().then(errorData => {
+					showToast(errorData.message);
+					throw new Error(errorData.message);
+				});
 			}
 			return response.json();
 		})
 		.then(data => {
-			/* Redirect to the demo site or show a link */
-			console.log(`redirecting to ${data.demo_site_url}`)
-			window.open(data.demo_site_url, '_blank');
-			showToast("Demo site generated successfully!");
+			console.log("test branch submitted successfully: ", data.message);
+			showToast(data.message);
 		})
 		.catch(error => {
-			console.error('Error generating demo site:', error);
-			showToast("Error generating demo site. Please try again.");
+			console.error("Error submitting test branch:", error)
 		});
+	}
+
+	function handleLiveBranchFormSubmit(event) {
+		event.preventDefault(); /* Prevent default form submission */
+
+		const liveBranch = document.getElementById("liveBranch").value.trim();
+		submitLiveBranch(liveBranch);
+	}
+
+	/* Submit the live branch to the server */
+	function submitLiveBranch(liveBranch) {
+		fetch("set-live-branch", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ branch: liveBranch })
+		})
+		.then(response => {
+			if (!response.ok) {
+				return response.json().then(errorData => {
+					showToast(errorData.message);
+					throw new Error(errorData.message);
+				});
+			}
+			return response.json();
+		})
+		.then(data => {
+			console.log("Success: ", data.message);
+			showToast(data.message);
+		})
+		.catch(error => console.error("Error submitting live branch:", error));
+	}
+
+	function handleStatusFormSubmit(event) {
+		event.preventDefault();
+
+		const blogStatus = document.querySelector('input[name="status"]:checked');
+		console.log(blogStatus.value);
+		submitStatus(blogStatus.value);
+	}
+
+	function submitStatus(status) {
+		fetch("set-status", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ status })
+		})
+		.then(response => {
+			if (!response.ok) {
+				return response.json().then(errorData => {
+					showToast(errorData.message);
+					throw new Error(errorData.message);
+				});
+			}
+			return response.json();
+		})
+		.then(data => {
+			console.log("Success: ", data.message);
+			showToast(data.message);
+		})
+		.catch(error => console.error("Error submitting state change:", error));
 	}
 
 	/* Show a toast message */
 	function showToast(message) {
-		const toast = document.getElementById('toast');
+		const toast = document.getElementById("toast");
 		toast.textContent = message;
-		toast.style.display = 'block';
+		toast.style.display = "block";
 
 		setTimeout(() => {
-			toast.style.display = 'none';
+			toast.style.display = "none";
 		}, 3000); // Hide after 3 seconds
 	}
 
 	/* Initialize the script on page load */
-	document.addEventListener('DOMContentLoaded', init);
+	document.addEventListener("DOMContentLoaded", init);
 </script>
 
 {{ template "footer". }}

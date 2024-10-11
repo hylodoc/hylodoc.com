@@ -257,7 +257,7 @@ func handleInstallationDeleted(c *http.Client, s *model.Store, ghInstallationID 
 		path := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, repo.Subdomain)
 		log.Printf("deleting website at `%s' from disk...\n", path)
 		if err := os.RemoveAll(path); err != nil {
-			return fmt.Errorf("error deleting website `%s' from disk: %w", err)
+			return fmt.Errorf("error deleting website `%s' from disk: %w", repo.Subdomain, err)
 		}
 	}
 	/* cascade delete the installation and associated repos */

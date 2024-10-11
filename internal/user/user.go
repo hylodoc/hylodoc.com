@@ -7,10 +7,10 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/billing"
+	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/util"
@@ -50,9 +50,9 @@ func (u *UserService) Home() http.HandlerFunc {
 			return
 		}
 
-		blogs, err := getBlogsInfo(u.store, session.UserID)
+		blogs, err := blog.GetBlogsInfo(u.store, session.UserID)
 		if err != nil {
-			log.Printf("could not get Installations info for user `%d': %v", session.UserID, err)
+			log.Println("error getting blogs for user `%d': %v", session.UserID, err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -65,7 +65,7 @@ func (u *UserService) Home() http.HandlerFunc {
 					Session             *auth.Session
 					GithubInstallAppUrl string
 					AccountDetails      AccountDetails
-					Blogs               []BlogInfo
+					Blogs               []blog.BlogInfo
 				}{
 					Title:               "Home",
 					Session:             session,
@@ -77,93 +77,6 @@ func (u *UserService) Home() http.HandlerFunc {
 			template.FuncMap{},
 		)
 	}
-}
-
-type BlogInfo struct {
-	ID             int32
-	Domain         string
-	DomainUrl      string
-	RepositoryUrl  string
-	SubscribersUrl string
-	MetricsUrl     string
-	Type           string
-	Status         string
-	UpdatedAt      time.Time
-	IsRepository   bool
-	IsLive         bool
-}
-
-func getBlogsInfo(s *model.Store, userID int32) ([]BlogInfo, error) {
-	blogs, err := s.ListBlogsByUserID(context.TODO(), userID)
-	if err != nil {
-		/* should not be possible to have an installation with no repositories */
-		return []BlogInfo{}, err
-	}
-	var info []BlogInfo
-	for _, blog := range blogs {
-		subdomain := blog.DemoSubdomain
-		if blog.Subdomain.Valid {
-			subdomain = blog.Subdomain.String
-		}
-		isRepository := false
-		if blog.BlogType == model.BlogTypeRepository {
-			isRepository = true
-		}
-		isLive := false
-		if blog.Status == model.BlogStatusLive {
-			isLive = true
-		}
-		blogInfo := BlogInfo{
-			ID:             blog.ID,
-			Domain:         buildDomain(subdomain),
-			DomainUrl:      buildDomainUrl(subdomain),
-			RepositoryUrl:  blog.GhUrl,
-			SubscribersUrl: buildSubscribersUrl(blog.ID),
-			MetricsUrl:     buildMetricsUrl(blog.ID),
-			Type:           string(blog.BlogType),
-			Status:         string(blog.Status),
-			UpdatedAt:      blog.UpdatedAt,
-			IsRepository:   isRepository,
-			IsLive:         isLive,
-		}
-		info = append(info, blogInfo)
-	}
-	return info, nil
-}
-
-func buildDomain(subdomain string) string {
-	return fmt.Sprintf(
-		"%s.%s",
-		subdomain,
-		config.Config.Progstack.ServiceName,
-	)
-}
-
-func buildDomainUrl(subdomain string) string {
-	return fmt.Sprintf(
-		"%s://%s.%s",
-		config.Config.Progstack.Protocol,
-		subdomain,
-		config.Config.Progstack.ServiceName,
-	)
-}
-
-func buildSubscribersUrl(blogID int32) string {
-	return fmt.Sprintf(
-		"%s://%s/user/blogs/%d/subscribers",
-		config.Config.Progstack.Protocol,
-		config.Config.Progstack.ServiceName,
-		blogID,
-	)
-}
-
-func buildMetricsUrl(blogID int32) string {
-	return fmt.Sprintf(
-		"%s://%s/user/blogs/%d/metrics",
-		config.Config.Progstack.Protocol,
-		config.Config.Progstack.ServiceName,
-		blogID,
-	)
 }
 
 type AccountDetails struct {

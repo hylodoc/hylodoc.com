@@ -118,10 +118,13 @@ func Serve() {
 	blogR := authR.PathPrefix("/blogs/{blogID}").Subrouter()
 	blogR.Use(blogMiddleware.AuthoriseBlog)
 	blogR.HandleFunc("/config", blogService.Config())
-	blogR.HandleFunc("/subdomain/check", blogService.SubdomainCheck())
-	blogR.HandleFunc("/subdomain/submit", blogService.SubdomainSubmit())
+	blogR.HandleFunc("/subdomain-check", blogService.SubdomainCheck())
+	blogR.HandleFunc("/subdomain-submit", blogService.SubdomainSubmit())
 	blogR.HandleFunc("/generate-demo", blogService.LaunchDemoBlog())
 	blogR.HandleFunc("/subscribers", blogService.SubscriberMetrics())
+	blogR.HandleFunc("/set-test-branch", blogService.TestBranchSubmit())
+	blogR.HandleFunc("/set-live-branch", blogService.LiveBranchSubmit())
+	blogR.HandleFunc("/set-status", blogService.SetStatusSubmit())
 
 	/* serve static content */
 	r.PathPrefix("/static/css").Handler(http.StripPrefix("/static/css", http.FileServer(http.Dir("./web/static/css"))))

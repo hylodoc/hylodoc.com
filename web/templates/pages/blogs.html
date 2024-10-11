@@ -2,7 +2,6 @@
 
 <div class="container">
 	<table>
-		<h4>Blogs</h4>
 		<thead>
 			<tr>
 				<th>Domain</th>
@@ -17,20 +16,28 @@
 		</thead>
 		<tbody>
 			{{ range . }}
-			<tr>
-				<td>{{ .Domain }}</td>
-				<td>
-					{{ if .IsRepository }}
-					<a href="{{ .RepositoryUrl }}" target="_blank">link</a>
-					{{ end }}
-				</td>
-				<td><a href="{{ .SubscribersUrl }}" target="_blank">view</a></td>
-				<td><a href="{{ .MetricsUrl }}" target="_blank">dashboard</a></td>
-				<td>{{ .Type }}</td>
-				<td>{{ .Status }}</td>
-				<td>{{ .UpdatedAt.Format "2006-01-02" }}</td>
-				<td><a href="/user/blogs/{{.ID}}/config" class="button-primary">edit</a> </td>
-			</tr>
+				<tr>
+					<td>
+						{{ if .IsLive }}
+							<a href="{{ .DomainUrl }}"
+								target="_blank">{{ .Domain }}</a></td>
+						{{ else }}
+							{{ .Domain }}
+						{{ end }}
+					<td>
+						{{ if .IsRepository }}
+							<a href="{{ .RepositoryUrl }}" target="_blank">link</a>
+						{{ else }}
+							N/A
+						{{ end }}
+					</td>
+					<td><a href="{{ .SubscribersUrl }}" target="_blank">view</a></td>
+					<td><a href="{{ .MetricsUrl }}" target="_blank">dashboard</a></td>
+					<td>{{ .Type }}</td>
+					<td>{{ .Status }}</td>
+					<td>{{ .UpdatedAt.Format "2006-01-02" }}</td>
+					<td><a href="/user/blogs/{{.ID}}/config" class="button-primary">edit</a> </td>
+				</tr>
 			{{end}}
 		</tbody>
 	</table>

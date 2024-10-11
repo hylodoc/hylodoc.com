@@ -104,7 +104,10 @@ CREATE TABLE blogs (
 	gh_url			VARCHAR(255)	NOT NULL,
 	gh_name			VARCHAR(255)	NOT NULL,
 	gh_full_name		VARCHAR(255)	NOT NULL,				-- needed for path construction
+	test_branch		VARCHAR(255),
+	live_branch		VARCHAR(255),
 	subdomain		VARCHAR(255)			UNIQUE,
+	custom_domain		VARCHAR(255),
 	demo_subdomain		VARCHAR(255)	NOT NULL	UNIQUE,
 	from_address		VARCHAR(255)	NOT NULL,
 	blog_type		blog_type	NOT NULL,
