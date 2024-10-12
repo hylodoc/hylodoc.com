@@ -30,7 +30,7 @@ type CumulativeCount struct {
 
 type Subscriber struct {
 	Email        string
-	SubscribedOn time.Time
+	SubscribedOn string
 	Status       string
 }
 
@@ -76,7 +76,7 @@ func (b *BlogService) subscriberMetrics(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		return SubscriberData{}, fmt.Errorf("error converting string path var to blogID: %w", err)
 	}
-	subs, err := b.store.ListSubscribersByBlogID(context.TODO(), int32(intBlogID))
+	subs, err := b.store.ListActiveSubscribersByBlogID(context.TODO(), int32(intBlogID))
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return SubscriberData{}, fmt.Errorf("error listing subscriber counts: %w", err)
@@ -100,7 +100,7 @@ func convertSubscribers(subs []model.Subscriber) []Subscriber {
 	for _, s := range subs {
 		res = append(res, Subscriber{
 			Email:        s.Email,
-			SubscribedOn: s.CreatedAt,
+			SubscribedOn: s.CreatedAt.Format("January 2, 2006"),
 			Status:       string(s.Status),
 		})
 	}

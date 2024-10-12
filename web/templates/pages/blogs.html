@@ -31,12 +31,12 @@
 							N/A
 						{{ end }}
 					</td>
-					<td><a href="{{ .SubscriberMetricsUrl }}" target="_blank">view</a></td>
-					<td><a href="{{ .MetricsUrl }}" target="_blank">dashboard</a></td>
+					<td><a href="{{ .SubscriberMetricsUrl }}">view</a></td>
+					<td><a href="{{ .MetricsUrl }}">dashboard</a></td>
 					<td>{{ .Type }}</td>
 					<td>{{ .Status }}</td>
 					<td>{{ .UpdatedAt.Format "2006-01-02" }}</td>
-					<td><a href="/user/blogs/{{.ID}}/config" class="button-primary">edit</a> </td>
+					<td><a href="{{ .ConfigUrl }}" class="button-primary">edit</a> </td>
 				</tr>
 			{{end}}
 		</tbody>

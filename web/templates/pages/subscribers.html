@@ -13,11 +13,12 @@
 		</thead>
 		<tbody>
 			{{ range .}}
-			<tr>
-				<td>{{ .Email }}</td>
-				<td>{{ .SubscribedOn }}</td>
-				<td>{{ .Status }}</td>
-			</tr>
+				<tr>
+					<td>{{ .Email }}</td>
+					<td>{{ .SubscribedOn }}</td>
+					<td>{{ .Status }}</td>
+					<td><a href="edit?email={{ .Email }}">Edit</a></td>
+				</tr>
 			{{ end }}
 		</tbody>
 	</table>

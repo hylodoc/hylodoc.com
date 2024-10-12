@@ -18,6 +18,7 @@ type BlogInfo struct {
 	RepositoryUrl        string
 	SubscriberMetricsUrl string
 	MetricsUrl           string
+	ConfigUrl            string
 	Type                 string
 	Status               string
 	TestBranch           string
@@ -62,6 +63,7 @@ func convertBlogInfo(blog model.Blog) BlogInfo {
 		RepositoryUrl:        blog.GhUrl,
 		SubscriberMetricsUrl: buildSubscriberMetricsUrl(blog.ID),
 		MetricsUrl:           buildMetricsUrl(blog.ID),
+		ConfigUrl:            buildConfigUrl(blog.ID),
 		TestBranch:           blog.TestBranch.String,
 		LiveBranch:           blog.LiveBranch.String,
 		Type:                 string(blog.BlogType),
@@ -91,18 +93,21 @@ func buildDomainUrl(subdomain string) string {
 
 func buildSubscriberMetricsUrl(blogID int32) string {
 	return fmt.Sprintf(
-		"%s://%s/user/blogs/%d/subscriber/metrics",
-		config.Config.Progstack.Protocol,
-		config.Config.Progstack.ServiceName,
+		"/user/blogs/%d/subscriber/metrics",
 		blogID,
 	)
 }
 
 func buildMetricsUrl(blogID int32) string {
 	return fmt.Sprintf(
-		"%s://%s/user/blogs/%d/metrics",
-		config.Config.Progstack.Protocol,
-		config.Config.Progstack.ServiceName,
+		"/user/blogs/%d/metrics",
+		blogID,
+	)
+}
+
+func buildConfigUrl(blogID int32) string {
+	return fmt.Sprintf(
+		"/user/blogs/%d/config",
 		blogID,
 	)
 }

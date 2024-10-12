@@ -454,6 +454,10 @@ type SetStatusRequest struct {
 }
 
 func (b *BlogService) setStatusSubmit(w http.ResponseWriter, r *http.Request) (statusChangeResponse, error) {
+	session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+	if !ok {
+		return statusChangeResponse{}, fmt.Errorf("no user found")
+	}
 	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -465,7 +469,7 @@ func (b *BlogService) setStatusSubmit(w http.ResponseWriter, r *http.Request) (s
 		return statusChangeResponse{}, fmt.Errorf("error decoding body: %w", err)
 	}
 
-	change, err := handleStatusChange(int32(intBlogID), req.Status, b.store)
+	change, err := handleStatusChange(int32(intBlogID), req.Status, session.Email, b.store)
 	if err != nil {
 		return statusChangeResponse{}, fmt.Errorf("error handling status change: %w", err)
 	}
@@ -477,7 +481,7 @@ type statusChangeResponse struct {
 	IsLive bool
 }
 
-func handleStatusChange(blogID int32, status string, s *model.Store) (statusChangeResponse, error) {
+func handleStatusChange(blogID int32, status, email string, s *model.Store) (statusChangeResponse, error) {
 	blog, err := s.GetBlogByID(context.TODO(), blogID)
 	if err != nil {
 		return statusChangeResponse{}, fmt.Errorf("error getting blog `%d': %w", blogID, err)
@@ -495,7 +499,7 @@ func handleStatusChange(blogID int32, status string, s *model.Store) (statusChan
 		return statusChangeResponse{
 			Domain: blog.Subdomain.String,
 			IsLive: true,
-		}, launchBlog(blog, s)
+		}, launchBlog(blog, email, s)
 	case "offline":
 		return statusChangeResponse{
 			Domain: blog.Subdomain.String,
@@ -520,25 +524,24 @@ func validateStatusChange(request, current string) error {
 	return nil
 }
 
-func launchBlog(blog model.Blog, s *model.Store) error {
+func launchBlog(blog model.Blog, email string, s *model.Store) error {
 	/* launch blog */
 	if !blog.Subdomain.Valid {
 		return fmt.Errorf("need a valid subdomain configured")
 	}
 
-	err := LaunchUserBlog(LaunchUserBlogParams{
+	if err := LaunchUserBlog(LaunchUserBlogParams{
 		GhRepoFullName: blog.GhFullName,
 		Subdomain:      blog.Subdomain.String,
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("error launching blog `%d': %w", blog.ID, err)
 	}
+
 	/* update status to live */
-	err = s.SetBlogStatusByID(context.TODO(), model.SetBlogStatusByIDParams{
+	if err := s.SetBlogStatusByID(context.TODO(), model.SetBlogStatusByIDParams{
 		ID:     blog.ID,
 		Status: model.BlogStatusLive,
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("error setting status to %s: %w", model.BlogStatusLive, err)
 	}
 	return nil

@@ -104,11 +104,11 @@ func Serve() {
 	/* authenticated routes */
 	authR := r.PathPrefix("/user").Subrouter()
 	authR.Use(authMiddleware.ValidateAuthSession)
+	authR.HandleFunc("/", userService.Home())
 	authR.HandleFunc("/auth/logout", authService.Logout())
 	authR.HandleFunc("/gh/linkgithub", authService.LinkGithubAccount())
 	authR.HandleFunc("/account", userService.Account())
 	authR.HandleFunc("/delete", userService.Delete())
-	authR.HandleFunc("/home", userService.Home())
 	authR.HandleFunc("/stripe/subscriptions", billingService.Subscriptions())
 	authR.HandleFunc("/stripe/create-checkout-session", billingService.CreateCheckoutSession())
 	authR.HandleFunc("/stripe/success", billingService.Success())
@@ -123,6 +123,8 @@ func Serve() {
 	blogR.HandleFunc("/generate-demo", blogService.LaunchDemoBlog())
 	blogR.HandleFunc("/subscriber/metrics", blogService.SubscriberMetrics())
 	blogR.HandleFunc("/subscriber/export", blogService.ExportSubscribers())
+	blogR.HandleFunc("/subscriber/edit", blogService.EditSubscriber())
+	blogR.HandleFunc("/subscriber/delete", blogService.DeleteSubscriber())
 	blogR.HandleFunc("/set-test-branch", blogService.TestBranchSubmit())
 	blogR.HandleFunc("/set-live-branch", blogService.LiveBranchSubmit())
 	blogR.HandleFunc("/set-status", blogService.SetStatusSubmit())
@@ -148,7 +150,7 @@ func index() http.HandlerFunc {
 		/* get email/username from context */
 		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
 		if session != nil {
-			http.Redirect(w, r, "/user/home", http.StatusSeeOther)
+			http.Redirect(w, r, "/user/", http.StatusSeeOther)
 		}
 
 		util.ExecTemplate(w, []string{"index.html"},
@@ -174,7 +176,7 @@ func register() http.HandlerFunc {
 		/* get email/username from context */
 		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
 		if session != nil {
-			http.Redirect(w, r, "/user/home", http.StatusSeeOther)
+			http.Redirect(w, r, "/user/", http.StatusSeeOther)
 		}
 
 		util.ExecTemplate(w, []string{"register.html"},
@@ -200,7 +202,7 @@ func login() http.HandlerFunc {
 		/* get email/username from context */
 		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
 		if session != nil {
-			http.Redirect(w, r, "/user/home", http.StatusSeeOther)
+			http.Redirect(w, r, "/user/", http.StatusSeeOther)
 		}
 
 		util.ExecTemplate(w, []string{"login.html"},

@@ -18,12 +18,18 @@ INNER JOIN blogs b
 ON s.blog_id = b.id
 WHERE b.gh_repository_id = $1 AND b.active = true AND s.status = 'active';
 
--- name: ListSubscribersByBlogID :many
+-- name: ListActiveSubscribersByBlogID :many
 SELECT *
 FROM subscribers
-WHERE blog_id = $1;
+WHERE blog_id = $1 and status = 'active';
 
 -- name: DeleteSubscriberForBlog :exec
 UPDATE subscribers
 SET status = 'unsubscribed'
 WHERE unsubscribe_token = $1 AND blog_id = $2;
+
+-- name: DeleteSubscriberByEmail :exec
+UPDATE subscribers
+SET status = 'unsubscribed'
+WHERE email = $1 AND blog_id = $2;
+
