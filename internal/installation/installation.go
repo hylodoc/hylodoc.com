@@ -52,7 +52,7 @@ func (i *InstallationService) InstallationCallback() http.HandlerFunc {
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, "/user/", http.StatusTemporaryRedirect)
+		http.Redirect(w, r, "/user", http.StatusTemporaryRedirect)
 	}
 }
 
@@ -97,7 +97,7 @@ func handleInstallation(c *http.Client, s *model.Store, body []byte) error {
 	/* XXX: is this safe given that we validated the request with the
 	* webhook? */
 	ghUserID := event.Sender.ID
-	user, err := s.GetGithubAccountByGhUserID(context.TODO(), ghUserID)
+	user, err := s.GetUserByGhUserID(context.TODO(), ghUserID)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return fmt.Errorf("error getting user with ghUserID `%s' (in event) from db: %w", ghUserID, err)
@@ -105,12 +105,11 @@ func handleInstallation(c *http.Client, s *model.Store, body []byte) error {
 	}
 
 	ghInstallationID := event.Installation.ID
-	userID := user.ID
 	switch event.Action {
 	case "created":
-		return handleInstallationCreated(c, s, ghInstallationID, userID)
+		return handleInstallationCreated(c, s, ghInstallationID, user.ID, user.GhEmail)
 	case "deleted":
-		return handleInstallationDeleted(c, s, ghInstallationID, userID)
+		return handleInstallationDeleted(c, s, ghInstallationID, user.ID)
 	default:
 		log.Println("unhandled event action: %s", event.Action)
 	}
@@ -118,14 +117,13 @@ func handleInstallation(c *http.Client, s *model.Store, body []byte) error {
 	return nil
 }
 
-func handleInstallationCreated(c *http.Client, s *model.Store, ghInstallationID int64, userID int32) error {
+func handleInstallationCreated(c *http.Client, s *model.Store, ghInstallationID int64, userID int32, ghEmail string) error {
 	log.Println("handling installation created event...")
 	/* get access token */
 	accessToken, err := auth.GetInstallationAccessToken(
 		c,
 		config.Config.Github.AppID,
 		ghInstallationID,
-
 		config.Config.Github.PrivateKeyPath,
 	)
 	if err != nil {
@@ -146,7 +144,7 @@ func handleInstallationCreated(c *http.Client, s *model.Store, ghInstallationID 
 	}
 
 	/* write installation and repos to db Tx */
-	createInstallationTxParams := buildCreateInstallationTxParams(ghInstallationID, userID, repos)
+	createInstallationTxParams := buildCreateInstallationTxParams(ghInstallationID, userID, ghEmail, repos)
 	if err = s.CreateInstallationTx(context.TODO(), createInstallationTxParams); err != nil {
 		/* XXX: wipe relavant repos from disk */
 		return fmt.Errorf("error executing db transaction: %w", err)
@@ -155,10 +153,11 @@ func handleInstallationCreated(c *http.Client, s *model.Store, ghInstallationID 
 	return nil
 }
 
-func buildCreateInstallationTxParams(installationID int64, userID int32, repos []Repository) model.InstallationTxParams {
+func buildCreateInstallationTxParams(installationID int64, userID int32, ghEmail string, repos []Repository) model.InstallationTxParams {
 	var iTxParams model.InstallationTxParams
 	iTxParams.InstallationID = installationID
 	iTxParams.UserID = userID
+	iTxParams.Email = ghEmail
 	var blogsTxParams []model.BlogTxParams
 	for _, repo := range repos {
 		blogsTxParams = append(blogsTxParams, model.BlogTxParams{
@@ -167,11 +166,10 @@ func buildCreateInstallationTxParams(installationID int64, userID int32, repos [
 			GhFullName:     repo.FullName,
 			GhUrl:          repo.HtmlUrl,
 			FromAddress:    config.Config.Progstack.FromEmail, /* XXX: should be configurable by user, hardcoding for now */
-
-			DemoSubdomain: subdomain.GenerateDemoSubdomain(),
+			DemoSubdomain:  subdomain.GenerateDemoSubdomain(),
 		})
 	}
-	iTxParams.Blogs = blogsTxParams
+	iTxParams.BlogsParams = blogsTxParams
 	return iTxParams
 }
 
@@ -279,7 +277,7 @@ func handleInstallationRepositories(c *http.Client, s *model.Store, body []byte)
 	log.Printf("installationRepositoriesEvent: %s", str)
 
 	ghUserID := event.Sender.ID
-	user, err := s.GetGithubAccountByGhUserID(context.TODO(), ghUserID)
+	user, err := s.GetUserByGhUserID(context.TODO(), ghUserID)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return fmt.Errorf("error getting user with ghUserID `%s' (in event) from db: %w", ghUserID, err)
@@ -478,7 +476,7 @@ func buildNewPostUpdateParamsList(ghRepositoryID int64, s *model.Store) ([]email
 	for _, subscriber := range subscribers {
 		subscriberParams := email.SubscriberParams{
 			To:               subscriber.Email,
-			UnsubscribeToken: subscriber.UnsubscribeToken,
+			UnsubscribeToken: subscriber.UnsubscribeToken.String(),
 		}
 		log.Printf("sending email to subscriber: `%s'\n", subscriberParams.To)
 

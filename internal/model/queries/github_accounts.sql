@@ -11,7 +11,7 @@ SELECT *
 FROM github_accounts
 WHERE user_id = $1;
 
--- name: GetGithubAccountByGhUserID :one
+-- name: GetUserByGhUserID :one
 SELECT *
 FROM github_accounts
 WHERE gh_user_id = $1;

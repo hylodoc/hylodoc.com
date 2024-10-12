@@ -1,8 +1,8 @@
 -- name: CreateSubscriber :one
 INSERT INTO subscribers (
-	blog_id, email, unsubscribe_token
+	blog_id, email
 ) VALUES (
-	$1, $2, $3
+	$1, $2
 )
 RETURNING *;
 

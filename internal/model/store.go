@@ -69,31 +69,37 @@ type BlogTxParams struct {
 type InstallationTxParams struct {
 	InstallationID int64
 	UserID         int32
-	Blogs          []BlogTxParams
+	Email          string
+	BlogsParams    []BlogTxParams
 }
 
 func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxParams) error {
 	return s.execTx(ctx, func(q *Queries) error {
-		createInstallationArgs := CreateInstallationParams{
+		installation, err := s.CreateInstallation(ctx, CreateInstallationParams{
 			GhInstallationID: arg.InstallationID,
 			UserID:           arg.UserID,
-		}
-		installation, err := s.CreateInstallation(ctx, createInstallationArgs)
+		})
 		if err != nil {
 			return err
 		}
-		for _, blog := range arg.Blogs {
-			_, err := s.CreateBlog(ctx, CreateBlogParams{
+		for _, blogParams := range arg.BlogsParams {
+			blog, err := s.CreateBlog(ctx, CreateBlogParams{
 				UserID:         arg.UserID,
 				InstallationID: installation.ID,
-				GhRepositoryID: blog.GhRepositoryID,
-				GhName:         blog.GhName,
-				GhFullName:     blog.GhFullName,
-				GhUrl:          fmt.Sprintf("https://github.com/%s", blog.GhFullName), /* ghUrl not always in events */
-
-				BlogType:      BlogTypeRepository,
-				FromAddress:   blog.FromAddress,
-				DemoSubdomain: blog.DemoSubdomain,
+				GhRepositoryID: blogParams.GhRepositoryID,
+				GhName:         blogParams.GhName,
+				GhFullName:     blogParams.GhFullName,
+				GhUrl:          fmt.Sprintf("https://github.com/%s", blogParams.GhFullName), /* ghUrl not always in events */
+				BlogType:       BlogTypeRepository,
+				FromAddress:    blogParams.FromAddress,
+				DemoSubdomain:  blogParams.DemoSubdomain,
+			})
+			if err != nil {
+				return err
+			}
+			_, err = s.CreateSubscriber(ctx, CreateSubscriberParams{
+				BlogID: blog.ID,
+				Email:  arg.Email,
 			})
 			if err != nil {
 				return err
@@ -104,9 +110,8 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 }
 
 type CreateSubscriberTxParams struct {
-	BlogID           int32
-	Email            string
-	UnsubscribeToken string
+	BlogID int32
+	Email  string
 }
 
 func (s *Store) CreateSubscriberTx(ctx context.Context, arg CreateSubscriberTxParams) error {
@@ -126,9 +131,8 @@ func (s *Store) CreateSubscriberTx(ctx context.Context, arg CreateSubscriberTxPa
 			return fmt.Errorf("subscription already exists")
 		}
 		_, err = s.CreateSubscriber(ctx, CreateSubscriberParams{
-			BlogID:           arg.BlogID,
-			Email:            arg.Email,
-			UnsubscribeToken: arg.UnsubscribeToken,
+			BlogID: arg.BlogID,
+			Email:  arg.Email,
 		})
 		if err != nil {
 			return fmt.Errorf("error writing subscriber for blog to db: %w", err)

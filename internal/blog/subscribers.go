@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
-	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
@@ -66,18 +66,12 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 		return fmt.Errorf("error converting string path var to blogID: %w", err)
 	}
 
-	unsubscribeToken, err := auth.GenerateToken()
-	if err != nil {
-		return fmt.Errorf("error generating unsubscribeToken: %w", err)
-	}
-
 	log.Printf("subscribing email `%s' to blog with id: `%d'", req.Email, intBlogID)
 	/* first check if exists */
 
 	err = b.store.CreateSubscriberTx(context.TODO(), model.CreateSubscriberTxParams{
-		BlogID:           int32(intBlogID),
-		Email:            req.Email,
-		UnsubscribeToken: unsubscribeToken,
+		BlogID: int32(intBlogID),
+		Email:  req.Email,
 	})
 	if err != nil {
 		return fmt.Errorf("error writing subscriber for blog to db: %w", err)
@@ -118,9 +112,14 @@ func (b *BlogService) unsubscribeFromBlog(w http.ResponseWriter, r *http.Request
 		return fmt.Errorf("error converting string path var to blogID: %w", err)
 	}
 	token := r.URL.Query().Get("token")
+	uuid, err := uuid.Parse(token)
+	if err != nil {
+		log.Fatalf("Failed to parse UUID: %v", err)
+	}
+
 	err = b.store.DeleteSubscriberForBlog(context.TODO(), model.DeleteSubscriberForBlogParams{
 		BlogID:           int32(intBlogID),
-		UnsubscribeToken: token,
+		UnsubscribeToken: uuid,
 	})
 	if err != nil {
 		return fmt.Errorf("error writing subscriber for blog to db: %w", err)

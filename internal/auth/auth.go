@@ -106,8 +106,7 @@ func (o *AuthService) githubOAuthCallback(w http.ResponseWriter, r *http.Request
 		return err
 	}
 
-	u, err := o.store.GetGithubAccountByGhUserID(context.TODO(), ghUser.ID)
-	userID := u.UserID
+	u, err := o.store.GetUserByGhUserID(context.TODO(), ghUser.ID)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return fmt.Errorf("error checking for user existence: %w", err)
@@ -124,17 +123,16 @@ func (o *AuthService) githubOAuthCallback(w http.ResponseWriter, r *http.Request
 			return fmt.Errorf("error creating user in db: %w", err)
 		}
 		/* fetch newly created userID, needed to create Auth session */
-		u, err := o.store.GetGithubAccountByGhUserID(context.TODO(), ghUser.ID)
+		u, err = o.store.GetUserByGhUserID(context.TODO(), ghUser.ID)
 		if err != nil {
 			return fmt.Errorf("error fetching")
 		}
-		userID = u.UserID
 	}
 
 	log.Println("got user: ", u)
 
 	/* create Auth Session */
-	err = createAuthSession(userID, w, o.store)
+	err = createAuthSession(u.ID, w, o.store)
 	if err != nil {
 		log.Printf("error creating auth session: %v", err)
 		return fmt.Errorf("error creating auth session: %w", err)

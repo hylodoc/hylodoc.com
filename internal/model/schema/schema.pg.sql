@@ -2,6 +2,9 @@ DROP SCHEMA IF EXISTS progstack;
 
 CREATE SCHEMA progstack;
 
+-- UUID generation
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- Grant usage on the schema
 GRANT USAGE ON SCHEMA progstack TO progstack_user;
 
@@ -134,7 +137,7 @@ CREATE TABLE subscribers (
 	id			SERIAL					PRIMARY KEY,
 	blog_id			INTEGER			NOT NULL,
 	email			VARCHAR(255)		NOT NULL,
-	unsubscribe_token 	VARCHAR(255)		NOT NULL,
+	unsubscribe_token 	UUID			NOT NULL			DEFAULT uuid_generate_v4(),
 	status			subscription_status	NOT NULL			DEFAULT('active'),
 
 	created_at		TIMESTAMPTZ		NOT NULL			DEFAULT(now()),
