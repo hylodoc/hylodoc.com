@@ -322,7 +322,10 @@ func LaunchUserBlog(params LaunchUserBlogParams) error {
 		config.Config.Progstack.WebsitesPath,
 		params.Subdomain,
 	)
-	return ssg.Generate(repo, site, "")
+	if err := ssg.GenerateSite(repo, site, "progstack-ssg/theme/lit"); err != nil {
+		return fmt.Errorf("error generating site: %w", err)
+	}
+	return nil
 }
 
 /* Git branch info */
