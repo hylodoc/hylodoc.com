@@ -20,11 +20,18 @@ import (
 type SubscriberData struct {
 	Count            int
 	CumulativeCounts template.JS
+	Subscribers      []Subscriber
 }
 
 type CumulativeCount struct {
 	Timestamp string `json:"timestamp"` /* Date as a string in "YYYY-MM-DD" format */
 	Count     int    `json:"count"`     /* Cumulative subscriber count on that date */
+}
+
+type Subscriber struct {
+	Email        string
+	SubscribedOn time.Time
+	Status       string
 }
 
 func (b *BlogService) SubscriberMetrics() http.HandlerFunc {
@@ -46,7 +53,7 @@ func (b *BlogService) SubscriberMetrics() http.HandlerFunc {
 		}
 		log.Printf("subscribers: %s\n", data)
 
-		util.ExecTemplate(w, []string{"blog_subscriber_metrics.html"},
+		util.ExecTemplate(w, []string{"subscriber_metrics.html", "subscribers.html"},
 			util.PageInfo{
 				Data: struct {
 					Title          string
@@ -75,6 +82,7 @@ func (b *BlogService) subscriberMetrics(w http.ResponseWriter, r *http.Request) 
 			return SubscriberData{}, fmt.Errorf("error listing subscriber counts: %w", err)
 		}
 	}
+
 	subscriberData := buildSubscriberCumulativeCounts(subs)
 	jsonSubscriberData, err := json.Marshal(subscriberData)
 	if err != nil {
@@ -83,7 +91,20 @@ func (b *BlogService) subscriberMetrics(w http.ResponseWriter, r *http.Request) 
 	return SubscriberData{
 		Count:            len(subs),
 		CumulativeCounts: template.JS(string(jsonSubscriberData)),
+		Subscribers:      convertSubscribers(subs),
 	}, nil
+}
+
+func convertSubscribers(subs []model.Subscriber) []Subscriber {
+	var res []Subscriber
+	for _, s := range subs {
+		res = append(res, Subscriber{
+			Email:        s.Email,
+			SubscribedOn: s.CreatedAt,
+			Status:       string(s.Status),
+		})
+	}
+	return res
 }
 
 func buildSubscriberCumulativeCounts(subs []model.Subscriber) []CumulativeCount {

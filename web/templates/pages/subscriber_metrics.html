@@ -1,0 +1,79 @@
+{{ template "header" . }}
+
+<!-- Subscriber Chart -->
+<section>
+	<div class="container">
+		<h3>Subscriber Dashboard</h3>
+		<div class="row">
+			<div class="four columns"></div>
+			<div class="four columns">
+				<h4>{{ .Data.SubscriberData.Count }}</h4>
+				<h6>Total Subscribers</h6>
+				<a id="exportBtn" class="button">Export</a>
+			</div>
+			<div class="four columns"></div>
+		</div>
+		<br><br>
+		<canvas id="subscriberMetrics"></canvas>
+	</div>
+</section>
+
+<section>
+	{{ template "subscribers" .Data.SubscriberData.Subscribers }}
+</section>
+
+<script>
+	function init() {
+		exportBtn = document.getElementById("exportBtn")
+		exportBtn.addEventListener("click", exportSubscribers)
+	}
+
+	function exportSubscribers() {
+		const a = document.createElement('a');
+		a.href = 'export'; /* endpoint */
+		document.body.appendChild(a);
+		a.click();
+		a.remove();
+	}
+
+	function renderChart() {
+		const ctx = document.getElementById("subscriberMetrics");
+		const metrics = {{ .Data.SubscriberData.CumulativeCounts }};
+		new Chart(ctx, {
+			type: "line",
+			data: {
+				datasets: [{
+					label: "Number of subscribers",
+					data: metrics.map(
+						item => ({
+							x: item.timestamp,
+							y: item.count
+						})
+					)
+				}],
+			},
+			options: {
+				scales: {
+					x: {
+						type: "time",
+						time: {
+							unit: "month"
+						},
+						title: {
+							display: true,
+							text: "Months"
+						}
+					},
+					y: {
+						beginAtZero: true
+					}
+				}
+			}
+		});
+	}
+
+	init();
+	renderChart();
+</script>
+
+{{ template "footer" . }}

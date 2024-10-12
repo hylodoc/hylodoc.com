@@ -32,6 +32,7 @@ type SubscribeRequest struct {
 }
 
 func (sr *SubscribeRequest) validate() error {
+	/* XXX: better validation */
 	if sr.Email == "" {
 		return fmt.Errorf("email is required")
 	}

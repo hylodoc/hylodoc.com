@@ -1,0 +1,26 @@
+{{ define "subscribers" }}
+
+<div class="container">
+	<h3>Total Subscribers</h3>
+	<table>
+		<thead>
+			<tr>
+				<td>Subscriber</td>
+				<td>Subscribed On</td>
+				<td>Status</td>
+				<td>Edit</td>
+			</tr>
+		</thead>
+		<tbody>
+			{{ range .}}
+			<tr>
+				<td>{{ .Email }}</td>
+				<td>{{ .SubscribedOn }}</td>
+				<td>{{ .Status }}</td>
+			</tr>
+			{{ end }}
+		</tbody>
+	</table>
+</div>
+
+{{ end }}

@@ -10,21 +10,21 @@ import (
 )
 
 type BlogInfo struct {
-	ID             int32
-	Domain         string
-	Subdomain      string
-	CustomDomain   string
-	DomainUrl      string
-	RepositoryUrl  string
-	SubscribersUrl string
-	MetricsUrl     string
-	Type           string
-	Status         string
-	TestBranch     string
-	LiveBranch     string
-	UpdatedAt      time.Time
-	IsRepository   bool
-	IsLive         bool
+	ID                   int32
+	Domain               string
+	Subdomain            string
+	CustomDomain         string
+	DomainUrl            string
+	RepositoryUrl        string
+	SubscriberMetricsUrl string
+	MetricsUrl           string
+	Type                 string
+	Status               string
+	TestBranch           string
+	LiveBranch           string
+	UpdatedAt            time.Time
+	IsRepository         bool
+	IsLive               bool
 }
 
 func GetBlogsInfo(s *model.Store, userID int32) ([]BlogInfo, error) {
@@ -54,21 +54,21 @@ func convertBlogInfo(blog model.Blog) BlogInfo {
 		isLive = true
 	}
 	return BlogInfo{
-		ID:             blog.ID,
-		Domain:         buildDomain(subdomain),
-		Subdomain:      blog.Subdomain.String,
-		CustomDomain:   blog.CustomDomain.String,
-		DomainUrl:      buildDomainUrl(subdomain),
-		RepositoryUrl:  blog.GhUrl,
-		SubscribersUrl: buildSubscribersUrl(blog.ID),
-		MetricsUrl:     buildMetricsUrl(blog.ID),
-		TestBranch:     blog.TestBranch.String,
-		LiveBranch:     blog.LiveBranch.String,
-		Type:           string(blog.BlogType),
-		Status:         string(blog.Status),
-		UpdatedAt:      blog.UpdatedAt,
-		IsRepository:   isRepository,
-		IsLive:         isLive,
+		ID:                   blog.ID,
+		Domain:               buildDomain(subdomain),
+		Subdomain:            blog.Subdomain.String,
+		CustomDomain:         blog.CustomDomain.String,
+		DomainUrl:            buildDomainUrl(subdomain),
+		RepositoryUrl:        blog.GhUrl,
+		SubscriberMetricsUrl: buildSubscriberMetricsUrl(blog.ID),
+		MetricsUrl:           buildMetricsUrl(blog.ID),
+		TestBranch:           blog.TestBranch.String,
+		LiveBranch:           blog.LiveBranch.String,
+		Type:                 string(blog.BlogType),
+		Status:               string(blog.Status),
+		UpdatedAt:            blog.UpdatedAt,
+		IsRepository:         isRepository,
+		IsLive:               isLive,
 	}
 }
 
@@ -89,9 +89,9 @@ func buildDomainUrl(subdomain string) string {
 	)
 }
 
-func buildSubscribersUrl(blogID int32) string {
+func buildSubscriberMetricsUrl(blogID int32) string {
 	return fmt.Sprintf(
-		"%s://%s/user/blogs/%d/subscribers",
+		"%s://%s/user/blogs/%d/subscriber/metrics",
 		config.Config.Progstack.Protocol,
 		config.Config.Progstack.ServiceName,
 		blogID,
