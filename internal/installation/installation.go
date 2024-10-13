@@ -287,7 +287,7 @@ func handleInstallationRepositories(c *http.Client, s *model.Store, body []byte)
 	ghInstallationID := event.Installation.ID
 	switch event.Action {
 	case "added":
-		return handleInstallationRepositoriesAdded(c, s, ghInstallationID, event.RepositoriesAdded, user.ID)
+		return handleInstallationRepositoriesAdded(c, s, ghInstallationID, event.RepositoriesAdded, user.ID, user.GhEmail)
 	case "removed":
 		return handleInstallationRepositoriesRemoved(c, s, ghInstallationID, event.RepositoriesRemoved)
 	default:
@@ -297,7 +297,7 @@ func handleInstallationRepositories(c *http.Client, s *model.Store, body []byte)
 	return nil
 }
 
-func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInstallationID int64, repos []Repository, userID int32) error {
+func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInstallationID int64, repos []Repository, userID int32, email string) error {
 	log.Println("handling repositories added event...")
 
 	/* get access token */
@@ -322,7 +322,7 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 	}
 
 	for _, repo := range repos {
-		_, err := s.CreateBlog(context.TODO(), model.CreateBlogParams{
+		blog, err := s.CreateBlog(context.TODO(), model.CreateBlogParams{
 			UserID:         userID,
 			InstallationID: installation.ID,
 			GhRepositoryID: repo.ID,
@@ -337,10 +337,14 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 			/* XXX: cleanup delete from disk */
 			return fmt.Errorf("error creating repository: %w", err)
 		}
+		_, err = s.CreateSubscriber(context.TODO(), model.CreateSubscriberParams{
+			BlogID: blog.ID,
+			Email:  email,
+		})
+		if err != nil {
+			return fmt.Errorf("error creating first subscriber: %w", err)
+		}
 	}
-
-	/* launch blog */
-
 	return nil
 }
 

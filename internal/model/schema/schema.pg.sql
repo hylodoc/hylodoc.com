@@ -149,8 +149,8 @@ CREATE TABLE subscribers (
 );
 
 --  active subscriber emails should be unique
-CREATE UNIQUE INDEX unique_active_subscriber_email
-	ON subscribers (email) 
+CREATE UNIQUE INDEX unique_active_subscriber_per_blog
+	ON subscribers (email, blog_id) 
 	WHERE status = 'active';
 
 -- stripe integration
