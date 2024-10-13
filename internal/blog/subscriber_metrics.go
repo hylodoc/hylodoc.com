@@ -43,7 +43,6 @@ func (b *BlogService) SubscriberMetrics() http.HandlerFunc {
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
-		log.Printf("session: %v\n", session)
 
 		data, err := b.subscriberMetrics(w, r)
 		if err != nil {

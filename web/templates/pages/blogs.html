@@ -1,46 +1,44 @@
 {{ define "blogs" }}
 
-<div class="container">
-	<table>
-		<thead>
+<table>
+	<thead>
+		<tr>
+			<th>Domain</th>
+			<th>Repository Link</th>
+			<th>Subscribers</th>
+			<th>Metrics</th>
+			<th>Type</th>
+			<th>Status</th>
+			<th>Updated At</th>
+			<th>Configuration</th>
+		</tr>
+	</thead>
+	<tbody>
+		{{ range . }}
 			<tr>
-				<th>Domain</th>
-				<th>Repository Link</th>
-				<th>Subscribers</th>
-				<th>Metrics</th>
-				<th>Type</th>
-				<th>Status</th>
-				<th>Updated At</th>
-				<th>Configuration</th>
+				<td>
+					{{ if .IsLive }}
+						<a href="{{ .DomainUrl }}" target="_blank">{{ .Domain }}</a>
+					{{ else }}
+						{{ .Domain }}
+					{{ end }}
+				</td>
+				<td>
+					{{ if .IsRepository }}
+						<a href="{{ .RepositoryUrl }}" target="_blank">link</a>
+					{{ else }}
+						N/A
+					{{ end }}
+				</td>
+				<td><a href="{{ .SubscriberMetricsUrl }}">view</a></td>
+				<td><a href="{{ .MetricsUrl }}">dashboard</a></td>
+				<td>{{ .Type }}</td>
+				<td>{{ .Status }}</td>
+				<td>{{ .UpdatedAt.Format "2006-01-02" }}</td>
+				<td><a href="{{ .ConfigUrl }}" class="button-primary">edit</a> </td>
 			</tr>
-		</thead>
-		<tbody>
-			{{ range . }}
-				<tr>
-					<td>
-						{{ if .IsLive }}
-							<a href="{{ .DomainUrl }}"
-								target="_blank">{{ .Domain }}</a></td>
-						{{ else }}
-							{{ .Domain }}
-						{{ end }}
-					<td>
-						{{ if .IsRepository }}
-							<a href="{{ .RepositoryUrl }}" target="_blank">link</a>
-						{{ else }}
-							N/A
-						{{ end }}
-					</td>
-					<td><a href="{{ .SubscriberMetricsUrl }}">view</a></td>
-					<td><a href="{{ .MetricsUrl }}">dashboard</a></td>
-					<td>{{ .Type }}</td>
-					<td>{{ .Status }}</td>
-					<td>{{ .UpdatedAt.Format "2006-01-02" }}</td>
-					<td><a href="{{ .ConfigUrl }}" class="button-primary">edit</a> </td>
-				</tr>
-			{{end}}
-		</tbody>
-	</table>
-<div>
+		{{end}}
+	</tbody>
+</table>
 
 {{ end }}

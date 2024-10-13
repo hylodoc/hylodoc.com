@@ -121,6 +121,7 @@ func Serve() {
 	blogR.HandleFunc("/subdomain-check", blogService.SubdomainCheck())
 	blogR.HandleFunc("/subdomain-submit", blogService.SubdomainSubmit())
 	blogR.HandleFunc("/generate-demo", blogService.LaunchDemoBlog())
+	blogR.HandleFunc("/metrics", blogService.SiteMetrics())
 	blogR.HandleFunc("/subscriber/metrics", blogService.SubscriberMetrics())
 	blogR.HandleFunc("/subscriber/export", blogService.ExportSubscribers())
 	blogR.HandleFunc("/subscriber/edit", blogService.EditSubscriber())

@@ -1,0 +1,26 @@
+{{ define "posts" }}
+
+<table>
+	<thead>
+		<tr>
+			<th>Post</th>
+			<th>Date</th>
+			<th>Deliveries</th>
+			<th>Opens</th>
+			<th>Open Rate</th>
+		</tr>
+	</thead>
+	<tbody>
+		{{ range . }}
+			<tr>
+				<td><a href="{{ .Url }}" target="_blank">{{ .Title }}</a></td>
+				<td>{{ .Date.Format "2006-01-02" }}</td>
+				<td>{{ .EmailData.Deliveries }}</td>
+				<td>{{ .EmailData.Opens }}</td>
+				<td>{{ .EmailData.OpenRate }}</td>
+			</tr>
+		{{end}}
+	</tbody>
+</table>
+
+{{ end }}
