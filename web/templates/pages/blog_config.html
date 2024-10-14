@@ -5,7 +5,7 @@
 <!-- Basic info-->
 <section>
 	<div class="container">
-		<h3>Blog Configuration</p>
+		<h3>Blog Configuration</h3>
 	</div>
 </section>
 
@@ -17,8 +17,7 @@
 		<form id="subdomainForm" onsubmit="return false;">
 			<label for="subdomainInput">Configure subdomain</label>
 			<div class="row">
-				<div class="four columns">
-					<input
+				<div class="four columns"> <input
 						class="u-full-width"
 						type="text"
 						id="subdomainInput"
@@ -146,7 +145,7 @@
 
 	/* Check subdomain availability */
 	function checkSubdomainAvailability(subdomain, messageElement, submitSubdomainBtn) {
-		fetch("subdomain-check", {
+		fetch("/user/subdomain-check", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ subdomain })

@@ -13,7 +13,7 @@ SELECT EXISTS (
 	WHERE user_id = $1
 ) AS installation_exists;
 
--- name: GetInstallationWithGithubInstallationID :one
+-- name: GetInstallationByGithubInstallationID :one
 SELECT *
 FROM installations
 WHERE gh_installation_id = $1 AND active = true;

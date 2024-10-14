@@ -1,18 +1,13 @@
 -- name: CreateBlog :one
 INSERT INTO blogs (
 	user_id,
-	installation_id,
 	gh_repository_id,
-	gh_url,
-	gh_name,
 	gh_full_name,
 	subdomain,
-	custom_domain,
-	demo_subdomain,
 	from_address,
 	blog_type
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+	$1, $2, $3, $4, $5, $6
 )
 RETURNING *;
 
@@ -31,10 +26,9 @@ WHERE id = $2;
 -- name: CheckBlogOwnership :one
 SELECT EXISTS (
 	SELECT 1
-	FROM blogs b
-	INNER JOIN installations i ON b.installation_id = i.id
-	WHERE b.id = $1 -- blogID
-	AND i.user_id = $2 -- userID
+	FROM blogs
+	WHERE id = $1 -- blogID
+	AND user_id = $2 -- userID
 ) AS owns_blog;
 
 -- name: GetBlogByID :one
@@ -55,9 +49,9 @@ WHERE user_id = $1;
 -- name: ListBlogsForInstallationByGhInstallationID :many
 SELECT *
 FROM blogs b
-INNER JOIN installations i
-ON b.installation_id = i.id
-WHERE i.gh_installation_id = $1;
+INNER JOIN repositories r
+ON b.gh_repository_id = r.id
+WHERE r.installation_id = $1;
 
 -- name: SetTestBranchByID :exec
 UPDATE blogs

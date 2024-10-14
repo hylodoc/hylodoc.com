@@ -15,14 +15,13 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/subdomain"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
 const (
-	ghInstallationRepositoriesUrl = "https://api.github.com/installation/repositories"
+	GhInstallUrlTemplate = "https://github.com/apps/%s/installations/new"
 
-	ghInstallUrlTemplate             = "https://github.com/apps/%s/installations/new"
+	ghInstallationRepositoriesUrl    = "https://api.github.com/installation/repositories"
 	ghAccessTokenUrlTemplate         = "https://api.github.com/app/installations/%d/access_tokens"
 	ghRepositoriesTarballUrlTemplate = "https://api.github.com/repos/%s/tarball"
 )
@@ -158,18 +157,15 @@ func buildCreateInstallationTxParams(installationID int64, userID int32, ghEmail
 	iTxParams.InstallationID = installationID
 	iTxParams.UserID = userID
 	iTxParams.Email = ghEmail
-	var blogsTxParams []model.BlogTxParams
+	var repositoryTxParams []model.RepositoryTxParams
 	for _, repo := range repos {
-		blogsTxParams = append(blogsTxParams, model.BlogTxParams{
-			GhRepositoryID: repo.ID,
-			GhName:         repo.Name,
-			GhFullName:     repo.FullName,
-			GhUrl:          repo.HtmlUrl,
-			FromAddress:    config.Config.Progstack.FromEmail, /* XXX: should be configurable by user, hardcoding for now */
-			DemoSubdomain:  subdomain.GenerateDemoSubdomain(),
+		repositoryTxParams = append(repositoryTxParams, model.RepositoryTxParams{
+			RepositoryID: repo.ID,
+			Name:         repo.Name,
+			FullName:     repo.FullName,
 		})
 	}
-	iTxParams.BlogsParams = blogsTxParams
+	iTxParams.RepositoriesTxParams = repositoryTxParams
 	return iTxParams
 }
 
@@ -243,7 +239,7 @@ func handleInstallationDeleted(c *http.Client, s *model.Store, ghInstallationID 
 	/* delete the repos on disk */
 	log.Println("deleting repos from disk...")
 	for _, repo := range repos {
-		path := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, repo.GhFullName)
+		path := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, repo.FullName)
 		log.Printf("deleting repo at `%s' from disk...\n", path)
 		if err := os.RemoveAll(path); err != nil {
 			return fmt.Errorf("error deleting repo `%s' from disk: %w", err)
@@ -283,8 +279,14 @@ func handleInstallationRepositories(c *http.Client, s *model.Store, body []byte)
 			return fmt.Errorf("error getting user with ghUserID `%s' (in event) from db: %w", ghUserID, err)
 		}
 	}
-
 	ghInstallationID := event.Installation.ID
+
+	/* check that installation exists */
+	_, err = s.GetInstallationByGithubInstallationID(context.TODO(), ghInstallationID)
+	if err != nil {
+		return fmt.Errorf("error getting installation with ghInstallationID: %w", err)
+	}
+
 	switch event.Action {
 	case "added":
 		return handleInstallationRepositoriesAdded(c, s, ghInstallationID, event.RepositoriesAdded, user.ID, user.GhEmail)
@@ -315,34 +317,18 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 		return fmt.Errorf("error downloading repos to disk: %w", err)
 	}
 
-	/* get installationID */
-	installation, err := s.GetInstallationWithGithubInstallationID(context.TODO(), ghInstallationID)
-	if err != nil {
-		return fmt.Errorf("error getting installation with ghInstallationID: %w", err)
-	}
-
 	for _, repo := range repos {
-		blog, err := s.CreateBlog(context.TODO(), model.CreateBlogParams{
+		_, err := s.CreateRepository(context.TODO(), model.CreateRepositoryParams{
 			UserID:         userID,
-			InstallationID: installation.ID,
-			GhRepositoryID: repo.ID,
-			GhName:         repo.Name,
-			GhFullName:     repo.FullName,
-			BlogType:       model.BlogTypeRepository,
-			GhUrl:          fmt.Sprintf("https://github.com/%s", repo.FullName),
-			FromAddress:    config.Config.Progstack.FromEmail, /* XXX: hardcoding for now */
-			DemoSubdomain:  subdomain.GenerateDemoSubdomain(),
+			InstallationID: ghInstallationID,
+			RepositoryID:   repo.ID,
+			Name:           repo.Name,
+			FullName:       repo.FullName,
+			Url:            fmt.Sprintf("https://github.com/%s", repo.FullName),
 		})
 		if err != nil {
 			/* XXX: cleanup delete from disk */
 			return fmt.Errorf("error creating repository: %w", err)
-		}
-		_, err = s.CreateSubscriber(context.TODO(), model.CreateSubscriberParams{
-			BlogID: blog.ID,
-			Email:  email,
-		})
-		if err != nil {
-			return fmt.Errorf("error creating first subscriber: %w", err)
 		}
 	}
 	return nil
@@ -370,7 +356,7 @@ func handleInstallationRepositoriesRemoved(c *http.Client, s *model.Store, ghIns
 	log.Println("deleting blogs from db...")
 	/* delete blogs removed from db */
 	for _, repo := range repos {
-		if err := s.DeleteBlogWithGhRepositoryID(context.TODO(), repo.ID); err != nil {
+		if err := s.DeleteRepositoryWithGhRepositoryID(context.TODO(), repo.ID); err != nil {
 			return fmt.Errorf("error deleting repository with ghRepositoryID `%d': %w", repo.ID, err)
 		}
 	}
@@ -458,20 +444,16 @@ func buildNewPostUpdateParamsList(ghRepositoryID int64, s *model.Store) ([]email
 		return []email.NewPostUpdateParams{}, fmt.Errorf("error getting active subscriber list: %w", err)
 	}
 
-	if !blog.Subdomain.Valid {
-		return []email.NewPostUpdateParams{}, fmt.Errorf("error missing subdomain value")
-	}
-
 	/* build details */
 	var paramsList []email.NewPostUpdateParams
 	blogParams := email.BlogParams{
 		ID:        blog.ID,
 		From:      blog.FromAddress,
-		Subdomain: blog.Subdomain.String,
+		Subdomain: blog.Subdomain,
 	}
 	/* XXX: construct postParams from generated site, hardcoding for now */
 	postParams := email.PostParams{
-		Link:    fmt.Sprintf("https://%s.progstack.com/posts/1", blog.Subdomain.String),
+		Link:    fmt.Sprintf("https://%s.progstack.com/posts/1", blog.Subdomain),
 		Body:    "testing subscriber update emails in progstack",
 		Subject: "#1 progstack email functinality",
 	}

@@ -56,21 +56,18 @@ func (s *Store) CreateUserWithGithubAccountTx(ctx context.Context, arg CreateGit
 	})
 }
 
-type BlogTxParams struct {
-	GhRepositoryID int64
-	GhName         string
-	GhFullName     string
-	GhUrl          string
-	Subdomain      string
-	DemoSubdomain  string
-	FromAddress    string
+type RepositoryTxParams struct {
+	RepositoryID int64
+	Name         string
+	FullName     string
+	Url          string
 }
 
 type InstallationTxParams struct {
-	InstallationID int64
-	UserID         int32
-	Email          string
-	BlogsParams    []BlogTxParams
+	InstallationID       int64
+	UserID               int32
+	Email                string
+	RepositoriesTxParams []RepositoryTxParams
 }
 
 func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxParams) error {
@@ -82,24 +79,14 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 		if err != nil {
 			return err
 		}
-		for _, blogParams := range arg.BlogsParams {
-			blog, err := s.CreateBlog(ctx, CreateBlogParams{
+		for _, repositoryTxParams := range arg.RepositoriesTxParams {
+			_, err := s.CreateRepository(ctx, CreateRepositoryParams{
 				UserID:         arg.UserID,
-				InstallationID: installation.ID,
-				GhRepositoryID: blogParams.GhRepositoryID,
-				GhName:         blogParams.GhName,
-				GhFullName:     blogParams.GhFullName,
-				GhUrl:          fmt.Sprintf("https://github.com/%s", blogParams.GhFullName), /* ghUrl not always in events */
-				BlogType:       BlogTypeRepository,
-				FromAddress:    blogParams.FromAddress,
-				DemoSubdomain:  blogParams.DemoSubdomain,
-			})
-			if err != nil {
-				return err
-			}
-			_, err = s.CreateSubscriber(ctx, CreateSubscriberParams{
-				BlogID: blog.ID,
-				Email:  arg.Email,
+				InstallationID: installation.GhInstallationID,
+				RepositoryID:   repositoryTxParams.RepositoryID,
+				Name:           repositoryTxParams.Name,
+				FullName:       repositoryTxParams.FullName,
+				Url:            fmt.Sprintf("https://github.com/%s", repositoryTxParams.FullName), /* ghUrl not always in events */
 			})
 			if err != nil {
 				return err
@@ -148,12 +135,7 @@ type CreateSubdomainTxParams struct {
 
 func (s *Store) CreateSubdomainTx(ctx context.Context, arg CreateSubdomainTxParams) error {
 	return s.execTx(ctx, func(q *Queries) error {
-		nullSubdomain := sql.NullString{Valid: true,
-			String: arg.Subdomain,
-		}
-
-		/* check if exists */
-		exists, err := s.SubdomainExists(ctx, nullSubdomain)
+		exists, err := s.SubdomainExists(ctx, arg.Subdomain)
 		if err != nil {
 			return fmt.Errorf("error checking if subdomain exists")
 		}
@@ -166,7 +148,7 @@ func (s *Store) CreateSubdomainTx(ctx context.Context, arg CreateSubdomainTxPara
 		/* write new subdomain */
 		err = s.UpdateSubdomainByID(ctx, UpdateSubdomainByIDParams{
 			ID:        arg.BlogID,
-			Subdomain: nullSubdomain,
+			Subdomain: arg.Subdomain,
 		})
 		if err != nil {
 			return fmt.Errorf("error creating subdomain `%s' for blog `%d': %w", arg.Subdomain, arg.BlogID, err)

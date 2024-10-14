@@ -36,16 +36,12 @@ func GetBlogsInfo(s *model.Store, userID int32) ([]BlogInfo, error) {
 	}
 	var info []BlogInfo
 	for _, blog := range blogs {
-		info = append(info, convertBlogInfo(blog))
+		info = append(info, buildBlogInfo(blog))
 	}
 	return info, nil
 }
 
-func convertBlogInfo(blog model.Blog) BlogInfo {
-	subdomain := blog.DemoSubdomain
-	if blog.Subdomain.Valid {
-		subdomain = blog.Subdomain.String
-	}
+func buildBlogInfo(blog model.Blog) BlogInfo {
 	isRepository := false
 	if blog.BlogType == model.BlogTypeRepository {
 		isRepository = true
@@ -56,11 +52,10 @@ func convertBlogInfo(blog model.Blog) BlogInfo {
 	}
 	return BlogInfo{
 		ID:                   blog.ID,
-		Domain:               buildDomain(subdomain),
-		Subdomain:            blog.Subdomain.String,
-		CustomDomain:         blog.CustomDomain.String,
-		DomainUrl:            buildDomainUrl(subdomain),
-		RepositoryUrl:        blog.GhUrl,
+		Domain:               buildDomain(blog.Subdomain),
+		Subdomain:            blog.Subdomain,
+		DomainUrl:            buildDomainUrl(blog.Subdomain),
+		RepositoryUrl:        buildRepositoryUrl(blog.GhFullName),
 		SubscriberMetricsUrl: buildSubscriberMetricsUrl(blog.ID),
 		MetricsUrl:           buildMetricsUrl(blog.ID),
 		ConfigUrl:            buildConfigUrl(blog.ID),
@@ -79,6 +74,13 @@ func buildDomain(subdomain string) string {
 		"%s.%s",
 		subdomain,
 		config.Config.Progstack.ServiceName,
+	)
+}
+
+func buildRepositoryUrl(fullName string) string {
+	return fmt.Sprintf(
+		"https://github.com/%s/",
+		fullName,
 	)
 }
 
@@ -117,5 +119,5 @@ func getBlogInfo(s *model.Store, blogID int32) (BlogInfo, error) {
 	if err != nil {
 		return BlogInfo{}, err
 	}
-	return convertBlogInfo(blog), err
+	return buildBlogInfo(blog), err
 }

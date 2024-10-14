@@ -4,18 +4,134 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/util"
 )
+
+func (b *BlogService) SubscribeToBlog() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("subscribe to blog handler...")
+
+		if err := b.subscribeToBlog(w, r); err != nil {
+			log.Printf("error subscribing to blog: %v", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+type SubscribeRequest struct {
+	Email string `json:"email"`
+}
+
+func (sr *SubscribeRequest) validate() error {
+	/* XXX: better validation */
+	if sr.Email == "" {
+		return fmt.Errorf("email is required")
+	}
+	return nil
+}
+
+func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) error {
+	/* extract BlogID from path */
+	vars := mux.Vars(r)
+	blogID := vars["blogID"]
+
+	/* parse the request body to get subscriber email */
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return fmt.Errorf("error reading request body: %w", err)
+	}
+	defer r.Body.Close()
+
+	var req SubscribeRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return fmt.Errorf("error unmarshaling request: %w", err)
+	}
+	if err = req.validate(); err != nil {
+		return fmt.Errorf("error invalid request body: %w", err)
+	}
+
+	/* XXX: validate email format */
+
+	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	if err != nil {
+		return fmt.Errorf("error converting string path var to blogID: %w", err)
+	}
+
+	log.Printf("subscribing email `%s' to blog with id: `%d'", req.Email, intBlogID)
+	/* first check if exists */
+
+	err = b.store.CreateSubscriberTx(context.TODO(), model.CreateSubscriberTxParams{
+		BlogID: int32(intBlogID),
+		Email:  req.Email,
+	})
+	if err != nil {
+		return fmt.Errorf("error writing subscriber for blog to db: %w", err)
+	}
+	return nil
+}
+
+func (b *BlogService) UnsubscribeFromBlog() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("unsubscribe from blog handler...")
+		if err := b.unsubscribeFromBlog(w, r); err != nil {
+			log.Printf("error in unsubscribeFromBlog handler: %w", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+type UnsubscribeRequest struct {
+	Token string `json:"token"`
+}
+
+func (ur *UnsubscribeRequest) validate() error {
+	if ur.Token == "" {
+		return fmt.Errorf("token is required")
+	}
+	return nil
+}
+
+func (b *BlogService) unsubscribeFromBlog(w http.ResponseWriter, r *http.Request) error {
+	/* extract BlogID from path */
+	vars := mux.Vars(r)
+	blogID := vars["blogID"]
+
+	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	if err != nil {
+		return fmt.Errorf("error converting string path var to blogID: %w", err)
+	}
+	token := r.URL.Query().Get("token")
+	uuid, err := uuid.Parse(token)
+	if err != nil {
+		log.Fatalf("Failed to parse UUID: %v", err)
+	}
+
+	err = b.store.DeleteSubscriberForBlog(context.TODO(), model.DeleteSubscriberForBlogParams{
+		BlogID:           int32(intBlogID),
+		UnsubscribeToken: uuid,
+	})
+	if err != nil {
+		return fmt.Errorf("error writing subscriber for blog to db: %w", err)
+	}
+	return nil
+}
 
 func (b *BlogService) ImportSubscribers() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

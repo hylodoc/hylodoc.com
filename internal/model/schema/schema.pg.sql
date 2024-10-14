@@ -96,37 +96,48 @@ CREATE TABLE installations (
 		ON DELETE CASCADE -- delete installations if user deleted
 );
 
+CREATE TABLE repositories (
+	id			SERIAL				PRIMARY KEY,
+	user_id			INTEGER		NOT NULL,
+	installation_id		BIGINT		NOT NULL,
+	repository_id		BIGINT		NOT NULL	UNIQUE,
+	name			VARCHAR(255)	NOT NULL,
+	full_name		VARCHAR(255)	NOT NULL,
+	url			VARCHAR(255)	NOT NULL,
+	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
+
+	CONSTRAINT fk_user_id
+		FOREIGN KEY (user_id)
+		REFERENCES users(id)
+		ON DELETE CASCADE, -- delete repositories when users deleted
+
+	CONSTRAINT fk_gh_installation_id
+		FOREIGN KEY (installation_id)
+		REFERENCES installations(gh_installation_id)
+		ON DELETE CASCADE -- delete repositories when installation deleted
+);
+
 CREATE TYPE blog_status AS ENUM ('live', 'offline');
 CREATE TYPE blog_type AS ENUM ('repository', 'folder');
 
 CREATE TABLE blogs (
 	id 			SERIAL				PRIMARY KEY,
 	user_id			INTEGER		NOT NULL,
-	installation_id		INTEGER		NOT NULL,
 	gh_repository_id	BIGINT		NOT NULL	UNIQUE,
-	gh_url			VARCHAR(255)	NOT NULL,
-	gh_name			VARCHAR(255)	NOT NULL,
-	gh_full_name		VARCHAR(255)	NOT NULL,				-- needed for path construction
+	gh_full_name		VARCHAR(255)	NOT NULL,
 	test_branch		VARCHAR(255),
 	live_branch		VARCHAR(255),
-	subdomain		VARCHAR(255)			UNIQUE,
-	custom_domain		VARCHAR(255),
-	demo_subdomain		VARCHAR(255)	NOT NULL	UNIQUE,
+	subdomain		VARCHAR(255)	NOT NULL	UNIQUE,
 	from_address		VARCHAR(255)	NOT NULL,
 	blog_type		blog_type	NOT NULL,
 	status			blog_status	NOT NULL			DEFAULT('offline'),
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 
-	CONSTRAINT fk_user_id
-		FOREIGN KEY (user_id)
-		REFERENCES users(id)
-		ON DELETE CASCADE, -- delete repositories when installation deleted
-
-	CONSTRAINT fk_installation_id
-		FOREIGN KEY (installation_id)
-		REFERENCES installations(id)
-		ON DELETE CASCADE -- delete repositories when installation deleted
+	CONSTRAINT fk_repository_id
+		FOREIGN KEY (gh_repository_id)
+		REFERENCES repositories(repository_id)
+		ON DELETE CASCADE -- delete blogs when repository deleted
 );
 
 -- blog subscriber lists

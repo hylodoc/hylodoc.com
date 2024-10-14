@@ -13,8 +13,9 @@ RUN apk add gcc musl-dev
 WORKDIR /app
 COPY . .
 
+# generate models with sqlc
 RUN sqlc generate -f internal/model/sqlc.yaml
 
-RUN go mod tidy
+# build application
 RUN CGO_ENABLED=1 go build -o progstack
 CMD ./progstack
