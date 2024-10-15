@@ -43,8 +43,10 @@ func GetBlogsInfo(s *model.Store, userID int32) ([]BlogInfo, error) {
 
 func buildBlogInfo(blog model.Blog) BlogInfo {
 	isRepository := false
+	url := ""
 	if blog.BlogType == model.BlogTypeRepository {
 		isRepository = true
+		url = blog.GhUrl.String
 	}
 	isLive := false
 	if blog.Status == model.BlogStatusLive {
@@ -55,7 +57,7 @@ func buildBlogInfo(blog model.Blog) BlogInfo {
 		Domain:               buildDomain(blog.Subdomain),
 		Subdomain:            blog.Subdomain,
 		DomainUrl:            buildDomainUrl(blog.Subdomain),
-		RepositoryUrl:        buildRepositoryUrl(blog.GhFullName),
+		RepositoryUrl:        url,
 		SubscriberMetricsUrl: buildSubscriberMetricsUrl(blog.ID),
 		MetricsUrl:           buildMetricsUrl(blog.ID),
 		ConfigUrl:            buildConfigUrl(blog.ID),
@@ -74,13 +76,6 @@ func buildDomain(subdomain string) string {
 		"%s.%s",
 		subdomain,
 		config.Config.Progstack.ServiceName,
-	)
-}
-
-func buildRepositoryUrl(fullName string) string {
-	return fmt.Sprintf(
-		"https://github.com/%s/",
-		fullName,
 	)
 }
 

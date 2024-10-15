@@ -56,7 +56,7 @@ func downloadRepoTarball(c *http.Client, repoFullName, accessToken string) (stri
 func extractTarball(tarPath, destPath string) error {
 	log.Println("extracting tarball...")
 	if err := os.MkdirAll(destPath, os.ModePerm); err != nil {
-		fmt.Println("error creating destination directory: %w", err)
+		log.Printf("error creating destination directory: %v\n", err)
 		return fmt.Errorf("error creating destination directory: %w", err)
 	}
 	/* we assume that we're deployed on unix based compute, this is simpler
@@ -66,7 +66,7 @@ func extractTarball(tarPath, destPath string) error {
 	cmd := exec.Command("tar", "--strip-components=1", "-xzf", tarPath,
 		"-C", destPath)
 	if err := cmd.Run(); err != nil {
-		log.Fatalf("error extracting tar file: %v", err)
+		log.Printf("error extracting tar file: %v\n", err)
 		return fmt.Errorf("error extraction tar file: %w", err)
 	}
 	return nil

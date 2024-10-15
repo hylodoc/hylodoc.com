@@ -138,7 +138,7 @@ func handleInstallationCreated(c *http.Client, s *model.Store, ghInstallationID 
 	log.Println("repos: %s", str)
 
 	/* clone all repos to disk */
-	if err = downloadReposToDisk(c, repos, accessToken); err != nil {
+	if err = downloadReposToDisk(c, repos, userID, accessToken); err != nil {
 		return fmt.Errorf("error downloading repos to disk: %w", err)
 	}
 
@@ -209,7 +209,7 @@ func getReposDetails(c *http.Client, accessToken string) ([]Repository, error) {
 *
 * NOTE: we use the Repository.GhFullName which is guaranteed to be
 * "<owner>/<name>" to build the repo path */
-func downloadReposToDisk(c *http.Client, repos []Repository, accessToken string) error {
+func downloadReposToDisk(c *http.Client, repos []Repository, userID int32, accessToken string) error {
 	log.Println("downloading repos to disk...")
 	for _, repo := range repos {
 		/* download tarball and write to tmp file */
@@ -219,8 +219,8 @@ func downloadReposToDisk(c *http.Client, repos []Repository, accessToken string)
 			return fmt.Errorf("error downloading tarball for at url: %s: %w", repoFullName, err)
 		}
 		/* extract tarball to destination should store under user */
-		tmpDst := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, repoFullName)
-		if err = extractTarball(tmpFile, tmpDst); err != nil {
+		dst := fmt.Sprintf("%s/%d/%s", config.Config.Progstack.RepositoriesPath, userID, repoFullName)
+		if err = extractTarball(tmpFile, dst); err != nil {
 			return fmt.Errorf("error extracting tarball to destination for /%s/: %w", repoFullName, err)
 		}
 	}
@@ -239,7 +239,7 @@ func handleInstallationDeleted(c *http.Client, s *model.Store, ghInstallationID 
 	/* delete the repos on disk */
 	log.Println("deleting repos from disk...")
 	for _, repo := range repos {
-		path := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, repo.FullName)
+		path := fmt.Sprintf("%s/%d/%s", config.Config.Progstack.RepositoriesPath, userID, repo.FullName)
 		log.Printf("deleting repo at `%s' from disk...\n", path)
 		if err := os.RemoveAll(path); err != nil {
 			return fmt.Errorf("error deleting repo `%s' from disk: %w", err)
@@ -313,13 +313,12 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 		return fmt.Errorf("error getting installation access token: %w", err)
 	}
 	/* clone respositories added to disk */
-	if err = downloadReposToDisk(c, repos, accessToken); err != nil {
+	if err = downloadReposToDisk(c, repos, userID, accessToken); err != nil {
 		return fmt.Errorf("error downloading repos to disk: %w", err)
 	}
 
 	for _, repo := range repos {
 		_, err := s.CreateRepository(context.TODO(), model.CreateRepositoryParams{
-			UserID:         userID,
 			InstallationID: ghInstallationID,
 			RepositoryID:   repo.ID,
 			Name:           repo.Name,
@@ -432,14 +431,20 @@ func sendNewPostUpdateEmailsForBlog(ghRepositoryID int64, c *resend.Client, s *m
 
 func buildNewPostUpdateParamsList(ghRepositoryID int64, s *model.Store) ([]email.NewPostUpdateParams, error) {
 	/* get blog */
-	blog, err := s.GetBlogByGhRepositoryID(context.TODO(), ghRepositoryID)
+	blog, err := s.GetBlogByGhRepositoryID(context.TODO(), sql.NullInt64{
+		Valid: true,
+		Int64: ghRepositoryID,
+	})
 	if err != nil {
 		return []email.NewPostUpdateParams{}, fmt.Errorf("error getting blog with ghRepositoryID `%d': %w", ghRepositoryID, err)
 	}
 	log.Printf("sending new post update emails for blog with id: `%d'\n", blog.ID)
 
 	/* list active subscribers */
-	subscribers, err := s.ListActiveSubscribersForGhRepositoryID(context.TODO(), ghRepositoryID)
+	subscribers, err := s.ListActiveSubscribersForGhRepositoryID(context.TODO(), sql.NullInt64{
+		Valid: true,
+		Int64: ghRepositoryID,
+	})
 	if err != nil {
 		return []email.NewPostUpdateParams{}, fmt.Errorf("error getting active subscriber list: %w", err)
 	}

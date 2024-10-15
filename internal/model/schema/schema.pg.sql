@@ -98,18 +98,12 @@ CREATE TABLE installations (
 
 CREATE TABLE repositories (
 	id			SERIAL				PRIMARY KEY,
-	user_id			INTEGER		NOT NULL,
 	installation_id		BIGINT		NOT NULL,
 	repository_id		BIGINT		NOT NULL	UNIQUE,
 	name			VARCHAR(255)	NOT NULL,
 	full_name		VARCHAR(255)	NOT NULL,
 	url			VARCHAR(255)	NOT NULL,
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
-
-	CONSTRAINT fk_user_id
-		FOREIGN KEY (user_id)
-		REFERENCES users(id)
-		ON DELETE CASCADE, -- delete repositories when users deleted
 
 	CONSTRAINT fk_gh_installation_id
 		FOREIGN KEY (installation_id)
@@ -123,8 +117,9 @@ CREATE TYPE blog_type AS ENUM ('repository', 'folder');
 CREATE TABLE blogs (
 	id 			SERIAL				PRIMARY KEY,
 	user_id			INTEGER		NOT NULL,
-	gh_repository_id	BIGINT		NOT NULL	UNIQUE,
-	gh_full_name		VARCHAR(255)	NOT NULL,
+	gh_repository_id	BIGINT				UNIQUE		DEFAULT(NULL),
+	gh_url			VARCHAR(255)			UNIQUE		DEFAULT(NULL),
+	repository_path		VARCHAR(255)	NOT NULL,			-- path on disk
 	test_branch		VARCHAR(255),
 	live_branch		VARCHAR(255),
 	subdomain		VARCHAR(255)	NOT NULL	UNIQUE,
@@ -137,7 +132,17 @@ CREATE TABLE blogs (
 	CONSTRAINT fk_repository_id
 		FOREIGN KEY (gh_repository_id)
 		REFERENCES repositories(repository_id)
-		ON DELETE CASCADE -- delete blogs when repository deleted
+		ON DELETE CASCADE, -- delete blogs when repository deleted
+
+	CONSTRAINT blog_type_check CHECK (
+		(
+			blog_type = 'repository'
+			AND gh_repository_id IS NOT NULL
+		) OR (
+			blog_type = 'folder'
+			AND gh_repository_id IS NULL
+		)
+	)
 );
 
 -- blog subscriber lists

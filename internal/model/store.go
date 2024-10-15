@@ -81,7 +81,6 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 		}
 		for _, repositoryTxParams := range arg.RepositoriesTxParams {
 			_, err := s.CreateRepository(ctx, CreateRepositoryParams{
-				UserID:         arg.UserID,
 				InstallationID: installation.GhInstallationID,
 				RepositoryID:   repositoryTxParams.RepositoryID,
 				Name:           repositoryTxParams.Name,
@@ -128,12 +127,12 @@ func (s *Store) CreateSubscriberTx(ctx context.Context, arg CreateSubscriberTxPa
 	})
 }
 
-type CreateSubdomainTxParams struct {
+type UpdateSubdomainTxParams struct {
 	BlogID    int32
 	Subdomain string
 }
 
-func (s *Store) CreateSubdomainTx(ctx context.Context, arg CreateSubdomainTxParams) error {
+func (s *Store) UpdateSubdomainTx(ctx context.Context, arg UpdateSubdomainTxParams) error {
 	return s.execTx(ctx, func(q *Queries) error {
 		exists, err := s.SubdomainExists(ctx, arg.Subdomain)
 		if err != nil {
@@ -142,9 +141,10 @@ func (s *Store) CreateSubdomainTx(ctx context.Context, arg CreateSubdomainTxPara
 		if exists {
 			return util.UserError{
 				Message: "subdomain already exists",
-				Code:    http.StatusTooManyRequests,
+				Code:    http.StatusBadRequest,
 			}
 		}
+
 		/* write new subdomain */
 		err = s.UpdateSubdomainByID(ctx, UpdateSubdomainByIDParams{
 			ID:        arg.BlogID,

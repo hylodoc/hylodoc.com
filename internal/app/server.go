@@ -22,12 +22,7 @@ import (
 )
 
 const (
-	Cssdir = "web/static/css"
-
 	listeningPort = 7999 /* XXX: make configurable */
-
-	ghInstallUrlTemplate = "https://github.com/apps/%s/installations/new"
-
 	clientTimeout = 3 * time.Second
 )
 
@@ -110,8 +105,11 @@ func Serve() {
 	authR.HandleFunc("/account", userService.Account())
 	authR.HandleFunc("/delete", userService.Delete())
 	authR.HandleFunc("/create-new-blog", userService.CreateNewBlog())
-	authR.HandleFunc("/create-blog", blogService.CreateBlog())
+	authR.HandleFunc("/repository-flow", userService.RepositoryFlow())
+	authR.HandleFunc("/folder-flow", userService.FolderFlow())
 	authR.HandleFunc("/subdomain-check", blogService.SubdomainCheck())
+	authR.HandleFunc("/create-repository-blog", blogService.CreateRepositoryBlog())
+	authR.HandleFunc("/create-folder-blog", blogService.CreateFolderBlog())
 	authR.HandleFunc("/stripe/subscriptions", billingService.Subscriptions())
 	authR.HandleFunc("/stripe/create-checkout-session", billingService.CreateCheckoutSession())
 	authR.HandleFunc("/stripe/success", billingService.Success())
@@ -121,7 +119,7 @@ func Serve() {
 	blogR := authR.PathPrefix("/blogs/{blogID}").Subrouter()
 	blogR.Use(blogMiddleware.AuthoriseBlog)
 	blogR.HandleFunc("/config", blogService.Config())
-	blogR.HandleFunc("/subdomain-submit", blogService.SubdomainSubmit())
+	blogR.HandleFunc("/set-subdomain", blogService.SubdomainSubmit())
 	blogR.HandleFunc("/set-test-branch", blogService.TestBranchSubmit())
 	blogR.HandleFunc("/set-live-branch", blogService.LiveBranchSubmit())
 	blogR.HandleFunc("/set-status", blogService.SetStatusSubmit())
@@ -155,6 +153,8 @@ func index() http.HandlerFunc {
 		if session != nil {
 			http.Redirect(w, r, "/user/", http.StatusSeeOther)
 		}
+
+		/* get repositories for unauth session */
 
 		util.ExecTemplate(w, []string{"index.html"},
 			util.PageInfo{

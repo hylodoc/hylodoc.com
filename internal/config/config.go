@@ -21,6 +21,7 @@ type ProgstackParams struct {
 	Protocol         string `mapstructure:"protocol"`
 	ServiceName      string `mapstructure:"service_name"`
 	RepositoriesPath string `mapstructure:"repositories_path"`
+	FoldersPath      string `mapstructure:"folders_path"`
 	WebsitesPath     string `mapstructure:"websites_path"`
 	FromEmail        string `mapstructure:"from_email"`
 	AccountsEmail    string `mapstructure:"accounts_email"`

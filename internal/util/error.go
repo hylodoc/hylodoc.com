@@ -9,3 +9,7 @@ type UserError struct {
 func (e UserError) Error() string {
 	return e.Message
 }
+
+type ErrorResponse struct {
+	Message string `json:"message"`
+}

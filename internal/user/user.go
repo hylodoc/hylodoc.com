@@ -76,12 +76,66 @@ func (u *UserService) Home() http.HandlerFunc {
 	}
 }
 
+func (u *UserService) CreateNewBlog() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("respository flow handler...")
+
+		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		if !ok {
+			log.Println("no user found")
+			http.Error(w, "", http.StatusNotFound)
+			return
+		}
+
+		util.ExecTemplate(w, []string{"blog_create.html"},
+			util.PageInfo{
+				Data: struct {
+					Title   string
+					Session *auth.Session
+				}{
+					Title:   "Create New Blog",
+					Session: session,
+				},
+			},
+			template.FuncMap{},
+		)
+	}
+}
+
+func (u *UserService) FolderFlow() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("folder flow handler...")
+
+		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		if !ok {
+			log.Println("no user found")
+			http.Error(w, "", http.StatusNotFound)
+			return
+		}
+
+		util.ExecTemplate(w, []string{"blog_folder_flow.html"},
+			util.PageInfo{
+				Data: struct {
+					Title       string
+					Session     *auth.Session
+					ServiceName string
+				}{
+					Title:       "Folder Flow",
+					Session:     session,
+					ServiceName: config.Config.Progstack.ServiceName,
+				},
+			},
+			template.FuncMap{},
+		)
+	}
+}
+
 type Repository struct {
 	Value int64
 	Name  string
 }
 
-func (u *UserService) CreateNewBlog() http.HandlerFunc {
+func (u *UserService) RepositoryFlow() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("create new blog handler...")
 
@@ -114,7 +168,7 @@ func (u *UserService) CreateNewBlog() http.HandlerFunc {
 		}
 
 		githubInstallAppUrl := fmt.Sprintf(installation.GhInstallUrlTemplate, config.Config.Github.AppName)
-		util.ExecTemplate(w, []string{"blog_create.html"},
+		util.ExecTemplate(w, []string{"blog_repository_flow.html"},
 			util.PageInfo{
 				Data: struct {
 					Title               string
@@ -125,7 +179,7 @@ func (u *UserService) CreateNewBlog() http.HandlerFunc {
 					ServiceName         string
 					Repositories        []Repository
 				}{
-					Title:               "Create New Blog",
+					Title:               "Repository Flow",
 					Session:             session,
 					AccountDetails:      details,
 					GithubInstallAppUrl: githubInstallAppUrl,

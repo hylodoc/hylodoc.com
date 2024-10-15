@@ -1,13 +1,12 @@
 -- name: CreateRepository :one
 INSERT INTO repositories (
-	user_id,
 	installation_id,
 	repository_id,
 	url,
 	name,
 	full_name
 ) VALUES (
-	$1, $2, $3, $4, $5, $6
+	$1, $2, $3, $4, $5
 )
 RETURNING *;
 
@@ -24,10 +23,12 @@ ON b.gh_repository_id = r.repository_id
 WHERE b.id = $1;
 
 -- name: ListOrderedRepositoriesByUserID :many
-SELECT *
-FROM repositories
-WHERE user_id = $1
-ORDER BY created_at ASC;
+SELECT r.*
+FROM repositories r
+INNER JOIN installations i
+ON r.installation_id = i.gh_installation_id
+WHERE i.user_id = $1
+ORDER BY r.created_at ASC;
 
 -- name: DeleteRepositoryWithGhRepositoryID :exec
 DELETE

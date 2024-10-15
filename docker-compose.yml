@@ -8,6 +8,7 @@ services:
       - '7999:7999'
     volumes:
       - './repositories:/app/repositories'
+      - './folders:/app/folders'
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,3 +31,4 @@ services:
 
 volumes:
   repositories:
+  folders:

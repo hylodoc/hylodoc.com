@@ -81,24 +81,15 @@ func ConvertCentsToDollars(cents int64) string {
 
 /* Launch Blog */
 
-type LaunchBlogParams struct {
-	GhRepoFullName string
-	Subdomain      string
-}
-
 type LaunchUserBlogParams struct {
-	GhRepoFullName string
+	RepositoryPath string
 	Subdomain      string
 }
 
-func LaunchUserBlog(params LaunchUserBlogParams) error {
-	repo := filepath.Join(
-		config.Config.Progstack.RepositoriesPath,
-		params.GhRepoFullName,
-	)
-	if _, err := os.Stat(repo); err != nil {
+func launchUserBlog(params LaunchUserBlogParams) error {
+	if _, err := os.Stat(params.RepositoryPath); err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("repository does not exist on disk: %w", err)
+			return fmt.Errorf("repository at `%s' does not exist on disk: %w", params.RepositoryPath, err)
 		}
 		return err
 	}
@@ -106,7 +97,7 @@ func LaunchUserBlog(params LaunchUserBlogParams) error {
 		config.Config.Progstack.WebsitesPath,
 		params.Subdomain,
 	)
-	if err := ssg.GenerateSite(repo, site, "progstack-ssg/theme/lit"); err != nil {
+	if err := ssg.GenerateSite(params.RepositoryPath, site, "progstack-ssg/theme/lit"); err != nil {
 		return fmt.Errorf("error generating site: %w", err)
 	}
 	return nil
@@ -167,6 +158,7 @@ func (b *BlogService) LiveBranchSubmit() http.HandlerFunc {
 		log.Println("live branch submit handler...")
 
 		if err := b.liveBranchSubmit(w, r); err != nil {
+			/* XXX: custom error handling of codes */
 			log.Printf("error updating live branch: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			response := map[string]string{"message": "An unexpected error occurred"}
@@ -211,25 +203,51 @@ func (b *BlogService) liveBranchSubmit(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
+type SetStatusSubmitResponse struct {
+	Message string `json:"message"`
+}
+
 func (b *BlogService) SetStatusSubmit() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("set status handler...")
 
+		w.Header().Set("Content-Type", "application/json")
+
 		change, err := b.setStatusSubmit(w, r)
 		if err != nil {
-			log.Printf("error setting status: %v", err)
+			userErr, ok := err.(util.UserError)
+			if ok {
+				log.Printf("Client Error: %v\n", userErr)
+				w.WriteHeader(http.StatusBadRequest)
+				if err := json.NewEncoder(w).Encode(util.ErrorResponse{
+					Message: userErr.Error(),
+				}); err != nil {
+					log.Printf("Failed to encode response: %v\n", err)
+					http.Error(w, "", http.StatusInternalServerError)
+					return
+				}
+				return
+			}
+			log.Printf("Internal Server Error: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			response := map[string]string{"message": "An unexpected error occurred"}
-			json.NewEncoder(w).Encode(response)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
 		}
+
 		w.WriteHeader(http.StatusOK)
-		var response map[string]string
+		message := ""
 		if change.IsLive {
-			response = map[string]string{"message": fmt.Sprintf("%s is live!", change.Domain)}
+			message = fmt.Sprintf("%s is live!", change.Domain)
 		} else {
-			response = map[string]string{"message": fmt.Sprintf("%s was taken offline successfully.", change.Domain)}
+			message = fmt.Sprintf("%s was taken offline successfully.", change.Domain)
 		}
-		json.NewEncoder(w).Encode(response)
+		if err = json.NewEncoder(w).Encode(SetStatusSubmitResponse{
+			Message: message,
+		}); err != nil {
+			log.Printf("Failed to encode response: %v\n", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
@@ -255,7 +273,7 @@ func (b *BlogService) setStatusSubmit(w http.ResponseWriter, r *http.Request) (s
 
 	change, err := handleStatusChange(int32(intBlogID), req.Status, session.Email, b.store)
 	if err != nil {
-		return statusChangeResponse{}, fmt.Errorf("error handling status change: %w", err)
+		return statusChangeResponse{}, err
 	}
 	return change, nil
 }
@@ -272,23 +290,14 @@ func handleStatusChange(blogID int32, status, email string, s *model.Store) (sta
 	}
 
 	if err := validateStatusChange(status, string(blog.Status)); err != nil {
-		return statusChangeResponse{}, util.UserError{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf("error: %w", err),
-		}
+		return statusChangeResponse{}, err
 	}
 
 	switch status {
 	case "live":
-		return statusChangeResponse{
-			Domain: blog.Subdomain,
-			IsLive: true,
-		}, launchBlog(blog, email, s)
+		return setBlogToLive(blog, s)
 	case "offline":
-		return statusChangeResponse{
-			Domain: blog.Subdomain,
-			IsLive: false,
-		}, deleteBlog(blog, s)
+		return setBlogToOffline(blog, s)
 	default:
 		return statusChangeResponse{}, fmt.Errorf("invalid status: %s", status)
 	}
@@ -303,18 +312,22 @@ func validateStatusChange(request, current string) error {
 		)
 	}
 	if request == current {
-		return fmt.Errorf("requested `%s' equals current state: %s", request, current)
+		return util.UserError{
+			Message: fmt.Sprintf("state is already %s", current),
+			Code:    http.StatusBadRequest,
+		}
 	}
 	return nil
 }
 
-func launchBlog(blog model.Blog, email string, s *model.Store) error {
-	/* launch blog */
-	if err := LaunchUserBlog(LaunchUserBlogParams{
-		GhRepoFullName: blog.GhFullName,
+func setBlogToLive(blog model.Blog, s *model.Store) (statusChangeResponse, error) {
+	fmt.Printf("repo disk path: %s\n", blog.RepositoryPath)
+
+	if err := launchUserBlog(LaunchUserBlogParams{
+		RepositoryPath: blog.RepositoryPath,
 		Subdomain:      blog.Subdomain,
 	}); err != nil {
-		return fmt.Errorf("error launching blog `%d': %w", blog.ID, err)
+		return statusChangeResponse{}, fmt.Errorf("error launching blog `%d': %w", blog.ID, err)
 	}
 
 	/* update status to live */
@@ -322,25 +335,31 @@ func launchBlog(blog model.Blog, email string, s *model.Store) error {
 		ID:     blog.ID,
 		Status: model.BlogStatusLive,
 	}); err != nil {
-		return fmt.Errorf("error setting status to %s: %w", model.BlogStatusLive, err)
+		return statusChangeResponse{}, fmt.Errorf("error setting status to %s: %w", model.BlogStatusLive, err)
 	}
-	return nil
+	return statusChangeResponse{
+		Domain: blog.Subdomain,
+		IsLive: true,
+	}, nil
 }
 
-func deleteBlog(blog model.Blog, s *model.Store) error {
+func setBlogToOffline(blog model.Blog, s *model.Store) (statusChangeResponse, error) {
 	site := filepath.Join(
 		config.Config.Progstack.WebsitesPath,
 		blog.Subdomain,
 	)
 	if err := os.RemoveAll(site); err != nil {
-		return fmt.Errorf("error deleting website `%s' from disk: %w", blog.Subdomain, err)
+		return statusChangeResponse{}, fmt.Errorf("error deleting website `%s' from disk: %w", blog.Subdomain, err)
 	}
 	err := s.SetBlogStatusByID(context.TODO(), model.SetBlogStatusByIDParams{
 		ID:     blog.ID,
 		Status: model.BlogStatusOffline,
 	})
 	if err != nil {
-		return fmt.Errorf("error setting status to `%s': %w", model.BlogStatusOffline, err)
+		return statusChangeResponse{}, fmt.Errorf("error setting status to `%s': %w", model.BlogStatusOffline, err)
 	}
-	return nil
+	return statusChangeResponse{
+		Domain: blog.Subdomain,
+		IsLive: false,
+	}, nil
 }

@@ -1,0 +1,157 @@
+{{ template "header" . }}
+
+<div id="toast" class="toast"></div>
+
+<section>
+	<div class="container">
+		<h3>Folder Flow</h3>
+	</div>
+</section>
+
+<section>
+	<div class="container">
+		<form id="blogForm" enctype="multipart/form-data">
+			<!-- Subdomain configuration -->
+			<label for="subdomainInput">Configure subdomain</label>
+			<div class="row">
+				<input class="four columns" autocomplete="off" type="text" id="subdomainInput" placeholder="Enter your subdomain"/>
+				<span> .{{ .Data.ServiceName }}</span>
+			</div>
+			<div id="availabilityMessage" class="availability-message"></div>
+
+			<div class="row">
+				<label for="folder">Select Folder (ZIP):</label>
+				<input type="file" id="folder" name="folder" accept=".zip" required>
+			</div>
+
+			<!-- Submit button -->
+			<button type="submit" id="submitBlogBtn" disabled>Launch</button>
+		</form>
+	</div>
+</section>
+
+<script>
+	let debounceTimer;
+
+	function init() {
+		const subdomainInput = document.getElementById("subdomainInput");
+		const form = document.getElementById("blogForm");
+
+		/* subdomain availability feedback */
+		subdomainInput.addEventListener("input", handleInput);
+
+		form.addEventListener("submit", handleSubmit);
+	}
+
+	function handleSubmit(event) {
+		event.preventDefault();
+
+		const subdomainInput = document.getElementById("subdomainInput").value.trim();
+		const fileInput = document.getElementById("folder");
+
+		if (!subdomainInput) {
+			alert("please provide subdomain")
+		}
+		if (!fileInput) {
+			alert("please upload .zip folder")
+		}
+
+		const formData = new FormData();
+		formData.append("subdomain", subdomainInput);
+		formData.append("folder", fileInput.files[0]);
+
+		fetch("/user/create-folder-blog", {
+			method: "POST",
+			body: formData
+		}).then(response => {
+			if (response.ok) {
+				return response.json();
+			} else {
+				throw new Error("failed to submit form");
+			}
+		}).then(data => {
+			showToast(data.message);
+			
+			setTimeout(() => {
+				window.location.href = data.url;
+			}, 1000);
+		}).catch(error => {
+			showToast("an error occured" + error.message);
+		})
+	}
+
+	/* handle input event with debounce */
+	function handleInput() {
+		const subdomain = this.value.trim();
+		const messageElement = document.getElementById("availabilityMessage");
+		const submitBlogBtn = document.getElementById("submitBlogBtn");
+
+		clearTimeout(debounceTimer); /* clear previous timer */
+
+		if (subdomain.length > 0) {
+			updateMessage(messageElement, "Checking availability...", "loading");
+		} else {
+			resetMessage(messageElement, submitBlogBtn); /* Clear message if input is empty */
+			return;
+		}
+
+		debounceTimer = setTimeout(() => {
+			checkSubdomainAvailability(subdomain, messageElement, submitBlogBtn);
+		}, 300); /* 300ms debounce delay */
+	}
+
+	/* Check subdomain availability */
+	function checkSubdomainAvailability(subdomain, messageElement, submitSubdomainBtn) {
+		fetch("/user/subdomain-check", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ subdomain })
+		})
+		.then(response => response.json())
+		.then(data => {
+			if (data.available) {
+				updateMessage(messageElement, "✅ This subdomain is available!", "available");
+				submitSubdomainBtn.disabled = false;
+			} else {
+				updateMessage(messageElement, "❌ " + data.message, "unavailable");
+				submitSubdomainBtn.disabled = true;
+			}
+		})
+		.catch(error => handleError(error, messageElement, submitSubdomainBtn));
+	}
+
+	/* Update the availability message */
+	function updateMessage(element, message, status) {
+		element.textContent = message;
+		element.className = `availability-message ${status}`;
+	}
+
+	/* Reset the message and disable submit button */
+	function resetMessage(messageElement, submitSubdomainBtn) {
+		messageElement.textContent = ""; /* Clear message */
+		submitSubdomainBtn.disabled = true; /* Disable submit button */
+	}
+
+	/* Handle fetch errors */
+	function handleError(error, messageElement, submitBlogBtn) {
+		console.error("Error checking subdomain:", error);
+		updateMessage(messageElement, "⚠️ An error occurred while checking availability.", "unavailable");
+		submitBlogBtn.disabled = true; /* Disable submit button on error */
+	}
+
+	/* Show a toast message */
+	function showToast(message) {
+		const toast = document.getElementById("toast");
+		toast.textContent = message;
+		toast.style.display = "block";
+
+		setTimeout(() => {
+			toast.style.display = "none";
+		}, 3000); // Hide after 3 seconds
+	}
+
+	/* Initialize the script on page load */
+	document.addEventListener("DOMContentLoaded", init);
+</script>
+
+{{ template "footer" . }}

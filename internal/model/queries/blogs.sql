@@ -2,12 +2,15 @@
 INSERT INTO blogs (
 	user_id,
 	gh_repository_id,
-	gh_full_name,
+	gh_url,
+	repository_path,
 	subdomain,
+	test_branch,
+	live_branch,
 	from_address,
 	blog_type
 ) VALUES (
-	$1, $2, $3, $4, $5, $6
+	$1, $2, $3, $4, $5, $6, $7, $8, $9
 )
 RETURNING *;
 
@@ -43,7 +46,7 @@ WHERE gh_repository_id = $1;
 
 -- name: ListBlogsByUserID :many
 SELECT *
-FROM blogs
+FROM blogs b
 WHERE user_id = $1;
 
 -- name: ListBlogsForInstallationByGhInstallationID :many

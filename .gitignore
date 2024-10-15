@@ -1,10 +1,11 @@
 bin/
 app/
 repositories/
+folders/
 websites/
 letsencrypt/
 .DS_Store
 conf.yaml
 *.swp
+*.swo
 *.pem
-github-app-key.pem

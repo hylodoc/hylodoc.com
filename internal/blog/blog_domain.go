@@ -27,28 +27,29 @@ func (b *BlogService) SubdomainCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("check subdomain handler...")
 
-		err := b.subdomainCheck(w, r)
 		available := true
-		message := "subdomain available"
-		if err != nil {
+		message := "Subdomain is available"
+		if err := b.subdomainCheck(w, r); err != nil {
 			userErr, ok := err.(util.UserError)
 			if !ok {
-				/* internal error */
+				log.Printf("internal server error: %v\n", err)
 				http.Error(w, "", http.StatusInternalServerError)
 				return
 			}
-			log.Printf("user error: %v\n", userErr)
+			log.Printf("client error: %v\n", userErr)
 			available = false
 			message = userErr.Message
 		}
 
 		w.WriteHeader(http.StatusOK)
-		err = json.NewEncoder(w).Encode(SubdomainCheckResponse{
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(SubdomainCheckResponse{
 			Available: available,
 			Message:   message,
-		})
-		if err != nil {
+		}); err != nil {
+			log.Printf("failed to encode response: %v", err)
 			http.Error(w, "failed to encode response", http.StatusInternalServerError)
+			return
 		}
 	}
 }
@@ -155,11 +156,29 @@ func (b *BlogService) subdomainSubmit(w http.ResponseWriter, r *http.Request) er
 	if err = validateSubdomain(req.Subdomain); err != nil {
 		return err
 	}
-	if err = b.store.CreateSubdomainTx(context.TODO(), model.CreateSubdomainTxParams{
+
+	/* get existing blog */
+	blog, err := b.store.GetBlogByID(context.TODO(), int32(intBlogID))
+	if err != nil {
+		return err
+	}
+
+	/* take current blog offline */
+	if _, err := setBlogToOffline(blog, b.store); err != nil {
+		return fmt.Errorf("error taking subdomain `%s' offline: %w", blog.Subdomain, err)
+	}
+
+	if err = b.store.UpdateSubdomainTx(context.TODO(), model.UpdateSubdomainTxParams{
 		BlogID:    int32(intBlogID),
 		Subdomain: req.Subdomain,
 	}); err != nil {
 		return err
 	}
+
+	/* bring blog online */
+	if _, err := setBlogToLive(blog, b.store); err != nil {
+		return fmt.Errorf("error bringing subdomain `%s' online: %w", blog.Subdomain, err)
+	}
+
 	return nil
 }
