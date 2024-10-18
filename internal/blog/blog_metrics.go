@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xr0-org/progstack/internal/auth"
+	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -29,8 +29,8 @@ type EmailData struct {
 
 func (b *BlogService) SiteMetrics() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
-		if session == nil {
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+		if !ok {
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
@@ -45,13 +45,13 @@ func (b *BlogService) SiteMetrics() http.HandlerFunc {
 		util.ExecTemplate(w, []string{"site_metrics.html", "posts.html"},
 			util.PageInfo{
 				Data: struct {
-					Title   string
-					Session *auth.Session
+					Title    string
+					UserInfo *session.UserInfo
 					SiteData
 					PostData []PostData
 				}{
 					Title:    "Dashboard",
-					Session:  session,
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
 					PostData: data,
 				},
 			},

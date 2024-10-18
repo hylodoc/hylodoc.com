@@ -17,19 +17,20 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
 const (
-	authCookieName = "auth_session_id"
-
 	ghAuthUrl  = "https://github.com/login/oauth/authorize"
 	ghTokenUrl = "https://github.com/login/oauth/access_token"
 	ghUserUrl  = "https://api.github.com/user"
 
 	ghInstallationAccessTokenUrlTemplate = "https://api.github.com/app/installations/%d/access_tokens"
+)
 
-	CtxSessionKey = "session"
+var (
+	authSessionDuration = time.Now().Add(7 * 24 * time.Hour)
 )
 
 type AuthService struct {
@@ -132,7 +133,7 @@ func (o *AuthService) githubOAuthCallback(w http.ResponseWriter, r *http.Request
 	log.Println("got user: ", u)
 
 	/* create Auth Session */
-	err = createAuthSession(u.ID, w, o.store)
+	_, err = session.CreateAuthSession(o.store, w, u.ID, authSessionDuration)
 	if err != nil {
 		log.Printf("error creating auth session: %v", err)
 		return fmt.Errorf("error creating auth session: %w", err)
@@ -185,13 +186,13 @@ func (o *AuthService) LinkGithubAccount() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("linking github account...")
 
-		session, ok := r.Context().Value(CtxSessionKey).(*Session)
+		session, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			http.Error(w, "User not found", http.StatusUnauthorized)
 			return
 		}
 
-		linkUrl, err := buildGithubLinkUrl(session.UserID)
+		linkUrl, err := buildGithubLinkUrl(session.GetUserID())
 		if err != nil {
 			http.Error(w, "", http.StatusInternalServerError)
 			return
@@ -320,48 +321,13 @@ func getGithubUserInfo(c *http.Client, accessToken string) (GithubUser, error) {
 	return user, nil
 }
 
-func createAuthSession(userId int32, w http.ResponseWriter, s *model.Store) error {
-	sessionId, err := GenerateToken()
-	if err != nil {
-		return fmt.Errorf("error generating sessionId: %w", err)
-	}
-	/* check generated sessionId doesn't exist in db */
-	_, err = s.GetSession(context.TODO(), sessionId)
-	if err == nil {
-		return fmt.Errorf("error sessionId already exists")
-	} else {
-		if err != sql.ErrNoRows {
-			return err
-		}
-	}
-	/* create session in db */
-	_, err = s.CreateSession(context.TODO(), model.CreateSessionParams{
-		Token:  sessionId,
-		UserID: userId,
-	})
-	if err != nil {
-		return fmt.Errorf("error writing unauth cookie to db: %w", err)
-	}
-	/* set cookie */
-	http.SetCookie(w, &http.Cookie{
-		Name:     authCookieName,
-		Value:    sessionId,
-		Path:     "/",
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		Expires:  time.Now().Add(168 * time.Hour), /* XXX: make configurable */
-	})
-	return nil
-}
-
 /* Logout */
 
 func (o *AuthService) Logout() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		/* XXX: metrics */
 
-		_, ok := r.Context().Value(CtxSessionKey).(*Session)
+		_, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			log.Println("error getting user from context")
 			http.Error(w, "User not found", http.StatusUnauthorized)
@@ -377,25 +343,12 @@ func (o *AuthService) Logout() http.HandlerFunc {
 }
 
 func (o *AuthService) logout(w http.ResponseWriter, r *http.Request) error {
-	cookie, err := r.Cookie(authCookieName)
+	cookie, err := r.Cookie(session.CookieName)
 	authSessionId := cookie.Value
 	if err != nil || authSessionId == "" {
 		return fmt.Errorf("error reading auth cookie")
 	}
-	/* end session */
-	err = o.store.EndSession(context.TODO(), cookie.Value)
-	if err != nil {
-		return err
-	}
-	/* expire the cookie */
-	http.SetCookie(w, &http.Cookie{
-		Name:    authCookieName,
-		Value:   "",
-		Path:    "/",
-		Expires: time.Unix(0, 0),
-		MaxAge:  -1,
-	})
-	return nil
+	return session.EndAuthSession(o.store, w, authSessionId)
 }
 
 /* Magic Link Auth */
@@ -485,7 +438,7 @@ func (o *AuthService) magicRegisterCallback(w http.ResponseWriter, r *http.Reque
 	log.Printf("successfully registered user `%v'\n", u)
 
 	/* create Auth Session */
-	err = createAuthSession(u.ID, w, o.store)
+	_, err = session.CreateAuthSession(o.store, w, u.ID, authSessionDuration)
 	if err != nil {
 		return fmt.Errorf("error creating auth session: %w", err)
 	}
@@ -568,7 +521,7 @@ func (o *AuthService) magicLoginCallback(w http.ResponseWriter, r *http.Request)
 		return fmt.Errorf("error creating user: %w", err)
 	}
 	/* create Auth Session */
-	err = createAuthSession(u.ID, w, o.store)
+	_, err = session.CreateAuthSession(o.store, w, u.ID, authSessionDuration)
 	if err != nil {
 		return fmt.Errorf("error creating auth session: %w", err)
 	}

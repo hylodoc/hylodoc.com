@@ -7,8 +7,8 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 )
 
 type BlogMiddleware struct {
@@ -25,7 +25,7 @@ func (bm *BlogMiddleware) AuthoriseBlog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("running blog middleware...")
 		/* authorise blog */
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			log.Println("error getting session from context")
 			http.Error(w, "User not found", http.StatusUnauthorized)
@@ -33,7 +33,7 @@ func (bm *BlogMiddleware) AuthoriseBlog(next http.Handler) http.Handler {
 		}
 		/* blogID and userID */
 		blogID := mux.Vars(r)["blogID"]
-		userID := session.UserID
+		userID := sesh.GetUserID()
 
 		intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 		if err != nil {

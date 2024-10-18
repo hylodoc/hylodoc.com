@@ -60,13 +60,12 @@ CREATE TABLE magic (
 	created_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now())
 );
 
-CREATE TABLE sessions (
-	id		SERIAL				PRIMARY KEY,
-	token		TEXT		NOT NULL	UNIQUE,
-	user_id		INTEGER 	NOT NULL,
-	active		BOOLEAN		NOT NULL			DEFAULT(true),
+CREATE TABLE auth_sessions (
+	id		UUID				PRIMARY KEY	DEFAULT(uuid_generate_v4()),
+	user_id		INTEGER		NOT NULL,
 	created_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	expires_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now() + INTERVAL '1 month'), -- XXX: set from configuration on creation
+	active		BOOLEAN		NOT NULL			DEFAULT(true),
 
 	CONSTRAINT fk_user_id
 		FOREIGN KEY (user_id)
@@ -75,8 +74,7 @@ CREATE TABLE sessions (
 );
 
 CREATE TABLE unauth_sessions (
-	id		SERIAL				PRIMARY KEY,
-	token		TEXT		NOT NULL	UNIQUE,
+	id		UUID				PRIMARY KEY	DEFAULT(uuid_generate_v4()),
 	created_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	expires_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now() + INTERVAL '7 days'), -- XXX: set from configuration on creation
 	active		BOOLEAN		NOT NULL			DEFAULT(true)
@@ -138,9 +136,11 @@ CREATE TABLE blogs (
 		(
 			blog_type = 'repository'
 			AND gh_repository_id IS NOT NULL
+			AND gh_url IS NOT NULL
 		) OR (
 			blog_type = 'folder'
 			AND gh_repository_id IS NULL
+			AND gh_url IS NULL
 		)
 	)
 );

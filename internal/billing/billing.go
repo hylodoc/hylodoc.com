@@ -7,9 +7,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 
 	"github.com/stripe/stripe-go/v72"
@@ -31,7 +31,7 @@ func (b *BillingService) Subscriptions() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("subscriptions...")
 
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			log.Println("user not found")
 			http.Error(w, "user not found", http.StatusUnauthorized)
@@ -41,13 +41,13 @@ func (b *BillingService) Subscriptions() http.HandlerFunc {
 		util.ExecTemplate(w, []string{"subscriptions.html", "subscription_product.html"},
 			util.PageInfo{
 				Data: struct {
-					Title   string
-					Session *auth.Session
-					Plans   []config.Plan
+					Title    string
+					UserInfo *session.UserInfo
+					Plans    []config.Plan
 				}{
-					Title:   "Subscriptions",
-					Session: session,
-					Plans:   config.Config.Stripe.Plans,
+					Title:    "Subscriptions",
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
+					Plans:    config.Config.Stripe.Plans,
 				},
 			},
 			template.FuncMap{
@@ -78,7 +78,7 @@ func (b *BillingService) CreateCheckoutSession() http.HandlerFunc {
 }
 
 func (b *BillingService) createCheckoutSession(w http.ResponseWriter, r *http.Request) (string, error) {
-	userSession, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+	userSession, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
 		return "", fmt.Errorf("error getting session")
 	}
@@ -108,7 +108,7 @@ func (b *BillingService) createCheckoutSession(w http.ResponseWriter, r *http.Re
 	/* write the stripeCheckoutSessionID to db */
 	_, err = b.store.CreateStripeCheckoutSession(context.TODO(), model.CreateStripeCheckoutSessionParams{
 		StripeSessionID: checkoutSession.ID,
-		UserID:          userSession.UserID,
+		UserID:          userSession.GetUserID(),
 	})
 	if err != nil {
 		return "", fmt.Errorf("error writing stripe checkout session to db: %w", err)
@@ -141,7 +141,7 @@ func (b *BillingService) Success() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("payment success...")
 
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			http.Error(w, "User not found", http.StatusUnauthorized)
 			return
@@ -156,13 +156,13 @@ func (b *BillingService) Success() http.HandlerFunc {
 		util.ExecTemplate(w, []string{"subscription_success.html"},
 			util.PageInfo{
 				Data: struct {
-					Title   string
-					Session *auth.Session
-					Success SuccessParams
+					Title    string
+					UserInfo *session.UserInfo
+					Success  SuccessParams
 				}{
-					Title:   "Payment Success",
-					Session: session,
-					Success: params,
+					Title:    "Payment Success",
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
+					Success:  params,
 				},
 			},
 			template.FuncMap{},
@@ -174,7 +174,7 @@ func (b *BillingService) Cancel() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("payment cancel...")
 
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			http.Error(w, "User not found", http.StatusUnauthorized)
 			return
@@ -183,11 +183,11 @@ func (b *BillingService) Cancel() http.HandlerFunc {
 		util.ExecTemplate(w, []string{"subscription_cancel.html"},
 			util.PageInfo{
 				Data: struct {
-					Title   string
-					Session *auth.Session
+					Title    string
+					UserInfo *session.UserInfo
 				}{
-					Title:   "Payment Cancel",
-					Session: session,
+					Title:    "Payment Cancel",
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
 				},
 			},
 			template.FuncMap{},
@@ -212,12 +212,12 @@ func (b *BillingService) BillingPortal() http.HandlerFunc {
 }
 
 func (b *BillingService) billingPortal(w http.ResponseWriter, r *http.Request) (string, error) {
-	userSession, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+	userSession, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
 		return "", fmt.Errorf("error getting session")
 	}
 
-	sub, err := b.store.GetStripeSubscriptionByUserID(context.TODO(), userSession.UserID)
+	sub, err := b.store.GetStripeSubscriptionByUserID(context.TODO(), userSession.GetUserID())
 	if err != nil {
 		return "", fmt.Errorf("could not get subcription for user: %w", err)
 	}

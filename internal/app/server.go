@@ -16,6 +16,7 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/installation"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/subdomain"
 	"github.com/xr0-org/progstack/internal/user"
 	"github.com/xr0-org/progstack/internal/util"
@@ -23,7 +24,7 @@ import (
 
 const (
 	listeningPort = 7999 /* XXX: make configurable */
-	clientTimeout = 3 * time.Second
+	clientTimeout = 60 * time.Second
 )
 
 type server struct {
@@ -59,8 +60,7 @@ func Serve() {
 
 	/* init middleware */
 	subdomainMiddleware := subdomain.NewSubdomainMiddleware(store)
-	unauthMiddleware := auth.NewUnauthMiddleware(store)
-	authMiddleware := auth.NewAuthMiddleware(store)
+	sessionMiddleware := session.NewSessionMiddleware(store)
 	blogMiddleware := blog.NewBlogMiddleware(store)
 	billingService := billing.NewBillingService(store)
 
@@ -76,7 +76,7 @@ func Serve() {
 	/* NOTE: userWebsite middleware currently runs before main application */
 	r.Use(subdomainMiddleware.RouteToSubdomains)
 
-	r.Use(unauthMiddleware.HandleUnauthSession)
+	r.Use(sessionMiddleware.SessionMiddleware)
 
 	/* public routes */
 	r.HandleFunc("/", index())
@@ -98,16 +98,16 @@ func Serve() {
 
 	/* authenticated routes */
 	authR := r.PathPrefix("/user").Subrouter()
-	authR.Use(authMiddleware.ValidateAuthSession)
+	authR.Use(auth.AuthMiddleware)
 	authR.HandleFunc("/", userService.Home())
 	authR.HandleFunc("/auth/logout", authService.Logout())
 	authR.HandleFunc("/gh/linkgithub", authService.LinkGithubAccount())
 	authR.HandleFunc("/account", userService.Account())
 	authR.HandleFunc("/delete", userService.Delete())
+	authR.HandleFunc("/subdomain-check", blogService.SubdomainCheck())
 	authR.HandleFunc("/create-new-blog", userService.CreateNewBlog())
 	authR.HandleFunc("/repository-flow", userService.RepositoryFlow())
 	authR.HandleFunc("/folder-flow", userService.FolderFlow())
-	authR.HandleFunc("/subdomain-check", blogService.SubdomainCheck())
 	authR.HandleFunc("/create-repository-blog", blogService.CreateRepositoryBlog())
 	authR.HandleFunc("/create-folder-blog", blogService.CreateFolderBlog())
 	authR.HandleFunc("/stripe/subscriptions", billingService.Subscriptions())
@@ -149,9 +149,16 @@ func index() http.HandlerFunc {
 		/* XXX: add metrics */
 
 		/* get email/username from context */
-		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
-		if session != nil {
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+		if !ok {
+			log.Printf("session not found")
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+		if sesh.IsAuthenticated() {
+			log.Printf("user authenticated redirecting home...")
 			http.Redirect(w, r, "/user/", http.StatusSeeOther)
+			return
 		}
 
 		/* get repositories for unauth session */
@@ -159,11 +166,11 @@ func index() http.HandlerFunc {
 		util.ExecTemplate(w, []string{"index.html"},
 			util.PageInfo{
 				Data: struct {
-					Title   string
-					Session *auth.Session
+					Title    string
+					UserInfo *session.UserInfo
 				}{
-					Title:   "Progstack - blogging for devs",
-					Session: session,
+					Title:    "Progstack - blogging for devs",
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
 				},
 			},
 			template.FuncMap{},
@@ -177,19 +184,20 @@ func register() http.HandlerFunc {
 		/* XXX: add metrics */
 
 		/* get email/username from context */
-		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
-		if session != nil {
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+		if !ok {
 			http.Redirect(w, r, "/user/", http.StatusSeeOther)
+			return
 		}
 
 		util.ExecTemplate(w, []string{"register.html"},
 			util.PageInfo{
 				Data: struct {
-					Title   string
-					Session *auth.Session
+					Title    string
+					UserInfo *session.UserInfo
 				}{
-					Title:   "Progstack - blogging for devs",
-					Session: session,
+					Title:    "Progstack - blogging for devs",
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
 				},
 			},
 			template.FuncMap{},
@@ -203,19 +211,20 @@ func login() http.HandlerFunc {
 		/* XXX: add metrics */
 
 		/* get email/username from context */
-		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
-		if session != nil {
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+		if !ok {
 			http.Redirect(w, r, "/user/", http.StatusSeeOther)
+			return
 		}
 
 		util.ExecTemplate(w, []string{"login.html"},
 			util.PageInfo{
 				Data: struct {
-					Title   string
-					Session *auth.Session
+					Title    string
+					UserInfo *session.UserInfo
 				}{
-					Title:   "Progstack - blogging for devs",
-					Session: session,
+					Title:    "Progstack - blogging for devs",
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
 				},
 			},
 			template.FuncMap{},

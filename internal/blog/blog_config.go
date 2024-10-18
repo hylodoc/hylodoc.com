@@ -15,9 +15,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack-ssg/pkg/ssg"
-	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -35,7 +35,7 @@ func (b *BlogService) Config() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("blog config handler...")
 
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			http.Error(w, "User not found", http.StatusUnauthorized)
 			return
@@ -50,7 +50,7 @@ func (b *BlogService) Config() http.HandlerFunc {
 
 		blog, err := getBlogInfo(b.store, int32(intBlogID))
 		if err != nil {
-			log.Println("error getting blog for user `%d': %v", session.UserID, err)
+			log.Println("error getting blog for user `%d': %v", sesh.GetUserID(), err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -58,15 +58,15 @@ func (b *BlogService) Config() http.HandlerFunc {
 		util.ExecTemplate(w, []string{"blog_config.html"},
 			util.PageInfo{
 				Data: struct {
-					Title   string
-					Session *auth.Session
-					ID      int32
-					Blog    BlogInfo
+					Title    string
+					UserInfo *session.UserInfo
+					ID       int32
+					Blog     BlogInfo
 				}{
-					Title:   "Blog Setup",
-					Session: session,
-					ID:      int32(intBlogID),
-					Blog:    blog,
+					Title:    "Blog Setup",
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
+					ID:       int32(intBlogID),
+					Blog:     blog,
 				},
 			},
 			template.FuncMap{},
@@ -256,7 +256,7 @@ type SetStatusRequest struct {
 }
 
 func (b *BlogService) setStatusSubmit(w http.ResponseWriter, r *http.Request) (statusChangeResponse, error) {
-	session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
 		return statusChangeResponse{}, fmt.Errorf("no user found")
 	}
@@ -271,7 +271,7 @@ func (b *BlogService) setStatusSubmit(w http.ResponseWriter, r *http.Request) (s
 		return statusChangeResponse{}, fmt.Errorf("error decoding body: %w", err)
 	}
 
-	change, err := handleStatusChange(int32(intBlogID), req.Status, session.Email, b.store)
+	change, err := handleStatusChange(int32(intBlogID), req.Status, sesh.GetEmail(), b.store)
 	if err != nil {
 		return statusChangeResponse{}, err
 	}

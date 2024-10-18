@@ -8,12 +8,12 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/installation"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -33,23 +33,23 @@ func (u *UserService) Home() http.HandlerFunc {
 		/* XXX: add metrics */
 
 		/* get session */
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			http.Error(w, "User not found", http.StatusUnauthorized)
 			return
 		}
 
 		/* get account details */
-		details, err := getAccountDetails(u.store, session)
+		details, err := getAccountDetails(u.store, sesh)
 		if err != nil {
 			log.Printf("error getting acount details: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
 
-		blogs, err := blog.GetBlogsInfo(u.store, session.UserID)
+		blogs, err := blog.GetBlogsInfo(u.store, sesh.GetUserID())
 		if err != nil {
-			log.Println("error getting blogs for user `%d': %v", session.UserID, err)
+			log.Println("error getting blogs for user `%d': %v", sesh.GetUserID(), err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -59,13 +59,13 @@ func (u *UserService) Home() http.HandlerFunc {
 			util.PageInfo{
 				Data: struct {
 					Title               string
-					Session             *auth.Session
+					UserInfo            *session.UserInfo
 					GithubInstallAppUrl string
 					AccountDetails      AccountDetails
 					Blogs               []blog.BlogInfo
 				}{
 					Title:               "Home",
-					Session:             session,
+					UserInfo:            session.ConvertSessionToUserInfo(sesh),
 					GithubInstallAppUrl: githubInstallAppUrl,
 					AccountDetails:      details,
 					Blogs:               blogs,
@@ -80,7 +80,7 @@ func (u *UserService) CreateNewBlog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("respository flow handler...")
 
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			log.Println("no user found")
 			http.Error(w, "", http.StatusNotFound)
@@ -90,11 +90,11 @@ func (u *UserService) CreateNewBlog() http.HandlerFunc {
 		util.ExecTemplate(w, []string{"blog_create.html"},
 			util.PageInfo{
 				Data: struct {
-					Title   string
-					Session *auth.Session
+					Title    string
+					UserInfo *session.UserInfo
 				}{
-					Title:   "Create New Blog",
-					Session: session,
+					Title:    "Create New Blog",
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
 				},
 			},
 			template.FuncMap{},
@@ -106,7 +106,7 @@ func (u *UserService) FolderFlow() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("folder flow handler...")
 
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			log.Println("no user found")
 			http.Error(w, "", http.StatusNotFound)
@@ -117,11 +117,11 @@ func (u *UserService) FolderFlow() http.HandlerFunc {
 			util.PageInfo{
 				Data: struct {
 					Title       string
-					Session     *auth.Session
+					UserInfo    *session.UserInfo
 					ServiceName string
 				}{
 					Title:       "Folder Flow",
-					Session:     session,
+					UserInfo:    session.ConvertSessionToUserInfo(sesh),
 					ServiceName: config.Config.Progstack.ServiceName,
 				},
 			},
@@ -139,19 +139,19 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("create new blog handler...")
 
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			log.Println("no user found")
 			http.Error(w, "user not found", http.StatusNotFound)
 			return
 		}
-		hasInstallation, err := u.store.InstallationExistsForUserID(context.TODO(), session.UserID)
+		hasInstallation, err := u.store.InstallationExistsForUserID(context.TODO(), sesh.GetUserID())
 		if err != nil {
 			log.Printf("error getting installation for user: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
-		repos, err := u.store.ListOrderedRepositoriesByUserID(context.TODO(), session.UserID)
+		repos, err := u.store.ListOrderedRepositoriesByUserID(context.TODO(), sesh.GetUserID())
 		if err != nil {
 			if err != sql.ErrNoRows {
 				log.Printf("error getting repositories: %v", err)
@@ -160,7 +160,7 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 			}
 		}
 
-		details, err := getAccountDetails(u.store, session)
+		details, err := getAccountDetails(u.store, sesh)
 		if err != nil {
 			log.Printf("error getting acount details: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
@@ -172,7 +172,7 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 			util.PageInfo{
 				Data: struct {
 					Title               string
-					Session             *auth.Session
+					UserInfo            *session.UserInfo
 					AccountDetails      AccountDetails
 					GithubInstallAppUrl string
 					HasInstallation     bool
@@ -180,7 +180,7 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 					Repositories        []Repository
 				}{
 					Title:               "Repository Flow",
-					Session:             session,
+					UserInfo:            session.ConvertSessionToUserInfo(sesh),
 					AccountDetails:      details,
 					GithubInstallAppUrl: githubInstallAppUrl,
 					HasInstallation:     hasInstallation,
@@ -225,14 +225,14 @@ func (u *UserService) Account() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("account handler...")
 
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			log.Printf("user auth session not found\n")
 			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
 
-		details, err := getAccountDetails(u.store, session)
+		details, err := getAccountDetails(u.store, sesh)
 		if err != nil {
 			log.Printf("error getting acount details: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
@@ -243,11 +243,11 @@ func (u *UserService) Account() http.HandlerFunc {
 			util.PageInfo{
 				Data: struct {
 					Title          string
-					Session        *auth.Session
+					UserInfo       *session.UserInfo
 					AccountDetails AccountDetails
 				}{
 					Title:          "Home",
-					Session:        session,
+					UserInfo:       session.ConvertSessionToUserInfo(sesh),
 					AccountDetails: details,
 				},
 			},
@@ -256,17 +256,17 @@ func (u *UserService) Account() http.HandlerFunc {
 	}
 }
 
-func getAccountDetails(s *model.Store, session *auth.Session) (AccountDetails, error) {
+func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails, error) {
 	/* get github info */
 	accountDetails := AccountDetails{
-		Username:        session.Username,
-		Email:           session.Email,
+		Username:        session.GetUsername(),
+		Email:           session.GetEmail(),
 		IsLinked:        false,
 		HasInstallation: false,
 		GithubEmail:     "",
 	}
 	linked := true
-	ghAccount, err := s.GetGithubAccountByUserID(context.TODO(), session.UserID)
+	ghAccount, err := s.GetGithubAccountByUserID(context.TODO(), session.GetUserID())
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return AccountDetails{}, fmt.Errorf("error getting account details: %w", err)
@@ -279,7 +279,7 @@ func getAccountDetails(s *model.Store, session *auth.Session) (AccountDetails, e
 		accountDetails.GithubEmail = ghAccount.GhEmail
 	}
 
-	hasInstallation, err := s.InstallationExistsForUserID(context.TODO(), session.UserID)
+	hasInstallation, err := s.InstallationExistsForUserID(context.TODO(), session.GetUserID())
 	if err != nil {
 		return AccountDetails{}, fmt.Errorf("error checking if user has installation: %w", err)
 	}
@@ -292,7 +292,7 @@ func getAccountDetails(s *model.Store, session *auth.Session) (AccountDetails, e
 		IsSubscribed: false,
 	}
 	subscribed := true
-	sub, err := s.GetStripeSubscriptionByUserID(context.TODO(), session.UserID)
+	sub, err := s.GetStripeSubscriptionByUserID(context.TODO(), session.GetUserID())
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return AccountDetails{}, fmt.Errorf("error getting stripe subscription details: %w", err)
@@ -317,7 +317,7 @@ func (u *UserService) Delete() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("user delete handler...")
 
-		session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			log.Printf("user auth session not found\n")
 			http.Error(w, "", http.StatusUnauthorized)
@@ -326,7 +326,7 @@ func (u *UserService) Delete() http.HandlerFunc {
 
 		/* XXX: need to call stripe to stop billing */
 
-		if err := u.store.DeleteUserByUserID(context.TODO(), session.UserID); err != nil {
+		if err := u.store.DeleteUserByUserID(context.TODO(), sesh.GetUserID()); err != nil {
 			log.Printf("error deleting user: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return

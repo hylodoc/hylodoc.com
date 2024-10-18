@@ -15,9 +15,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -68,7 +68,7 @@ type CreateRepositoryBlogRequest struct {
 }
 
 func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Request) (string, error) {
-	session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
 		return "", fmt.Errorf("user not found")
 	}
@@ -94,7 +94,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 	}
 
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
-		UserID: session.UserID,
+		UserID: sesh.GetUserID(),
 		GhRepositoryID: sql.NullInt64{
 			Valid: true,
 			Int64: intRepoID,
@@ -103,7 +103,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 			Valid:  true,
 			String: buildRepositoryUrl(repo.FullName),
 		},
-		RepositoryPath: buildRepositoryPath(session.UserID, repo.FullName),
+		RepositoryPath: buildRepositoryPath(sesh.GetUserID(), repo.FullName),
 		Subdomain:      req.Subdomain,
 		TestBranch: sql.NullString{
 			Valid:  true,
@@ -123,7 +123,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 	/* add first user as subscriber */
 	if err = b.store.CreateSubscriberTx(context.TODO(), model.CreateSubscriberTxParams{
 		BlogID: blog.ID,
-		Email:  session.Email,
+		Email:  sesh.GetEmail(),
 	}); err != nil {
 		return "", fmt.Errorf("error creating first subscriber: %w", err)
 	}
@@ -182,7 +182,7 @@ func (b *BlogService) CreateFolderBlog() http.HandlerFunc {
 }
 
 func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (string, error) {
-	session, ok := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
 		log.Println("user not found")
 		return "", util.UserError{
@@ -191,65 +191,15 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		}
 	}
 
-	/* XXX: Add subscription based file size limits */
-	err := r.ParseMultipartForm(maxFileSize) /* 10MB limit */
+	src, subdomain, err := parseRequest(r)
 	if err != nil {
-		log.Printf("fiile too large: %v\n", err)
-		return "", util.UserError{
-			Message: "File too large",
-			Code:    http.StatusBadRequest,
-		}
+		return "", err
 	}
 
-	subdomain := r.FormValue("subdomain")
-	if subdomain == "" {
-		log.Printf("error reading subdomain: %v\n", err)
-		return "", util.UserError{
-			Message: "Subdomain is required",
-			Code:    http.StatusBadRequest,
-		}
-	}
+	userIDString := strconv.FormatInt(int64(sesh.GetUserID()), 10)
+	dst := buildFolderPath(userIDString)
 
-	file, header, err := r.FormFile("folder")
-	if err != nil {
-		log.Printf("error reading file: %v\n", err)
-		return "", util.UserError{
-			Message: "Invalid file",
-			Code:    http.StatusBadRequest,
-		}
-	}
-	defer file.Close()
-
-	if !isValidFileType(header.Filename) {
-		log.Printf("invalid file extension for `%s'\n", header.Filename)
-		return "", util.UserError{
-			Message: "Must upload a .zip file",
-			Code:    http.StatusBadRequest,
-		}
-	}
-
-	log.Printf("user: %d", session.UserID)
-	log.Printf("Subdomain: %s\n", subdomain)
-	log.Printf("Uploaded file: %s\n", header.Filename)
-	log.Printf("File size: %d bytes\n", header.Size)
-	log.Printf("File header MIME type: %s\n", header.Header.Get("Content-Type"))
-
-	/* create to tmp file */
-	tmpFile, err := os.CreateTemp("", "uploaded-*.zip")
-	if err != nil {
-		return "", fmt.Errorf("error creating tmp file: %w", err)
-	}
-	defer tmpFile.Close()
-
-	/* copy uploaded file to tmpFile */
-	if _, err = io.Copy(tmpFile, file); err != nil {
-		return "", fmt.Errorf("error copying upload to temp file: %w", err)
-	}
-
-	src := tmpFile.Name()
-	dst := buildFolderPath(session.UserID, subdomain)
-
-	log.Printf("src: %s\n", tmpFile.Name())
+	log.Printf("src: %s\n", src)
 	log.Printf("dst: %s\n", dst)
 
 	/* extract to disk for folders */
@@ -259,7 +209,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 
 	/* create blog */
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
-		UserID: session.UserID,
+		UserID: sesh.GetUserID(),
 		GhRepositoryID: sql.NullInt64{
 			Valid: false,
 		},
@@ -275,9 +225,9 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	/* add user as first subscriber */
 	if err = b.store.CreateSubscriberTx(context.TODO(), model.CreateSubscriberTxParams{
 		BlogID: blog.ID,
-		Email:  session.Email,
+		Email:  sesh.GetEmail(),
 	}); err != nil {
-		return "", fmt.Errorf("error adding email `%d' for user `%s' as subscriber to blog `%d': %w", session.Email, session.UserID, blog.ID, err)
+		return "", fmt.Errorf("error adding email `%d' for user `%s' as subscriber to blog `%d': %w", sesh.GetEmail(), sesh.GetUserID(), blog.ID, err)
 	}
 
 	/* take blog live  */
@@ -288,6 +238,59 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	return buildDomainUrl(blog.Subdomain), nil
 }
 
+func parseRequest(r *http.Request) (string, string, error) {
+	/* XXX: Add subscription based file size limits */
+	err := r.ParseMultipartForm(maxFileSize) /* 10MB limit */
+	if err != nil {
+		log.Printf("fiile too large: %v\n", err)
+		return "", "", util.UserError{
+			Message: "File too large",
+			Code:    http.StatusBadRequest,
+		}
+	}
+
+	subdomain := r.FormValue("subdomain")
+	if subdomain == "" {
+		log.Printf("error reading subdomain: %v\n", err)
+		return "", "", util.UserError{
+			Message: "Subdomain is required",
+			Code:    http.StatusBadRequest,
+		}
+	}
+
+	file, header, err := r.FormFile("folder")
+	if err != nil {
+		log.Printf("error reading file: %v\n", err)
+		return "", "", util.UserError{
+			Message: "Invalid file",
+			Code:    http.StatusBadRequest,
+		}
+	}
+	defer file.Close()
+
+	if !isValidFileType(header.Filename) {
+		log.Printf("invalid file extension for `%s'\n", header.Filename)
+		return "", "", util.UserError{
+			Message: "Must upload a .zip file",
+			Code:    http.StatusBadRequest,
+		}
+	}
+
+	/* create to tmp file */
+	tmpFile, err := os.CreateTemp("", "uploaded-*.zip")
+	if err != nil {
+		return "", "", fmt.Errorf("error creating tmp file: %w", err)
+	}
+	defer tmpFile.Close()
+
+	/* copy uploaded file to tmpFile */
+	if _, err = io.Copy(tmpFile, file); err != nil {
+		return "", "", fmt.Errorf("error copying upload to temp file: %w", err)
+	}
+
+	return tmpFile.Name(), subdomain, nil
+}
+
 func isValidFileType(filename string) bool {
 	allowedExtensions := map[string]bool{
 		".zip": true,
@@ -296,11 +299,10 @@ func isValidFileType(filename string) bool {
 	return allowedExtensions[ext]
 }
 
-func buildFolderPath(userID int32, subdomain string) string {
-	userIDString := strconv.FormatInt(int64(userID), 10)
+func buildFolderPath(userID string) string {
 	return filepath.Join(
 		config.Config.Progstack.FoldersPath,
-		userIDString,
+		userID,
 		uuid.New().String(),
 	)
 }

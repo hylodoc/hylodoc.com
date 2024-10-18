@@ -51,7 +51,7 @@ func (i *InstallationService) InstallationCallback() http.HandlerFunc {
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, "/user", http.StatusTemporaryRedirect)
+		w.WriteHeader(http.StatusOK)
 	}
 }
 
@@ -220,6 +220,7 @@ func downloadReposToDisk(c *http.Client, repos []Repository, userID int32, acces
 		}
 		/* extract tarball to destination should store under user */
 		dst := fmt.Sprintf("%s/%d/%s", config.Config.Progstack.RepositoriesPath, userID, repoFullName)
+		log.Printf("repo dst: %s\n", dst)
 		if err = extractTarball(tmpFile, dst); err != nil {
 			return fmt.Errorf("error extracting tarball to destination for /%s/: %w", repoFullName, err)
 		}

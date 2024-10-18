@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -38,8 +38,8 @@ func (b *BlogService) SubscriberMetrics() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("subscriber metrics handler...")
 
-		session, _ := r.Context().Value(auth.CtxSessionKey).(*auth.Session)
-		if session == nil {
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+		if !ok {
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
@@ -56,11 +56,11 @@ func (b *BlogService) SubscriberMetrics() http.HandlerFunc {
 			util.PageInfo{
 				Data: struct {
 					Title          string
-					Session        *auth.Session
+					UserInfo       *session.UserInfo
 					SubscriberData SubscriberData
 				}{
 					Title:          "Dashboard",
-					Session:        session,
+					UserInfo:       session.ConvertSessionToUserInfo(sesh),
 					SubscriberData: data,
 				},
 			},
