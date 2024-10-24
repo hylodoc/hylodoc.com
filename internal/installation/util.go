@@ -13,10 +13,11 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
-func downloadRepoTarball(c *http.Client, repoFullName, accessToken string) (string, error) {
+func downloadRepoTarball(c *httpclient.Client, repoFullName, accessToken string) (string, error) {
 	log.Println("downloading repo tarball...")
 
 	/* build request */

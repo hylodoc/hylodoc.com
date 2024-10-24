@@ -16,6 +16,7 @@ import (
 	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
+	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
@@ -35,12 +36,12 @@ var (
 
 type AuthService struct {
 	store        *model.Store
-	client       *http.Client
+	client       *httpclient.Client
 	resendClient *resend.Client
 	config       *config.GithubParams
 }
 
-func NewAuthService(c *http.Client, resendClient *resend.Client, s *model.Store, config *config.GithubParams) AuthService {
+func NewAuthService(c *httpclient.Client, resendClient *resend.Client, s *model.Store, config *config.GithubParams) AuthService {
 	return AuthService{
 		client:       c,
 		resendClient: resendClient,
@@ -141,7 +142,7 @@ func (o *AuthService) githubOAuthCallback(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
-func getOauthAccessToken(c *http.Client, code, clientID, clientSecret string) (string, error) {
+func getOauthAccessToken(c *httpclient.Client, code, clientID, clientSecret string) (string, error) {
 	/* build access token request */
 	req, err := util.NewRequestBuilder("POST", ghTokenUrl).
 		WithHeader("Content-Type", "application/x-www-form-urlencoded").
@@ -290,7 +291,7 @@ func (u *GithubUser) validate() error {
 	return nil
 }
 
-func getGithubUserInfo(c *http.Client, accessToken string) (GithubUser, error) {
+func getGithubUserInfo(c *httpclient.Client, accessToken string) (GithubUser, error) {
 	req, err := util.NewRequestBuilder("GET", ghUserUrl).
 		WithHeader("Authorization", fmt.Sprintf("Bearer %s", accessToken)).
 		Build()

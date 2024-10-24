@@ -7,10 +7,10 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt"
+	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -21,7 +21,7 @@ type InstallationAccessToken struct {
 	ExpiresAt time.Time `json:"expires_at"` /* The timestamp when the token expires */
 }
 
-func GetInstallationAccessToken(client *http.Client, appID, installationID int64, privateKeyPath string) (string, error) {
+func GetInstallationAccessToken(client *httpclient.Client, appID, installationID int64, privateKeyPath string) (string, error) {
 	jwt, err := createJWT(appID, privateKeyPath)
 	if err != nil {
 		return "", fmt.Errorf("Error creating JWT: %w", err)

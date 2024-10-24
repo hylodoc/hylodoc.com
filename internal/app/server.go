@@ -14,6 +14,7 @@ import (
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/installation"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
@@ -24,14 +25,8 @@ import (
 
 const (
 	listeningPort = 7999 /* XXX: make configurable */
-	clientTimeout = 60 * time.Second
+	clientTimeout = 30 * time.Second
 )
-
-type server struct {
-	client       *http.Client
-	store        *model.Store
-	resendClient *resend.Client
-}
 
 func init() {
 	viper.SetConfigFile("conf.yaml")
@@ -52,9 +47,7 @@ func Serve() {
 	if err != nil {
 		log.Fatal("could not connect to db: %w", err)
 	}
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
+	client := httpclient.NewHttpClient(clientTimeout)
 	store := model.NewStore(db)
 	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
 

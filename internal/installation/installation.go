@@ -14,6 +14,7 @@ import (
 	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
+	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/util"
 )
@@ -27,13 +28,13 @@ const (
 )
 
 type InstallationService struct {
-	client       *http.Client
+	client       *httpclient.Client
 	resendClient *resend.Client
 	store        *model.Store
 	config       *config.Configuration
 }
 
-func NewInstallationService(c *http.Client, r *resend.Client, s *model.Store, config *config.Configuration) *InstallationService {
+func NewInstallationService(c *httpclient.Client, r *resend.Client, s *model.Store, config *config.Configuration) *InstallationService {
 	return &InstallationService{
 		client:       c,
 		resendClient: r,
@@ -83,7 +84,7 @@ func (i *InstallationService) installationCallback(w http.ResponseWriter, r *htt
 	return nil
 }
 
-func handleInstallation(c *http.Client, s *model.Store, body []byte) error {
+func handleInstallation(c *httpclient.Client, s *model.Store, body []byte) error {
 	log.Println("handling installation event...")
 
 	var event InstallationEvent
@@ -116,7 +117,7 @@ func handleInstallation(c *http.Client, s *model.Store, body []byte) error {
 	return nil
 }
 
-func handleInstallationCreated(c *http.Client, s *model.Store, ghInstallationID int64, userID int32, ghEmail string) error {
+func handleInstallationCreated(c *httpclient.Client, s *model.Store, ghInstallationID int64, userID int32, ghEmail string) error {
 	log.Println("handling installation created event...")
 	/* get access token */
 	accessToken, err := auth.GetInstallationAccessToken(
@@ -174,7 +175,7 @@ type InstallationRepositoriesResponse struct {
 	Repositories []Repository `json:"repositories"` /* XXX: reusing from events */
 }
 
-func getReposDetails(c *http.Client, accessToken string) ([]Repository, error) {
+func getReposDetails(c *httpclient.Client, accessToken string) ([]Repository, error) {
 	log.Println("getting repositories details...")
 	req, err := util.NewRequestBuilder("GET", ghInstallationRepositoriesUrl).
 		WithHeader("Authorization", fmt.Sprintf("Bearer %s", accessToken)).
@@ -209,7 +210,7 @@ func getReposDetails(c *http.Client, accessToken string) ([]Repository, error) {
 *
 * NOTE: we use the Repository.GhFullName which is guaranteed to be
 * "<owner>/<name>" to build the repo path */
-func downloadReposToDisk(c *http.Client, repos []Repository, userID int32, accessToken string) error {
+func downloadReposToDisk(c *httpclient.Client, repos []Repository, userID int32, accessToken string) error {
 	log.Println("downloading repos to disk...")
 	for _, repo := range repos {
 		/* download tarball and write to tmp file */
@@ -228,7 +229,7 @@ func downloadReposToDisk(c *http.Client, repos []Repository, userID int32, acces
 	return nil
 }
 
-func handleInstallationDeleted(c *http.Client, s *model.Store, ghInstallationID int64, userID int32) error {
+func handleInstallationDeleted(c *httpclient.Client, s *model.Store, ghInstallationID int64, userID int32) error {
 	log.Println("handling installation deleted event...")
 
 	/* fetch repos associated with installation */
@@ -263,7 +264,7 @@ func handleInstallationDeleted(c *http.Client, s *model.Store, ghInstallationID 
 	return nil
 }
 
-func handleInstallationRepositories(c *http.Client, s *model.Store, body []byte) error {
+func handleInstallationRepositories(c *httpclient.Client, s *model.Store, body []byte) error {
 	log.Println("handling installation repositories event...")
 
 	var event InstallationRepositoriesEvent
@@ -300,7 +301,7 @@ func handleInstallationRepositories(c *http.Client, s *model.Store, body []byte)
 	return nil
 }
 
-func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInstallationID int64, repos []Repository, userID int32, email string) error {
+func handleInstallationRepositoriesAdded(c *httpclient.Client, s *model.Store, ghInstallationID int64, repos []Repository, userID int32, email string) error {
 	log.Println("handling repositories added event...")
 
 	/* get access token */
@@ -334,7 +335,7 @@ func handleInstallationRepositoriesAdded(c *http.Client, s *model.Store, ghInsta
 	return nil
 }
 
-func handleInstallationRepositoriesRemoved(c *http.Client, s *model.Store, ghInstallationID int64, repos []Repository) error {
+func handleInstallationRepositoriesRemoved(c *httpclient.Client, s *model.Store, ghInstallationID int64, repos []Repository) error {
 	log.Println("handling repositories removed event...")
 
 	log.Println("deleting websites from disk...")
@@ -363,7 +364,7 @@ func handleInstallationRepositoriesRemoved(c *http.Client, s *model.Store, ghIns
 	return nil
 }
 
-func handlePush(c *http.Client, resendClient *resend.Client, s *model.Store, body []byte) error {
+func handlePush(c *httpclient.Client, resendClient *resend.Client, s *model.Store, body []byte) error {
 	log.Println("handling push event...")
 
 	var event PushEvent
