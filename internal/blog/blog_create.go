@@ -62,6 +62,7 @@ func (b *BlogService) CreateRepositoryBlog() http.HandlerFunc {
 type CreateRepositoryBlogRequest struct {
 	Subdomain    string `json:"subdomain"`
 	RepositoryID string `json:"repository_id"`
+	Theme        string `json:"theme"`
 	TestBranch   string `json:"test_branch"`
 	LiveBranch   string `json:"live_branch"`
 	Flow         string `json:"flow"`
@@ -93,6 +94,11 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		return "", fmt.Errorf("could not get repository for ghRepoId `%s': %w", intRepoID, err)
 	}
 
+	theme, err := validateTheme(req.Theme)
+	if err != nil {
+		return "", err
+	}
+
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
 		UserID: sesh.GetUserID(),
 		GhRepositoryID: sql.NullInt64{
@@ -104,6 +110,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 			String: buildRepositoryUrl(repo.FullName),
 		},
 		RepositoryPath: buildRepositoryPath(sesh.GetUserID(), repo.FullName),
+		Theme:          theme,
 		Subdomain:      req.Subdomain,
 		TestBranch: sql.NullString{
 			Valid:  true,
@@ -141,6 +148,17 @@ func buildRepositoryUrl(fullName string) string {
 		"https://github.com/%s/",
 		fullName,
 	)
+}
+
+func validateTheme(theme string) (model.BlogTheme, error) {
+	switch theme {
+	case "lit":
+		return model.BlogThemeLit, nil
+	case "latex":
+		return model.BlogThemeLatex, nil
+	default:
+		return "", fmt.Errorf("`%s' is not a supported theme", theme)
+	}
 }
 
 func buildRepositoryPath(userID int32, repoFullName string) string {
@@ -191,7 +209,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		}
 	}
 
-	src, subdomain, err := parseRequest(r)
+	req, err := parseRequest(r)
 	if err != nil {
 		return "", err
 	}
@@ -199,11 +217,11 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	userIDString := strconv.FormatInt(int64(sesh.GetUserID()), 10)
 	dst := buildFolderPath(userIDString)
 
-	log.Printf("src: %s\n", src)
+	log.Printf("src: %s\n", req.src)
 	log.Printf("dst: %s\n", dst)
 
 	/* extract to disk for folders */
-	if err := extractZip(src, dst); err != nil {
+	if err := extractZip(req.src, dst); err != nil {
 		return "", fmt.Errorf("error extracting .zip: %w", err)
 	}
 
@@ -214,8 +232,9 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 			Valid: false,
 		},
 		RepositoryPath: dst,
-		Subdomain:      subdomain,
+		Subdomain:      req.subdomain,
 		FromAddress:    config.Config.Progstack.FromEmail,
+		Theme:          req.theme,
 		BlogType:       model.BlogTypeFolder,
 	})
 	if err != nil {
@@ -238,12 +257,18 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	return buildDomainUrl(blog.Subdomain), nil
 }
 
-func parseRequest(r *http.Request) (string, string, error) {
+type createFolderBlogRequest struct {
+	subdomain string
+	src       string
+	theme     model.BlogTheme
+}
+
+func parseRequest(r *http.Request) (createFolderBlogRequest, error) {
 	/* XXX: Add subscription based file size limits */
 	err := r.ParseMultipartForm(maxFileSize) /* 10MB limit */
 	if err != nil {
 		log.Printf("fiile too large: %v\n", err)
-		return "", "", util.UserError{
+		return createFolderBlogRequest{}, util.UserError{
 			Message: "File too large",
 			Code:    http.StatusBadRequest,
 		}
@@ -251,8 +276,8 @@ func parseRequest(r *http.Request) (string, string, error) {
 
 	subdomain := r.FormValue("subdomain")
 	if subdomain == "" {
-		log.Printf("error reading subdomain: %v\n", err)
-		return "", "", util.UserError{
+		log.Println("error reading subdomain")
+		return createFolderBlogRequest{}, util.UserError{
 			Message: "Subdomain is required",
 			Code:    http.StatusBadRequest,
 		}
@@ -261,7 +286,7 @@ func parseRequest(r *http.Request) (string, string, error) {
 	file, header, err := r.FormFile("folder")
 	if err != nil {
 		log.Printf("error reading file: %v\n", err)
-		return "", "", util.UserError{
+		return createFolderBlogRequest{}, util.UserError{
 			Message: "Invalid file",
 			Code:    http.StatusBadRequest,
 		}
@@ -270,7 +295,7 @@ func parseRequest(r *http.Request) (string, string, error) {
 
 	if !isValidFileType(header.Filename) {
 		log.Printf("invalid file extension for `%s'\n", header.Filename)
-		return "", "", util.UserError{
+		return createFolderBlogRequest{}, util.UserError{
 			Message: "Must upload a .zip file",
 			Code:    http.StatusBadRequest,
 		}
@@ -279,16 +304,30 @@ func parseRequest(r *http.Request) (string, string, error) {
 	/* create to tmp file */
 	tmpFile, err := os.CreateTemp("", "uploaded-*.zip")
 	if err != nil {
-		return "", "", fmt.Errorf("error creating tmp file: %w", err)
+		return createFolderBlogRequest{}, fmt.Errorf("error creating tmp file: %w", err)
 	}
 	defer tmpFile.Close()
 
 	/* copy uploaded file to tmpFile */
 	if _, err = io.Copy(tmpFile, file); err != nil {
-		return "", "", fmt.Errorf("error copying upload to temp file: %w", err)
+		return createFolderBlogRequest{}, fmt.Errorf("error copying upload to temp file: %w", err)
 	}
 
-	return tmpFile.Name(), subdomain, nil
+	/* theme */
+	theme, err := validateTheme(r.FormValue("theme"))
+	if err != nil {
+		log.Printf("error reading theme")
+		return createFolderBlogRequest{}, util.UserError{
+			Message: "Invalid theme",
+			Code:    http.StatusBadRequest,
+		}
+	}
+
+	return createFolderBlogRequest{
+		subdomain: subdomain,
+		src:       tmpFile.Name(),
+		theme:     theme,
+	}, nil
 }
 
 func isValidFileType(filename string) bool {

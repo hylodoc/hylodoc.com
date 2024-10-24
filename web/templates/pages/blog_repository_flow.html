@@ -40,7 +40,19 @@
 					<span> .{{ .Data.ServiceName }}</span>
 				</div>
 				<div id="availabilityMessage" class="availability-message"></div>
-			</div>	
+			</div>
+
+			<!-- Select theme -->
+			<div class="row">
+				<div class="four columns">
+					<label for="themesDropdown">Select a theme</label>
+					<select id="themesDropdown">
+						{{ range .Data.Themes }}
+							<option value="{{ . }}">{{ . }}</option>
+						{{ end }}
+					</select>
+				</div>
+			</div>
 
 			<!-- Select repository -->
 			<div class="row">
@@ -48,7 +60,7 @@
 					<label for="repositoriesDropdown">Select a repository</label>
 					<select id="repositoriesDropdown">
 						{{ range .Data.Repositories }}
-						<option value="{{ .Value }}">{{ .Name }}</option>
+							<option value="{{ .Value }}">{{ .Name }}</option>
 						{{ end }}
 					</select>
 				</div>
@@ -136,24 +148,27 @@
 
 		const subdomain = document.getElementById("subdomainInput").value.trim();
 		const repoID = document.getElementById("repositoriesDropdown").value.trim();
+		const theme = document.getElementById("themesDropdown").value.trim();
 		const testBranch = document.getElementById("testBranchInput").value.trim();
 		const liveBranch = document.getElementById("liveBranchInput").value.trim();
 		console.log("subdomain: ", subdomain);
 		console.log("repositoryID: ", repoID);
+		console.log("theme: ", theme);
 		console.log("testBranch: ", testBranch);
 		console.log("liveBranch: ", liveBranch);
 
-		submitBlog(subdomain, repoID, testBranch, liveBranch);
+		submitBlog(subdomain, repoID, theme, testBranch, liveBranch);
 	}
 
 	/* Submit the subdomain to the server */
-	function submitBlog(subdomain, repoID, testBranch, liveBranch) {
+	function submitBlog(subdomain, repoID, theme, testBranch, liveBranch) {
 		fetch("/user/create-repository-blog", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				subdomain: subdomain,
 				repository_id: repoID,
+				theme: theme,
 				test_branch: testBranch,
 				live_branch: liveBranch
 			})

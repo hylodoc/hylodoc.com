@@ -48,7 +48,7 @@ func (b *BlogService) Config() http.HandlerFunc {
 			return
 		}
 
-		blog, err := getBlogInfo(b.store, int32(intBlogID))
+		blogInfo, err := getBlogInfo(b.store, int32(intBlogID))
 		if err != nil {
 			log.Println("error getting blog for user `%d': %v", sesh.GetUserID(), err)
 			http.Error(w, "", http.StatusInternalServerError)
@@ -58,20 +58,32 @@ func (b *BlogService) Config() http.HandlerFunc {
 		util.ExecTemplate(w, []string{"blog_config.html"},
 			util.PageInfo{
 				Data: struct {
-					Title    string
-					UserInfo *session.UserInfo
-					ID       int32
-					Blog     BlogInfo
+					Title        string
+					UserInfo     *session.UserInfo
+					ID           int32
+					Blog         BlogInfo
+					Themes       []string
+					CurrentTheme string
 				}{
-					Title:    "Blog Setup",
-					UserInfo: session.ConvertSessionToUserInfo(sesh),
-					ID:       int32(intBlogID),
-					Blog:     blog,
+					Title:        "Blog Setup",
+					UserInfo:     session.ConvertSessionToUserInfo(sesh),
+					ID:           int32(intBlogID),
+					Blog:         blogInfo,
+					Themes:       BuildThemes(config.Config.ProgstackSsg.Themes),
+					CurrentTheme: string(blogInfo.Theme),
 				},
 			},
 			template.FuncMap{},
 		)
 	}
+}
+
+func BuildThemes(themes map[string]config.Theme) []string {
+	var keys []string
+	for key := range themes {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 func ConvertCentsToDollars(cents int64) string {
@@ -84,6 +96,7 @@ func ConvertCentsToDollars(cents int64) string {
 type LaunchUserBlogParams struct {
 	RepositoryPath string
 	Subdomain      string
+	Theme          string
 }
 
 func launchUserBlog(params LaunchUserBlogParams) error {
@@ -97,9 +110,59 @@ func launchUserBlog(params LaunchUserBlogParams) error {
 		config.Config.Progstack.WebsitesPath,
 		params.Subdomain,
 	)
-	if err := ssg.GenerateSite(params.RepositoryPath, site, "progstack-ssg/theme/lit"); err != nil {
+	if err := ssg.GenerateSite(params.RepositoryPath, site, config.Config.ProgstackSsg.Themes[params.Theme].Path); err != nil {
 		return fmt.Errorf("error generating site: %w", err)
 	}
+	return nil
+}
+
+/* Theme */
+
+func (b *BlogService) ThemeSubmit() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("theme submit handler...")
+
+		if err := b.themeSubmit(w, r); err != nil {
+			log.Printf("error updating theme: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			response := map[string]string{"message": "An unexpected error occured"}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		response := map[string]string{"message": "Theme changed successsfully!"}
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+type ThemeRequest struct {
+	Theme string `json:"theme"`
+}
+
+func (b *BlogService) themeSubmit(w http.ResponseWriter, r *http.Request) error {
+	blogID := mux.Vars(r)["blogID"]
+	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	if err != nil {
+		return err
+	}
+
+	var req ThemeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return fmt.Errorf("error decoding body: %w", err)
+	}
+
+	theme, err := validateTheme(req.Theme)
+	if err != nil {
+		return err
+	}
+
+	if err := b.store.SetBlogThemeByID(context.TODO(), model.SetBlogThemeByIDParams{
+		ID:    int32(intBlogID),
+		Theme: theme,
+	}); err != nil {
+		return fmt.Errorf("error setting blog theme: %w", err)
+	}
+
 	return nil
 }
 
@@ -140,14 +203,13 @@ func (b *BlogService) testBranchSubmit(w http.ResponseWriter, r *http.Request) e
 	log.Printf("test branch: %s\n", req.Branch)
 
 	/* XXX: validate input before writing to db */
-	err = b.store.SetTestBranchByID(context.TODO(), model.SetTestBranchByIDParams{
+	if err := b.store.SetTestBranchByID(context.TODO(), model.SetTestBranchByIDParams{
 		ID: int32(intBlogID),
 		TestBranch: sql.NullString{
 			Valid:  true,
 			String: req.Branch,
 		},
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("error updating branch info: %w", err)
 	}
 	return nil
@@ -326,6 +388,7 @@ func setBlogToLive(blog model.Blog, s *model.Store) (statusChangeResponse, error
 	if err := launchUserBlog(LaunchUserBlogParams{
 		RepositoryPath: blog.RepositoryPath,
 		Subdomain:      blog.Subdomain,
+		Theme:          string(blog.Theme),
 	}); err != nil {
 		return statusChangeResponse{}, fmt.Errorf("error launching blog `%d': %w", blog.ID, err)
 	}

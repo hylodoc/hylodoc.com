@@ -111,6 +111,7 @@ CREATE TABLE repositories (
 
 CREATE TYPE blog_status AS ENUM ('live', 'offline');
 CREATE TYPE blog_type AS ENUM ('repository', 'folder');
+CREATE TYPE blog_theme AS ENUM ('lit', 'latex');
 
 CREATE TABLE blogs (
 	id 			SERIAL				PRIMARY KEY,
@@ -118,6 +119,7 @@ CREATE TABLE blogs (
 	gh_repository_id	BIGINT				UNIQUE		DEFAULT(NULL),
 	gh_url			VARCHAR(255)			UNIQUE		DEFAULT(NULL),
 	repository_path		VARCHAR(255)	NOT NULL,			-- path on disk
+	theme			blog_theme	NOT NULL			DEFAULT('lit'),
 	test_branch		VARCHAR(255),
 	live_branch		VARCHAR(255),
 	subdomain		VARCHAR(255)	NOT NULL	UNIQUE,

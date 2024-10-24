@@ -4,13 +4,14 @@ INSERT INTO blogs (
 	gh_repository_id,
 	gh_url,
 	repository_path,
+	theme,
 	subdomain,
 	test_branch,
 	live_branch,
 	from_address,
 	blog_type
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 )
 RETURNING *;
 
@@ -55,6 +56,12 @@ FROM blogs b
 INNER JOIN repositories r
 ON b.gh_repository_id = r.id
 WHERE r.installation_id = $1;
+
+-- name: SetBlogThemeByID :exec
+UPDATE blogs
+SET
+	theme = $1
+WHERE id = $2;
 
 -- name: SetTestBranchByID :exec
 UPDATE blogs

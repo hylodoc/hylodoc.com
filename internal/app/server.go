@@ -120,6 +120,7 @@ func Serve() {
 	blogR.Use(blogMiddleware.AuthoriseBlog)
 	blogR.HandleFunc("/config", blogService.Config())
 	blogR.HandleFunc("/set-subdomain", blogService.SubdomainSubmit())
+	blogR.HandleFunc("/set-theme", blogService.ThemeSubmit())
 	blogR.HandleFunc("/set-test-branch", blogService.TestBranchSubmit())
 	blogR.HandleFunc("/set-live-branch", blogService.LiveBranchSubmit())
 	blogR.HandleFunc("/set-status", blogService.SetStatusSubmit())

@@ -25,6 +25,18 @@
 				<input type="file" id="folder" name="folder" accept=".zip" required>
 			</div>
 
+			<!-- Select theme -->
+			<div class="row">
+				<div class="four columns">
+					<label for="themesDropdown">Select a theme</label>
+					<select id="themesDropdown">
+						{{ range .Data.Themes }}
+							<option value="{{ . }}">{{ . }}</option>
+						{{ end }}
+					</select>
+				</div>
+			</div>
+
 			<!-- Submit button -->
 			<button type="submit" id="submitBlogBtn" disabled>Launch</button>
 		</form>
@@ -49,6 +61,7 @@
 
 		const subdomainInput = document.getElementById("subdomainInput").value.trim();
 		const fileInput = document.getElementById("folder");
+		const theme = document.getElementById("themesDropdown").value.trim();
 
 		if (!subdomainInput) {
 			alert("please provide subdomain")
@@ -56,10 +69,14 @@
 		if (!fileInput) {
 			alert("please upload .zip folder")
 		}
+		if (!theme) {
+			alert("please select a theme")
+		}
 
 		const formData = new FormData();
 		formData.append("subdomain", subdomainInput);
 		formData.append("folder", fileInput.files[0]);
+		formData.append("theme", theme)
 
 		fetch("/user/create-folder-blog", {
 			method: "POST",

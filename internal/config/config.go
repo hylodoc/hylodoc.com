@@ -10,11 +10,12 @@ import (
 var Config Configuration
 
 type Configuration struct {
-	Progstack ProgstackParams `mapstructure:"progstack"`
-	Github    GithubParams    `mapstructure:"github"`
-	Db        DbParams        `mapstructure:"postgres"`
-	Resend    ResendParams    `mapstructure:"resend"`
-	Stripe    StripeParams    `mapstructure:"stripe"`
+	Progstack    ProgstackParams    `mapstructure:"progstack"`
+	ProgstackSsg ProgstackSsgParams `mapstructure:"progstack_ssg"`
+	Github       GithubParams       `mapstructure:"github"`
+	Db           DbParams           `mapstructure:"postgres"`
+	Resend       ResendParams       `mapstructure:"resend"`
+	Stripe       StripeParams       `mapstructure:"stripe"`
 }
 
 type ProgstackParams struct {
@@ -25,6 +26,17 @@ type ProgstackParams struct {
 	WebsitesPath     string `mapstructure:"websites_path"`
 	FromEmail        string `mapstructure:"from_email"`
 	AccountsEmail    string `mapstructure:"accounts_email"`
+}
+
+type ProgstackSsgParams struct {
+	Themes map[string]Theme `mapstructure:"themes"`
+}
+
+type Theme struct {
+	Name        string `mapstructure:"name"`
+	Description string `mapstructure:"description"`
+	Preview     string `mapstructure:"preview"`
+	Path        string `mapstructure:"path"`
 }
 
 type GithubParams struct {

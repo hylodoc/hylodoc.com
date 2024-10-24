@@ -19,6 +19,7 @@ type BlogInfo struct {
 	SubscriberMetricsUrl string
 	MetricsUrl           string
 	ConfigUrl            string
+	Theme                string
 	Type                 string
 	Status               string
 	TestBranch           string
@@ -63,6 +64,7 @@ func buildBlogInfo(blog model.Blog) BlogInfo {
 		ConfigUrl:            buildConfigUrl(blog.ID),
 		TestBranch:           blog.TestBranch.String,
 		LiveBranch:           blog.LiveBranch.String,
+		Theme:                string(blog.Theme),
 		Type:                 string(blog.BlogType),
 		Status:               string(blog.Status),
 		UpdatedAt:            blog.UpdatedAt,

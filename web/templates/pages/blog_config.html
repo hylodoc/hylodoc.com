@@ -48,6 +48,7 @@
 				<div class="four columns">
 					<input
 						class="u-full-width"
+						autocomplete="off"
 						type="text"
 						id="testBranch"
 						value="{{ if .Data.Blog.TestBranch }}{{ .Data.Blog.TestBranch }}{{ end }}"
@@ -67,6 +68,7 @@
 				<div class="four columns">
 					<input
 						class="u-full-width"
+						autocomplete="off"
 						type="text"
 						id="liveBranch"
 						value="{{ if .Data.Blog.LiveBranch }}{{ .Data.Blog.LiveBranch }}{{ end }}"
@@ -82,10 +84,33 @@
 </section>
 {{ end }}
 
+<!-- Change theme -->
+<section>
+	<div class="container">
+		<h4>Theme</h4>
+
+		<form id="theme-form" onsubmit="return false">
+			<label for="themesDropdown">Change theme</label>
+			<div class="row">
+				<div class="four columns">
+					<select id="themesDropdown">
+						{{ range .Data.Themes }}
+						<option value="{{ . }}" {{ if eq . $.Data.CurrentTheme }}selected{{ end }}>{{ . }}</option>
+						{{ end }}
+					</select>
+				</div>
+				<div class="three columns u-pull-left">
+					<button type="submit">Save</button>
+				</div>
+			</div>
+		</form>
+	</div>
+</section>
+
 <!-- Toggle site between live/offline -->
 <section>
 	<div class="container">
-		<h4>Site</h4>
+		<h4>Status</h4>
 		<form id="status-form">
 			<label for="statusInput">Set status</label>
 			<div class="row">
@@ -109,9 +134,6 @@
 	</div>
 </section>
 
-<section>
-</section>
-
 <script>
 	let debounceTimer;
 
@@ -120,12 +142,14 @@
 		/* domain config */
 		const subdomainInput = document.getElementById("subdomainInput");
 		const subdomainForm = document.getElementById("subdomainForm");
+		const themeForm = document.getElementById("theme-form")
 		const testBranchInputForm = document.getElementById("test-branch-form")
 		const liveBranchInputForm = document.getElementById("live-branch-form")
 		const statusForm = document.getElementById("status-form")
 
 		subdomainInput.addEventListener("input", handleInput);
 		subdomainForm.addEventListener("submit", handleSubdomainFormSubmit);
+		themeForm.addEventListener("submit", handleThemeFormSubmit);
 		{{ if .Data.Blog.IsRepository }}
 			testBranchInputForm.addEventListener("submit", handleTestBranchFormSubmit)
 			liveBranchInputForm.addEventListener("submit", handleLiveBranchFormSubmit)
@@ -223,12 +247,45 @@
 		submitSubdomainBtn.disabled = true; /* Disable submit button on error */
 	}
 
+	function handleThemeFormSubmit(event) {
+		event.preventDefault(); /* Prevent default form submission */
+
+		const theme = document.getElementById("themesDropdown").value.trim();
+		submitTheme(theme);
+	}
+
+	/* Submit the theme to server */
+	function submitTheme(theme) {
+		fetch("set-theme", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ theme: theme }),
+		})
+		.then(response => {
+			if (!response.ok) {
+				return response.json().then(errorData => {
+					showToast(errorData.message);
+					throw new Error(errorData.message);
+				});
+			}
+			return response.json();
+		})
+		.then(data => {
+			console.log("theme successfully submitted: ", data.message);
+			showToast(data.message);
+		})
+		.catch(error => {
+			console.log("error submitting theme: ", error)
+			showToast(error);
+		});
+	}
+
 	function handleTestBranchFormSubmit(event) {
 		event.preventDefault(); /* Prevent default form submission */
 
 		const testBranch = document.getElementById("testBranch").value.trim();
 		submitTestBranch(testBranch);
-	}
+	}	
 
 	/* Submit the test branch to the server */
 	function submitTestBranch(testBranch) {
@@ -252,6 +309,7 @@
 		})
 		.catch(error => {
 			console.error("Error submitting test branch:", error)
+			showToast(error);
 		});
 	}
 

@@ -119,10 +119,12 @@ func (u *UserService) FolderFlow() http.HandlerFunc {
 					Title       string
 					UserInfo    *session.UserInfo
 					ServiceName string
+					Themes      []string
 				}{
 					Title:       "Folder Flow",
 					UserInfo:    session.ConvertSessionToUserInfo(sesh),
 					ServiceName: config.Config.Progstack.ServiceName,
+					Themes:      blog.BuildThemes(config.Config.ProgstackSsg.Themes),
 				},
 			},
 			template.FuncMap{},
@@ -145,12 +147,14 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 			http.Error(w, "user not found", http.StatusNotFound)
 			return
 		}
+
 		hasInstallation, err := u.store.InstallationExistsForUserID(context.TODO(), sesh.GetUserID())
 		if err != nil {
 			log.Printf("error getting installation for user: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
+
 		repos, err := u.store.ListOrderedRepositoriesByUserID(context.TODO(), sesh.GetUserID())
 		if err != nil {
 			if err != sql.ErrNoRows {
@@ -178,6 +182,7 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 					HasInstallation     bool
 					ServiceName         string
 					Repositories        []Repository
+					Themes              []string
 				}{
 					Title:               "Repository Flow",
 					UserInfo:            session.ConvertSessionToUserInfo(sesh),
@@ -186,6 +191,7 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 					HasInstallation:     hasInstallation,
 					ServiceName:         config.Config.Progstack.ServiceName,
 					Repositories:        buildRepositoriesInfo(repos),
+					Themes:              blog.BuildThemes(config.Config.ProgstackSsg.Themes),
 				},
 			},
 			template.FuncMap{},
