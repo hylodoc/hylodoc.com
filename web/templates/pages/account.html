@@ -2,6 +2,16 @@
 
 <section>
 	<div class="container">
+		<h3>Storage Info</h3>
+		<p>
+			<strong>Storage Used:</strong>
+			{{ .Data.AccountDetails.StorageUsed }} of {{ .Data.AccountDetails.StorageLimit}} MB
+		</p>
+	</div>
+</section>
+
+<section>
+	<div class="container">
 		<h3>Account Details</h3>
 		<p>Username: {{ .Data.AccountDetails.Username }}</p>
 		<p>Email: {{ .Data.AccountDetails.Email }}</p>

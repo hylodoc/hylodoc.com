@@ -49,7 +49,7 @@ func (u *UserService) Home() http.HandlerFunc {
 
 		blogs, err := blog.GetBlogsInfo(u.store, sesh.GetUserID())
 		if err != nil {
-			log.Println("error getting blogs for user `%d': %v", sesh.GetUserID(), err)
+			log.Printf("error getting blogs for user `%d': %v\n", sesh.GetUserID(), err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -148,13 +148,6 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 			return
 		}
 
-		hasInstallation, err := u.store.InstallationExistsForUserID(context.TODO(), sesh.GetUserID())
-		if err != nil {
-			log.Printf("error getting installation for user: %v", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-
 		repos, err := u.store.ListOrderedRepositoriesByUserID(context.TODO(), sesh.GetUserID())
 		if err != nil {
 			if err != sql.ErrNoRows {
@@ -179,7 +172,6 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 					UserInfo            *session.UserInfo
 					AccountDetails      AccountDetails
 					GithubInstallAppUrl string
-					HasInstallation     bool
 					ServiceName         string
 					Repositories        []Repository
 					Themes              []string
@@ -188,7 +180,6 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 					UserInfo:            session.ConvertSessionToUserInfo(sesh),
 					AccountDetails:      details,
 					GithubInstallAppUrl: githubInstallAppUrl,
-					HasInstallation:     hasInstallation,
 					ServiceName:         config.Config.Progstack.ServiceName,
 					Repositories:        buildRepositoriesInfo(repos),
 					Themes:              blog.BuildThemes(config.Config.ProgstackSsg.Themes),
@@ -217,6 +208,8 @@ type AccountDetails struct {
 	HasInstallation bool
 	GithubEmail     string
 	Subscription    Subscription
+	StorageUsed     string
+	StorageLimit    string
 }
 
 type Subscription struct {
@@ -263,6 +256,13 @@ func (u *UserService) Account() http.HandlerFunc {
 }
 
 func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails, error) {
+	/* calculate storage */
+	userBytes, err := UserBytes(s, session.GetUserID())
+	if err != nil {
+		return AccountDetails{}, err
+	}
+	userMegaBytes := float64(userBytes) / (1024 * 1024)
+
 	/* get github info */
 	accountDetails := AccountDetails{
 		Username:        session.GetUsername(),
@@ -270,6 +270,8 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 		IsLinked:        false,
 		HasInstallation: false,
 		GithubEmail:     "",
+		StorageUsed:     fmt.Sprintf("%.2f", userMegaBytes),
+		StorageLimit:    "10",
 	}
 	linked := true
 	ghAccount, err := s.GetGithubAccountByUserID(context.TODO(), session.GetUserID())
