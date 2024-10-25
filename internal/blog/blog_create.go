@@ -15,7 +15,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
@@ -109,7 +111,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 			Valid:  true,
 			String: buildRepositoryUrl(repo.FullName),
 		},
-		RepositoryPath: buildRepositoryPath(sesh.GetUserID(), repo.FullName),
+		RepositoryPath: buildRepositoryPath(repo.FullName),
 		Theme:          theme,
 		Subdomain:      req.Subdomain,
 		TestBranch: sql.NullString{
@@ -135,8 +137,17 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		return "", fmt.Errorf("error creating first subscriber: %w", err)
 	}
 
+	if !blog.GhRepositoryID.Valid {
+		return "", fmt.Errorf("invalid blog repositoryID")
+	}
+
+	/* pull latest changes for live branch */
+	if err := UpdateRepositoryOnDisk(b.client, b.store, blog.GhRepositoryID.Int64); err != nil {
+		return "", fmt.Errorf("error pulling latest changes on live branch: %w", err)
+	}
+
 	/* take blog live  */
-	_, err = setBlogToLive(blog, b.store)
+	_, err = SetBlogToLive(blog, b.store)
 	if err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
@@ -161,13 +172,63 @@ func validateTheme(theme string) (model.BlogTheme, error) {
 	}
 }
 
-func buildRepositoryPath(userID int32, repoFullName string) string {
-	userIDString := strconv.FormatInt(int64(userID), 10)
+func buildRepositoryPath(repoFullName string) string {
 	return filepath.Join(
 		config.Config.Progstack.RepositoriesPath,
-		userIDString,
 		repoFullName,
 	)
+}
+
+func UpdateRepositoryOnDisk(c *httpclient.Client, s *model.Store, ghRepositoryId int64) error {
+	log.Printf("updating repository `%d' on disk...", ghRepositoryId)
+
+	/* get repository */
+	repo, err := s.GetRepositoryByGhRepositoryID(context.TODO(), ghRepositoryId)
+	if err != nil {
+		return err
+	}
+
+	/* get blog */
+	blog, err := s.GetBlogByGhRepositoryID(context.TODO(), sql.NullInt64{
+		Valid: true,
+		Int64: ghRepositoryId,
+	})
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("error getting blog for repository event: %w", err)
+		}
+		/* XXX: can happen if user pushes to repo after installing
+		* application without having created an associated blog*/
+		log.Printf("no associated blog with repositoryID `%s'\n", blog.GhRepositoryID)
+		return nil
+	}
+
+	accessToken, err := auth.GetInstallationAccessToken(
+		c,
+		config.Config.Github.AppID,
+		repo.InstallationID,
+		config.Config.Github.PrivateKeyPath,
+	)
+	if err != nil {
+		return fmt.Errorf("error getting installation access token: %w", err)
+	}
+
+	if !blog.LiveBranch.Valid {
+		return fmt.Errorf("no live branch configured for blog `%d'", blog.ID)
+	}
+
+	/* download live branch tarball */
+	tmpFile, err := downloadRepoTarball(c, repo.FullName, blog.LiveBranch.String, accessToken)
+	if err != nil {
+		return fmt.Errorf("error downloading tarball for at url: %s: %w", repo.FullName, err)
+	}
+
+	/* extract tarball to destination should store under user */
+	tmpDst := buildRepositoryPath(repo.FullName)
+	if err = extractTarball(tmpFile, tmpDst); err != nil {
+		return fmt.Errorf("error extracting tarball to destination for `%s': %w", repo.FullName, err)
+	}
+	return nil
 }
 
 func (b *BlogService) CreateFolderBlog() http.HandlerFunc {
@@ -250,7 +311,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	}
 
 	/* take blog live  */
-	_, err = setBlogToLive(blog, b.store)
+	_, err = SetBlogToLive(blog, b.store)
 	if err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}

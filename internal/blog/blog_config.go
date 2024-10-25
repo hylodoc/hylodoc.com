@@ -16,18 +16,24 @@ import (
 	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack-ssg/pkg/ssg"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
 type BlogService struct {
+	client       *httpclient.Client
 	store        *model.Store
 	resendClient *resend.Client
 }
 
-func NewBlogService(store *model.Store, resendClient *resend.Client) *BlogService {
-	return &BlogService{store: store, resendClient: resendClient}
+func NewBlogService(client *httpclient.Client, store *model.Store, resendClient *resend.Client) *BlogService {
+	return &BlogService{
+		client:       client,
+		store:        store,
+		resendClient: resendClient,
+	}
 }
 
 /* Blog configuration page */
@@ -357,7 +363,7 @@ func handleStatusChange(blogID int32, status, email string, s *model.Store) (sta
 
 	switch status {
 	case "live":
-		return setBlogToLive(blog, s)
+		return SetBlogToLive(blog, s)
 	case "offline":
 		return setBlogToOffline(blog, s)
 	default:
@@ -382,7 +388,7 @@ func validateStatusChange(request, current string) error {
 	return nil
 }
 
-func setBlogToLive(blog model.Blog, s *model.Store) (statusChangeResponse, error) {
+func SetBlogToLive(blog model.Blog, s *model.Store) (statusChangeResponse, error) {
 	fmt.Printf("repo disk path: %s\n", blog.RepositoryPath)
 
 	if err := launchUserBlog(LaunchUserBlogParams{

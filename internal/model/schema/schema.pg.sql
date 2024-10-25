@@ -139,10 +139,14 @@ CREATE TABLE blogs (
 			blog_type = 'repository'
 			AND gh_repository_id IS NOT NULL
 			AND gh_url IS NOT NULL
+			AND test_branch IS NOT NULL
+			AND live_branch IS NOT NULL
 		) OR (
 			blog_type = 'folder'
 			AND gh_repository_id IS NULL
 			AND gh_url IS NULL
+			AND test_branch IS NULL
+			AND live_branch IS NULL
 		)
 	)
 );

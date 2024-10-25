@@ -9,9 +9,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/auth"
+	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/httpclient"
@@ -24,7 +26,7 @@ const (
 
 	ghInstallationRepositoriesUrl    = "https://api.github.com/installation/repositories"
 	ghAccessTokenUrlTemplate         = "https://api.github.com/app/installations/%d/access_tokens"
-	ghRepositoriesTarballUrlTemplate = "https://api.github.com/repos/%s/tarball"
+	ghRepositoriesTarballUrlTemplate = "https://api.github.com/repos/%s/tarball/%s"
 )
 
 type InstallationService struct {
@@ -138,11 +140,6 @@ func handleInstallationCreated(c *httpclient.Client, s *model.Store, ghInstallat
 	str, _ := eventToJSON(repos)
 	log.Println("repos: %s", str)
 
-	/* clone all repos to disk */
-	if err = downloadReposToDisk(c, repos, userID, accessToken); err != nil {
-		return fmt.Errorf("error downloading repos to disk: %w", err)
-	}
-
 	/* write installation and repos to db Tx */
 	createInstallationTxParams := buildCreateInstallationTxParams(ghInstallationID, userID, ghEmail, repos)
 	if err = s.CreateInstallationTx(context.TODO(), createInstallationTxParams); err != nil {
@@ -203,30 +200,6 @@ func getReposDetails(c *httpclient.Client, accessToken string) ([]Repository, er
 		return []Repository{}, err
 	}
 	return reposResponse.Repositories, nil
-}
-
-/* this downloads all the repositories to disk int tmp folder then extracts them
-* to the configured destination on disk
-*
-* NOTE: we use the Repository.GhFullName which is guaranteed to be
-* "<owner>/<name>" to build the repo path */
-func downloadReposToDisk(c *httpclient.Client, repos []Repository, userID int32, accessToken string) error {
-	log.Println("downloading repos to disk...")
-	for _, repo := range repos {
-		/* download tarball and write to tmp file */
-		repoFullName := repo.FullName
-		tmpFile, err := downloadRepoTarball(c, repoFullName, accessToken)
-		if err != nil {
-			return fmt.Errorf("error downloading tarball for at url: %s: %w", repoFullName, err)
-		}
-		/* extract tarball to destination should store under user */
-		dst := fmt.Sprintf("%s/%d/%s", config.Config.Progstack.RepositoriesPath, userID, repoFullName)
-		log.Printf("repo dst: %s\n", dst)
-		if err = extractTarball(tmpFile, dst); err != nil {
-			return fmt.Errorf("error extracting tarball to destination for /%s/: %w", repoFullName, err)
-		}
-	}
-	return nil
 }
 
 func handleInstallationDeleted(c *httpclient.Client, s *model.Store, ghInstallationID int64, userID int32) error {
@@ -304,21 +277,6 @@ func handleInstallationRepositories(c *httpclient.Client, s *model.Store, body [
 func handleInstallationRepositoriesAdded(c *httpclient.Client, s *model.Store, ghInstallationID int64, repos []Repository, userID int32, email string) error {
 	log.Println("handling repositories added event...")
 
-	/* get access token */
-	accessToken, err := auth.GetInstallationAccessToken(
-		c,
-		config.Config.Github.AppID,
-		ghInstallationID,
-		config.Config.Github.PrivateKeyPath,
-	)
-	if err != nil {
-		return fmt.Errorf("error getting installation access token: %w", err)
-	}
-	/* clone respositories added to disk */
-	if err = downloadReposToDisk(c, repos, userID, accessToken); err != nil {
-		return fmt.Errorf("error downloading repos to disk: %w", err)
-	}
-
 	for _, repo := range repos {
 		_, err := s.CreateRepository(context.TODO(), model.CreateRepositoryParams{
 			InstallationID: ghInstallationID,
@@ -374,44 +332,61 @@ func handlePush(c *httpclient.Client, resendClient *resend.Client, s *model.Stor
 	str, _ := eventToJSON(event)
 	log.Println("push event: %s", str)
 
-	/* XXX: validate that installation and repository exists locally, i.e.
-	* we are in sync */
-
-	/* get access token */
-	ghInstallationID := event.Installation.ID
-	accessToken, err := auth.GetInstallationAccessToken(
-		c,
-		config.Config.Github.AppID,
-		ghInstallationID,
-		config.Config.Github.PrivateKeyPath,
-	)
+	/* validate that blog exists for repository */
+	b, err := s.GetBlogByGhRepositoryID(context.TODO(), sql.NullInt64{
+		Valid: true,
+		Int64: event.Repository.ID,
+	})
 	if err != nil {
-		return fmt.Errorf("error getting installation access token: %w", err)
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("error getting blog for repository event: %w", err)
+		}
+		/* this can happen if user pushes to repo after installing
+		* application without having created an associated blog*/
+		log.Printf("no associated blog with repositoryID `%s'\n", b.GhRepositoryID)
+		return nil
 	}
 
-	/* download repo tarball */
-	repoFullName := event.Repository.FullName
-	tmpFile, err := downloadRepoTarball(c, repoFullName, accessToken)
+	/* get branch for push event */
+	branchName, err := getEventBranchName(event)
 	if err != nil {
-		return fmt.Errorf("error downloading tarball for at url: %s: %w", repoFullName, err)
+		return err
+	}
+	if !b.LiveBranch.Valid {
+		/* XXX: should never fail we constraint this at the db level */
+		return fmt.Errorf("blog has no live branch configured")
 	}
 
-	/* extract tarball to destination should store under user */
-	tmpDst := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, repoFullName)
-	if err = extractTarball(tmpFile, tmpDst); err != nil {
-		return fmt.Errorf("error extracting tarball to destination for /%s/: %w", repoFullName, err)
+	log.Printf("event branch: `%s'\n", branchName)
+	log.Printf("live branch: `%s'\n", b.LiveBranch.String)
+
+	if branchName != b.LiveBranch.String {
+		/* event does not match live branch */
+		return nil
 	}
 
-	/* XXX: generate website afresh */
+	/* pull latest changes if event is on live branch */
+	if err := blog.UpdateRepositoryOnDisk(c, s, event.Repository.ID); err != nil {
+		return fmt.Errorf("error pulling latest changes: %w", err)
+	}
 
-	/* XXX: users should trigger emails manually on dashboard? how do we
-	* ensure that we send emails for the right post, since the posts are
-	* generated by the repository */
-	ghRepositoryID := event.Repository.ID
-	if err = sendNewPostUpdateEmailsForBlog(ghRepositoryID, resendClient, s); err != nil {
-		return fmt.Errorf("error sending post emails for repo `%d': %w", ghRepositoryID, err)
+	/* take blog live  */
+	_, err = blog.SetBlogToLive(b, s)
+	if err != nil {
+		return fmt.Errorf("error setting blog to live: %w", err)
 	}
 	return nil
+}
+
+func getEventBranchName(event PushEvent) (string, error) {
+	log.Printf("Ref: `%s'\n", event.Ref)
+	if event.Ref != "" {
+		refParts := strings.Split(event.Ref, "/")
+		if len(refParts) > 2 && refParts[1] == "heads" {
+			return strings.Join(refParts[2:], "/"), nil
+		}
+	}
+	return "", fmt.Errorf("could not get extract branch name")
 }
 
 func sendNewPostUpdateEmailsForBlog(ghRepositoryID int64, c *resend.Client, s *model.Store) error {

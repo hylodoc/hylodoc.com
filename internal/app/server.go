@@ -61,7 +61,7 @@ func Serve() {
 	authService := auth.NewAuthService(client, resendClient, store, &config.Config.Github)
 	userService := user.NewUserService(store)
 	installService := installation.NewInstallationService(client, resendClient, store, &config.Config)
-	blogService := blog.NewBlogService(store, resendClient)
+	blogService := blog.NewBlogService(client, store, resendClient)
 
 	/* routes */
 	r := mux.NewRouter()

@@ -43,7 +43,7 @@ WHERE id = $1;
 -- name: GetBlogByGhRepositoryID :one
 SELECT *
 FROM blogs
-WHERE gh_repository_id = $1;
+WHERE gh_repository_id = $1 AND blog_type = 'repository';
 
 -- name: ListBlogsByUserID :many
 SELECT *
