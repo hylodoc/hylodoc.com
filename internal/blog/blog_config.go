@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -269,6 +270,122 @@ func (b *BlogService) liveBranchSubmit(w http.ResponseWriter, r *http.Request) e
 		return fmt.Errorf("error updating branch info: %w", err)
 	}
 	return nil
+}
+
+func (b *BlogService) FolderSubmit() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("folder submit handler...")
+
+		if err := b.folderSubmit(w, r); err != nil {
+			log.Printf("error update folder: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			response := map[string]string{"message": "An unexpected error occured"}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		response := map[string]string{"message": "Folder updated successfully!"}
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func (b *BlogService) folderSubmit(w http.ResponseWriter, r *http.Request) error {
+	_, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	if !ok {
+		log.Println("user not found")
+		return util.UserError{
+			Message: "",
+			Code:    http.StatusNotFound,
+		}
+	}
+
+	src, err := parseFolderUpdateRequest(r)
+	if err != nil {
+		return err
+	}
+
+	blogID := mux.Vars(r)["blogID"]
+	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	if err != nil {
+		return err
+	}
+
+	blog, err := b.store.GetBlogByID(context.TODO(), int32(intBlogID))
+	if err != nil {
+		return fmt.Errorf("error getting blog `%d': %w", blogID, err)
+	}
+
+	log.Printf("src: %s\n", src)
+	log.Printf("dst: %s\n", blog.RepositoryPath)
+
+	/* extract to appropriate path for folders */
+	if err := clearAndExtract(src, blog.RepositoryPath); err != nil {
+		return err
+	}
+
+	/* take blog live  */
+	_, err = SetBlogToLive(blog, b.store)
+	if err != nil {
+		return fmt.Errorf("error setting blog to live: %w", err)
+	}
+	return nil
+}
+
+func clearAndExtract(src, dst string) error {
+	if err := os.RemoveAll(dst); err != nil {
+		return fmt.Errorf("failed to delete directory %s: %w", dst, err)
+	}
+	if err := os.MkdirAll(dst, os.ModePerm); err != nil {
+		return fmt.Errorf("failed to recreate directory %s: %w", dst, err)
+	}
+	if err := extractZip(src, dst); err != nil {
+		return fmt.Errorf("error extracting .zip: %w", err)
+	}
+	return nil
+}
+
+func parseFolderUpdateRequest(r *http.Request) (string, error) {
+	/* XXX: Add subscription based file size limits */
+	err := r.ParseMultipartForm(maxFileSize) /* 10MB limit */
+	if err != nil {
+		log.Printf("file too large: %v\n", err)
+		return "", util.UserError{
+			Message: "File too large",
+			Code:    http.StatusBadRequest,
+		}
+	}
+
+	file, header, err := r.FormFile("folder")
+	if err != nil {
+		log.Printf("error reading file: %v\n", err)
+		return "", util.UserError{
+			Message: "Invalid file",
+			Code:    http.StatusBadRequest,
+		}
+	}
+	defer file.Close()
+
+	if !isValidFileType(header.Filename) {
+		log.Printf("invalid file extension for `%s'\n", header.Filename)
+		return "", util.UserError{
+			Message: "Must upload a .zip file",
+			Code:    http.StatusBadRequest,
+		}
+	}
+
+	/* create to tmp file */
+	tmpFile, err := os.CreateTemp("", "uploaded-*.zip")
+	if err != nil {
+		return "", fmt.Errorf("error creating tmp file: %w", err)
+	}
+	defer tmpFile.Close()
+
+	/* copy uploaded file to tmpFile */
+	if _, err = io.Copy(tmpFile, file); err != nil {
+		return "", fmt.Errorf("error copying upload to temp file: %w", err)
+	}
+
+	return tmpFile.Name(), nil
 }
 
 type SetStatusSubmitResponse struct {

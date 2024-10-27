@@ -270,7 +270,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		}
 	}
 
-	req, err := parseRequest(r)
+	req, err := parseCreateFolderBlogRequest(r)
 	if err != nil {
 		return "", err
 	}
@@ -324,11 +324,11 @@ type createFolderBlogRequest struct {
 	theme     model.BlogTheme
 }
 
-func parseRequest(r *http.Request) (createFolderBlogRequest, error) {
+func parseCreateFolderBlogRequest(r *http.Request) (createFolderBlogRequest, error) {
 	/* XXX: Add subscription based file size limits */
 	err := r.ParseMultipartForm(maxFileSize) /* 10MB limit */
 	if err != nil {
-		log.Printf("fiile too large: %v\n", err)
+		log.Printf("file too large: %v\n", err)
 		return createFolderBlogRequest{}, util.UserError{
 			Message: "File too large",
 			Code:    http.StatusBadRequest,

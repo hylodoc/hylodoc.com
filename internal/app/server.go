@@ -116,6 +116,7 @@ func Serve() {
 	blogR.HandleFunc("/set-theme", blogService.ThemeSubmit())
 	blogR.HandleFunc("/set-test-branch", blogService.TestBranchSubmit())
 	blogR.HandleFunc("/set-live-branch", blogService.LiveBranchSubmit())
+	blogR.HandleFunc("/set-folder", blogService.FolderSubmit())
 	blogR.HandleFunc("/set-status", blogService.SetStatusSubmit())
 
 	blogR.HandleFunc("/metrics", blogService.SiteMetrics())
