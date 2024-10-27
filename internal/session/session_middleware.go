@@ -27,8 +27,15 @@ func (a *SessionMiddleware) SessionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("running session middleware...")
 
+		/* ignore /metrics used by prometheus */
+		if r.URL.Path == "/metrics" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		cookie, err := r.Cookie(CookieName)
 		if err != nil {
+			log.Printf("error getting cookie: %v", err)
 			/* create unauth session */
 			session, err := CreateUnauthSession(a.store, w, unauthSessionDuration)
 			if err != nil {

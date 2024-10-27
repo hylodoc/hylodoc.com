@@ -41,9 +41,11 @@ func ExecTemplate(w http.ResponseWriter, names []string, info PageInfo, funcMap 
 	if err != nil {
 		log.Println("cannot load template", err)
 		http.Error(w, "error loading page", http.StatusInternalServerError)
+		return
 	}
 	if err := tmpl.Execute(w, info); err != nil {
 		log.Println("cannot execute template", err)
 		http.Error(w, "error loading page", http.StatusInternalServerError)
+		return
 	}
 }

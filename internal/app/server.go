@@ -16,6 +16,7 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/installation"
+	"github.com/xr0-org/progstack/internal/metrics"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/subdomain"
@@ -63,16 +64,22 @@ func Serve() {
 	installService := installation.NewInstallationService(client, resendClient, store, &config.Config)
 	blogService := blog.NewBlogService(client, store, resendClient)
 
+	/* init metrics */
+	metrics.Initialize()
+
 	/* routes */
 	r := mux.NewRouter()
 
 	/* NOTE: userWebsite middleware currently runs before main application */
 	r.Use(subdomainMiddleware.RouteToSubdomains)
 
+	r.Use(metrics.MetricsMiddleware)
+
 	r.Use(sessionMiddleware.SessionMiddleware)
 
 	/* public routes */
 	r.HandleFunc("/", index())
+	r.Handle("/metrics", metrics.Handler())
 	r.HandleFunc("/register", register())
 	r.HandleFunc("/login", login())
 	r.HandleFunc("/gh/login", authService.GithubLogin())
