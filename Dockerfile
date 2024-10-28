@@ -16,6 +16,9 @@ COPY . .
 # generate models with sqlc
 RUN sqlc generate -f internal/model/sqlc.yaml
 
+# Run unit tests
+RUN go test ./... -v
+
 # build application
 RUN CGO_ENABLED=1 go build -o progstack
 CMD ./progstack
