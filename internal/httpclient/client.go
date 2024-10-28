@@ -27,14 +27,14 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		log.Printf("error calling downstream: %v\n", err)
 		/* record downstream error */
-		metrics.HTTPClientErrors.WithLabelValues(req.Method, req.URL.String()).Inc()
+		metrics.RecordClientErrors(req.Method, req.URL.String())
 		return nil, err
 	}
 
 	duration := time.Since(start).Seconds()
 
 	/* record downstream call duration */
-	metrics.HTTPClientDuration.WithLabelValues(req.Method, req.URL.String()).Observe(duration)
+	metrics.RecordClientDuration(req.Method, req.URL.String(), duration)
 
 	return resp, nil
 }

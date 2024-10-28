@@ -10,52 +10,52 @@ import (
 )
 
 var (
-	/* Service metrics */
-	HTTPRequestTotal = prometheus.NewCounterVec(
+	/* service metrics */
+	httpRequestTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "http_requests_total",
-			Help: "Total number of HTTP requests",
+			Help: "Total number of http requests",
 		},
 		[]string{"method", "path", "status", "error_type"},
 	)
 
-	HTTPRequestDuration = prometheus.NewHistogramVec(
+	httpRequestDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "http_request_duration_seconds",
-			Help:    "Duration of HTTP requests",
+			Help:    "Duration of http requests",
 			Buckets: prometheus.DefBuckets,
 		},
 		[]string{"method", "path", "status", "error_type"},
 	)
 
-	HTTPRequestSuccessTotal = prometheus.NewCounterVec(
+	httpRequestSuccessTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "http_request_success_total",
-			Help: "Total number of successful HTTP requests",
+			Help: "Total number of successful http requests",
 		},
 		[]string{"method", "path", "status", "error_type"},
 	)
 
-	HTTPRequestErrorsTotal = prometheus.NewCounterVec(
+	httpRequestErrorsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "http_request_errors_total",
-			Help: "Total number of failed HTTP requests",
+			Help: "Total number of failed http requests",
 		},
 		[]string{"method", "path", "status", "error_type"},
 	)
 
-	/* Downstream metrics */
-	HTTPClientErrors = prometheus.NewCounterVec(
+	/* downstream metrics */
+	httpClientErrors = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "http_client_errors_total",
-			Help: "Total number of HTTP client errors"},
+			Help: "Total number of http client errors"},
 		[]string{"method", "url"},
 	)
 
-	HTTPClientDuration = prometheus.NewHistogramVec(
+	httpClientDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "http_client_duration_seconds",
-			Help:    "Duration of HTTP client calls",
+			Help:    "Duration of http client calls",
 			Buckets: prometheus.DefBuckets,
 		},
 		[]string{"method", "url"},
@@ -63,12 +63,12 @@ var (
 )
 
 func Initialize() {
-	prometheus.MustRegister(HTTPRequestTotal)
-	prometheus.MustRegister(HTTPRequestDuration)
-	prometheus.MustRegister(HTTPRequestSuccessTotal)
-	prometheus.MustRegister(HTTPRequestErrorsTotal)
-	prometheus.MustRegister(HTTPClientErrors)
-	prometheus.MustRegister(HTTPClientDuration)
+	prometheus.MustRegister(httpRequestTotal)
+	prometheus.MustRegister(httpRequestDuration)
+	prometheus.MustRegister(httpRequestSuccessTotal)
+	prometheus.MustRegister(httpRequestErrorsTotal)
+	prometheus.MustRegister(httpClientErrors)
+	prometheus.MustRegister(httpClientDuration)
 }
 
 type responseWriterWithStatus struct {
@@ -103,17 +103,17 @@ func MetricsMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(rec, r)
 		duration := time.Since(start).Seconds()
 
-		HTTPRequestTotal.WithLabelValues(r.Method, r.URL.Path, http.StatusText(rec.statusCode), "none").Inc()
+		httpRequestTotal.WithLabelValues(r.Method, r.URL.Path, http.StatusText(rec.statusCode), "none").Inc()
 
 		/* handle errors */
 		if rec.statusCode >= 200 && rec.statusCode < 400 {
-			HTTPRequestSuccessTotal.WithLabelValues(r.Method, r.URL.Path, http.StatusText(rec.statusCode), "none").Inc()
+			httpRequestSuccessTotal.WithLabelValues(r.Method, r.URL.Path, http.StatusText(rec.statusCode), "none").Inc()
 		} else {
 			errorType := classifyError(rec.statusCode)
-			HTTPRequestErrorsTotal.WithLabelValues(r.Method, r.URL.Path, http.StatusText(rec.statusCode), errorType).Inc()
+			httpRequestErrorsTotal.WithLabelValues(r.Method, r.URL.Path, http.StatusText(rec.statusCode), errorType).Inc()
 		}
 
-		HTTPRequestDuration.WithLabelValues(r.Method, r.URL.Path, http.StatusText(rec.statusCode), "none").Observe(duration)
+		httpRequestDuration.WithLabelValues(r.Method, r.URL.Path, http.StatusText(rec.statusCode), "none").Observe(duration)
 	})
 }
 
@@ -133,4 +133,12 @@ func classifyError(statusCode int) string {
 
 func Handler() http.Handler {
 	return promhttp.Handler()
+}
+
+func RecordClientErrors(method, url string) {
+	httpClientErrors.WithLabelValues(method, url).Inc()
+}
+
+func RecordClientDuration(method, url string, duration float64) {
+	httpClientDuration.WithLabelValues(method, url).Observe(duration)
 }
