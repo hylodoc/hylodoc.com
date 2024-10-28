@@ -6,9 +6,22 @@ progstack:
   service_name: "localhost:7999"
   domain: "localhost"
   repositories_path: "./repositories"
+  folders_path: "./folders"
   websites_path: "./websites"
   from_email: "no-reply@lbnz.dev"	# update email
   accounts_email: "accounts@lbnz.dev"	# billing query email
+
+# Progstack ssg config
+progstack_ssg:
+  themes:
+    lit:
+      name: "lit"
+      description: "pretty, simple"
+      path: "progstack-ssg/theme/lit"
+    latex:
+      name: "latex"
+      description: "latex style"
+      path: "progstack-ssg/theme/latex"
 
 # Github config
 github:
