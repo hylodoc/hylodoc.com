@@ -45,11 +45,27 @@ var (
 	)
 
 	/* downstream metrics */
-	httpClientErrors = prometheus.NewCounterVec(
+	httpClientRequestTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_client_request_total",
+			Help: "Total number of client requests",
+		},
+		[]string{"method", "url"},
+	)
+
+	httpClientSuccessTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_client_success_total",
+			Help: "Total number of successful http client requests",
+		},
+		[]string{"method", "url", "status"},
+	)
+
+	httpClientErrorsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "http_client_errors_total",
 			Help: "Total number of http client errors"},
-		[]string{"method", "url"},
+		[]string{"method", "url", "status"},
 	)
 
 	httpClientDuration = prometheus.NewHistogramVec(
@@ -58,7 +74,7 @@ var (
 			Help:    "Duration of http client calls",
 			Buckets: prometheus.DefBuckets,
 		},
-		[]string{"method", "url"},
+		[]string{"method", "url", "status"},
 	)
 )
 
@@ -67,7 +83,10 @@ func Initialize() {
 	prometheus.MustRegister(httpRequestDuration)
 	prometheus.MustRegister(httpRequestSuccessTotal)
 	prometheus.MustRegister(httpRequestErrorsTotal)
-	prometheus.MustRegister(httpClientErrors)
+
+	prometheus.MustRegister(httpClientRequestTotal)
+	prometheus.MustRegister(httpClientSuccessTotal)
+	prometheus.MustRegister(httpClientErrorsTotal)
 	prometheus.MustRegister(httpClientDuration)
 }
 
@@ -135,10 +154,18 @@ func Handler() http.Handler {
 	return promhttp.Handler()
 }
 
-func RecordClientErrors(method, url string) {
-	httpClientErrors.WithLabelValues(method, url).Inc()
+func RecordClientRequest(method, url string) {
+	httpClientRequestTotal.WithLabelValues(method, url).Inc()
 }
 
-func RecordClientDuration(method, url string, duration float64) {
-	httpClientDuration.WithLabelValues(method, url).Observe(duration)
+func RecordClientSuccess(method, url, status string) {
+	httpClientSuccessTotal.WithLabelValues(method, url, status).Inc()
+}
+
+func RecordClientErrors(method, url, status string) {
+	httpClientErrorsTotal.WithLabelValues(method, url, status).Inc()
+}
+
+func RecordClientDuration(method, url string, duration float64, status string) {
+	httpClientDuration.WithLabelValues(method, url, status).Observe(duration)
 }
