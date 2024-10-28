@@ -23,7 +23,7 @@ Unsubscribe {{ .UnsubscribeLink }}`
 	 *	e.g. <http>://<localhost.com:7999>/blogs/<1>/unsubscribe
 	 *	e.g. <https>://<progstack.com>/blogs/<596>/unsubscribe
 	 */
-	unsubscribeLinkTemplate = "%s://%s/blogs/%d/unsubscribe"
+	unsubscribeLinkTemplate = "%s://%s.%s/blogs/%d/unsubscribe"
 )
 
 type NewPostUpdateParams struct {
@@ -106,9 +106,11 @@ func buildUnsubscribeLink(blogID int32, blogSubdomain, unsubscribeToken string) 
 	log.Println("building unsubscribe link...")
 
 	/* build base url */
+	log.Printf("protocol: %s\n", config.Config.Progstack.Protocol)
 	base := fmt.Sprintf(
 		unsubscribeLinkTemplate,
 		config.Config.Progstack.Protocol,
+		blogSubdomain,
 		config.Config.Progstack.ServiceName,
 		blogID,
 	)

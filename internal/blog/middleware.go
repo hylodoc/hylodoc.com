@@ -37,7 +37,7 @@ func (bm *BlogMiddleware) AuthoriseBlog(next http.Handler) http.Handler {
 
 		intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 		if err != nil {
-			log.Println("error converting string path var to blogID: %v", err)
+			log.Printf("error converting string path var to blogID: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -51,7 +51,7 @@ func (bm *BlogMiddleware) AuthoriseBlog(next http.Handler) http.Handler {
 			return
 		}
 		if !userOwnsBlog {
-			log.Printf("user `%d' does not own blog `%d'\n", userID, blogID)
+			log.Printf("user `%d' does not own blog `%d'\n", userID, intBlogID)
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}

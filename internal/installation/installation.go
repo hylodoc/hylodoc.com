@@ -81,7 +81,7 @@ func (i *InstallationService) installationCallback(w http.ResponseWriter, r *htt
 	case "push":
 		return handlePush(i.client, i.resendClient, i.store, body)
 	default:
-		log.Println("unhandled event type: %s", eventType)
+		log.Printf("unhandled event type: %s\n", eventType)
 	}
 	return nil
 }
@@ -94,7 +94,7 @@ func handleInstallation(c *httpclient.Client, s *model.Store, body []byte) error
 		return err
 	}
 	str, _ := eventToJSON(event)
-	log.Println("installation event: %s", str)
+	log.Printf("installation event: %s\n", str)
 
 	/* XXX: is this safe given that we validated the request with the
 	* webhook? */
@@ -102,7 +102,7 @@ func handleInstallation(c *httpclient.Client, s *model.Store, body []byte) error
 	user, err := s.GetUserByGhUserID(context.TODO(), ghUserID)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			return fmt.Errorf("error getting user with ghUserID `%s' (in event) from db: %w", ghUserID, err)
+			return fmt.Errorf("error getting user with ghUserID `%d' (in event) from db: %w", ghUserID, err)
 		}
 	}
 
@@ -113,7 +113,7 @@ func handleInstallation(c *httpclient.Client, s *model.Store, body []byte) error
 	case "deleted":
 		return handleInstallationDeleted(c, s, ghInstallationID, user.ID)
 	default:
-		log.Println("unhandled event action: %s", event.Action)
+		log.Printf("unhandled event action: %s\n", event.Action)
 	}
 
 	return nil
@@ -138,7 +138,7 @@ func handleInstallationCreated(c *httpclient.Client, s *model.Store, ghInstallat
 		return fmt.Errorf("error getting repositories: %w", err)
 	}
 	str, _ := eventToJSON(repos)
-	log.Println("repos: %s", str)
+	log.Printf("repos: %s\n", str)
 
 	/* write installation and repos to db Tx */
 	createInstallationTxParams := buildCreateInstallationTxParams(ghInstallationID, userID, ghEmail, repos)
@@ -217,7 +217,7 @@ func handleInstallationDeleted(c *httpclient.Client, s *model.Store, ghInstallat
 		path := fmt.Sprintf("%s/%d/%s", config.Config.Progstack.RepositoriesPath, userID, repo.FullName)
 		log.Printf("deleting repo at `%s' from disk...\n", path)
 		if err := os.RemoveAll(path); err != nil {
-			return fmt.Errorf("error deleting repo `%s' from disk: %w", err)
+			return fmt.Errorf("error deleting repo `%d' from disk: %w", repo.ID, err)
 		}
 	}
 	/* delete generated websites */
@@ -230,7 +230,7 @@ func handleInstallationDeleted(c *httpclient.Client, s *model.Store, ghInstallat
 		}
 	}
 	/* cascade delete the installation and associated repos */
-	log.Println("deleting installation with ghInstallationID `%d'...", ghInstallationID)
+	log.Printf("deleting installation with ghInstallationID `%d'...\n", ghInstallationID)
 	if err = s.DeleteInstallationWithGithubInstallationID(context.TODO(), ghInstallationID); err != nil {
 		return fmt.Errorf("error deleting installation: %w", err)
 	}
@@ -245,13 +245,13 @@ func handleInstallationRepositories(c *httpclient.Client, s *model.Store, body [
 		return fmt.Errorf("error unmarshaling InstallationRepositoriesEvent: %w", err)
 	}
 	str, _ := eventToJSON(event)
-	log.Printf("installationRepositoriesEvent: %s", str)
+	log.Printf("installationRepositoriesEvent: %s\n", str)
 
 	ghUserID := event.Sender.ID
 	user, err := s.GetUserByGhUserID(context.TODO(), ghUserID)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			return fmt.Errorf("error getting user with ghUserID `%s' (in event) from db: %w", ghUserID, err)
+			return fmt.Errorf("error getting user with ghUserID `%d' (in event) from db: %w", ghUserID, err)
 		}
 	}
 	ghInstallationID := event.Installation.ID
@@ -268,7 +268,7 @@ func handleInstallationRepositories(c *httpclient.Client, s *model.Store, body [
 	case "removed":
 		return handleInstallationRepositoriesRemoved(c, s, ghInstallationID, event.RepositoriesRemoved)
 	default:
-		log.Println("unhandled event action: %s", event.Action)
+		log.Printf("unhandled event action: %s\n", event.Action)
 	}
 
 	return nil
@@ -330,7 +330,7 @@ func handlePush(c *httpclient.Client, resendClient *resend.Client, s *model.Stor
 		return fmt.Errorf("error unmarshaling push event: %w", err)
 	}
 	str, _ := eventToJSON(event)
-	log.Println("push event: %s", str)
+	log.Printf("push event: %s\n", str)
 
 	/* validate that blog exists for repository */
 	b, err := s.GetBlogByGhRepositoryID(context.TODO(), sql.NullInt64{
@@ -343,7 +343,7 @@ func handlePush(c *httpclient.Client, resendClient *resend.Client, s *model.Stor
 		}
 		/* this can happen if user pushes to repo after installing
 		* application without having created an associated blog*/
-		log.Printf("no associated blog with repositoryID `%s'\n", b.GhRepositoryID)
+		log.Printf("no associated blog with repositoryID `%d'\n", event.Repository.ID)
 		return nil
 	}
 

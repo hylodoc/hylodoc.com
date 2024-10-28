@@ -89,7 +89,7 @@ func (b *BlogService) UnsubscribeFromBlog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("unsubscribe from blog handler...")
 		if err := b.unsubscribeFromBlog(w, r); err != nil {
-			log.Printf("error in unsubscribeFromBlog handler: %w", err)
+			log.Printf("error in unsubscribeFromBlog handler: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}

@@ -50,7 +50,7 @@ func (b *BlogService) SubscriberMetrics() http.HandlerFunc {
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
-		log.Printf("subscribers: %s\n", data)
+		log.Printf("subscribers: %v\n", data)
 
 		util.ExecTemplate(w, []string{"subscriber_metrics.html", "subscribers.html"},
 			util.PageInfo{

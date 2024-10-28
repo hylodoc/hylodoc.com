@@ -3,8 +3,10 @@ package config
 import (
 	"database/sql"
 	"fmt"
+	"log"
 
 	_ "github.com/lib/pq"
+	"github.com/spf13/viper"
 )
 
 var Config Configuration
@@ -97,4 +99,18 @@ func (params DbParams) Connect() (*sql.DB, error) {
 		return nil, err
 	}
 	return db, nil
+}
+
+func LoadConfig(path string) error {
+	viper.SetConfigFile(path)
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err != nil {
+		return err
+	}
+	if err := viper.Unmarshal(&Config); err != nil {
+		return err
+	}
+	log.Printf("loaded config: %+v\n", Config)
+	return nil
 }

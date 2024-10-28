@@ -9,7 +9,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/resend/resend-go/v2"
-	"github.com/spf13/viper"
 	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
@@ -30,16 +29,9 @@ const (
 )
 
 func init() {
-	viper.SetConfigFile("conf.yaml")
-	viper.AutomaticEnv()
-
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error reading .env file: %s", err)
+	if err := config.LoadConfig("conf.yaml"); err != nil {
+		log.Fatalf("failed to laod config: %v", err)
 	}
-	if err := viper.Unmarshal(&config.Config); err != nil {
-		log.Fatalf("Error unmarshaling config: %s", err)
-	}
-	log.Printf("loaded config: %+v\n", config.Config)
 }
 
 func Serve() {

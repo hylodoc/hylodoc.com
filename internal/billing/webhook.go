@@ -193,7 +193,7 @@ func handleCustomerSubscriptionUpdated(s *model.Store, e *stripe.Event) error {
 
 func eventString(e *stripe.Event) string {
 	return fmt.Sprintf(
-		"EventID: %s\nEventType: %s\nCreatedAt: %s\nData Object:%vs\n",
+		"EventID: %s\nEventType: %s\nCreatedAt: %d\nData Object:%vs\n",
 		e.ID, e.Type, e.Created, e.Data.Object,
 	)
 }

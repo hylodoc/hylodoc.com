@@ -50,14 +50,14 @@ func (b *BlogService) Config() http.HandlerFunc {
 		blogID := mux.Vars(r)["blogID"]
 		intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 		if err != nil {
-			log.Println("error converting string path var to blogID: %v", err)
+			log.Printf("error converting string path var to blogID: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
 
 		blogInfo, err := getBlogInfo(b.store, int32(intBlogID))
 		if err != nil {
-			log.Println("error getting blog for user `%d': %v", sesh.GetUserID(), err)
+			log.Printf("error getting blog for user `%d': %v\n", sesh.GetUserID(), err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -312,7 +312,7 @@ func (b *BlogService) folderSubmit(w http.ResponseWriter, r *http.Request) error
 
 	blog, err := b.store.GetBlogByID(context.TODO(), int32(intBlogID))
 	if err != nil {
-		return fmt.Errorf("error getting blog `%d': %w", blogID, err)
+		return fmt.Errorf("error getting blog `%d': %w", intBlogID, err)
 	}
 
 	log.Printf("src: %s\n", src)

@@ -93,7 +93,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 
 	repo, err := b.store.GetRepositoryByGhRepositoryID(context.TODO(), intRepoID)
 	if err != nil {
-		return "", fmt.Errorf("could not get repository for ghRepoId `%s': %w", intRepoID, err)
+		return "", fmt.Errorf("could not get repository for ghRepoId `%d': %w", intRepoID, err)
 	}
 
 	theme, err := validateTheme(req.Theme)
@@ -199,7 +199,7 @@ func UpdateRepositoryOnDisk(c *httpclient.Client, s *model.Store, ghRepositoryId
 		}
 		/* XXX: can happen if user pushes to repo after installing
 		* application without having created an associated blog*/
-		log.Printf("no associated blog with repositoryID `%s'\n", blog.GhRepositoryID)
+		log.Printf("no associated blog with repositoryID `%d'\n", ghRepositoryId)
 		return nil
 	}
 
@@ -307,7 +307,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		BlogID: blog.ID,
 		Email:  sesh.GetEmail(),
 	}); err != nil {
-		return "", fmt.Errorf("error adding email `%d' for user `%s' as subscriber to blog `%d': %w", sesh.GetEmail(), sesh.GetUserID(), blog.ID, err)
+		return "", fmt.Errorf("error adding email `%s' for user `%d' as subscriber to blog `%d': %w", sesh.GetEmail(), sesh.GetUserID(), blog.ID, err)
 	}
 
 	/* take blog live  */

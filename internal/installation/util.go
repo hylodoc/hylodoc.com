@@ -38,7 +38,7 @@ func validateSignature(r *http.Request, secret string) error {
 	expectedSignature := "sha256=" + hex.EncodeToString(expectedMAC)
 	ok := hmac.Equal([]byte(signature), []byte(expectedSignature))
 	if !ok {
-		return fmt.Errorf("expected signature: %s but got: %s", err)
+		return fmt.Errorf("expected signature: %s but got: %s", expectedSignature, signature)
 	}
 	return nil
 }
