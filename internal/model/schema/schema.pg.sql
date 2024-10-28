@@ -151,6 +151,22 @@ CREATE TABLE blogs (
 	)
 );
 
+CREATE TABLE generations (
+	id		SERIAL		PRIMARY KEY,
+	blog		INTEGER		NOT NULL	REFERENCES blogs,
+	created_at	TIMESTAMPTZ	NOT NULL	DEFAULT(now())
+);
+CREATE INDEX ON generations(blog);
+CREATE INDEX ON generations(created_at);
+
+CREATE TABLE bindings (
+	gen	INTEGER		NOT NULL	REFERENCES generations,
+	url	VARCHAR(1000)	NOT NULL,
+	file	VARCHAR(1000)	NOT NULL,
+
+	PRIMARY KEY (gen, url)
+);
+
 -- blog subscriber lists
 
 CREATE TYPE subscription_status AS ENUM ('active', 'unsubscribed');

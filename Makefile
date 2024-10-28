@@ -1,17 +1,46 @@
 .PHONY: $(PROGSTACK) $(REPOSITORIES) $(DB) $(BIN) 
 
-# Docker resource management
-up:
+DOCKER=$(SUDO) docker
+
+GO = go
+BIN = ${CURDIR}/bin
+SOURCES := $(shell find $(CURDIR) -name '*.go')
+PROGSTACK = $(BIN)/progstack
+
+$(PROGSTACK): $(BIN) $(SOURCES) db test
+	@printf 'GO\t$@\n'
+	@$(GO) build -o $@
+
+get: go.mod go.sum
+	@printf 'GO\tmod tidy\n'
+	@go mod tidy
+
+test: get
+	@printf 'GO\ttest\n'
+	@go test ./... -v
+
+$(BIN):
+	@mkdir -p $@
+
+DBDIR = internal/model
+dbfiles := $(shell find $(DBDIR) -name '*.sql')
+db: $(DBDIR)/sqlc.yaml $(dbfiles)
+	@printf 'SQLC\t$<\n'
+	@sqlc generate -f $<
+
+up: $(PROGSTACK)
 	@echo 'launching docker containers...'
-	@docker compose up --build
+	$(DOCKER) compose up --build
 
 down:
 	@echo 'stopping docker containers...'
-	docker compose down
+	$(DOCKER) compose down
 
 clean:
 	@echo 'cleaning up docker resources'
-	docker compose down --volumes --remove-orphans
+	$(DOCKER) compose down --volumes --remove-orphans
+	@rm -rf $(BIN)
+	@rm $(DBDIR)/*.gen.go
 
 github:
 	@echo 'forwarding Github events to http://localhost:7999/gh/installcallback...'

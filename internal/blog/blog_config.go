@@ -102,24 +102,45 @@ func ConvertCentsToDollars(cents int64) string {
 /* Launch Blog */
 
 type LaunchUserBlogParams struct {
+	ID             int32
 	RepositoryPath string
 	Subdomain      string
 	Theme          string
 }
 
-func launchUserBlog(params LaunchUserBlogParams) error {
+func launchUserBlog(s *model.Store, params LaunchUserBlogParams) error {
 	if _, err := os.Stat(params.RepositoryPath); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("repository at `%s' does not exist on disk: %w", params.RepositoryPath, err)
 		}
 		return err
 	}
-	site := filepath.Join(
-		config.Config.Progstack.WebsitesPath,
-		params.Subdomain,
+	bindings, err := ssg.GenerateSiteWithBindings(
+		params.RepositoryPath,
+		filepath.Join(
+			config.Config.Progstack.WebsitesPath,
+			params.Subdomain,
+		),
+		config.Config.ProgstackSsg.Themes[params.Theme].Path,
+		"algol_nu",
 	)
-	if err := ssg.GenerateSite(params.RepositoryPath, site, config.Config.ProgstackSsg.Themes[params.Theme].Path); err != nil {
+	if err != nil {
 		return fmt.Errorf("error generating site: %w", err)
+	}
+	gen, err := s.InsertGeneration(context.TODO(), params.ID)
+	if err != nil {
+		return fmt.Errorf("error inserting generation: %w", err)
+	}
+	for url, file := range bindings {
+		if err := s.InsertBinding(context.TODO(),
+			model.InsertBindingParams{
+				Gen:  gen,
+				Url:  url,
+				File: file,
+			},
+		); err != nil {
+			return fmt.Errorf("error inserting binding: %w", err)
+		}
 	}
 	return nil
 }
@@ -506,7 +527,8 @@ func validateStatusChange(request, current string) error {
 func SetBlogToLive(blog model.Blog, s *model.Store) (statusChangeResponse, error) {
 	fmt.Printf("repo disk path: %s\n", blog.RepositoryPath)
 
-	if err := launchUserBlog(LaunchUserBlogParams{
+	if err := launchUserBlog(s, LaunchUserBlogParams{
+		ID:             blog.ID,
 		RepositoryPath: blog.RepositoryPath,
 		Subdomain:      blog.Subdomain,
 		Theme:          string(blog.Theme),
