@@ -3,6 +3,7 @@ package blog
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -30,15 +31,16 @@ func (b *BlogService) SubdomainCheck() http.HandlerFunc {
 		available := true
 		message := "Subdomain is available"
 		if err := b.subdomainCheck(w, r); err != nil {
-			userErr, ok := err.(util.UserError)
-			if !ok {
+			var customErr *util.CustomError
+			if errors.As(err, &customErr) {
+				log.Printf("client error: %v\n", customErr)
+				available = false
+				message = customErr.Error()
+			} else {
 				log.Printf("internal server error: %v\n", err)
 				http.Error(w, "", http.StatusInternalServerError)
 				return
 			}
-			log.Printf("client error: %v\n", userErr)
-			available = false
-			message = userErr.Message
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -64,9 +66,10 @@ func (b *BlogService) subdomainCheck(w http.ResponseWriter, r *http.Request) err
 		return fmt.Errorf("error checking for subdomain in db: %w", err)
 	}
 	if exists {
-		return util.UserError{
-			Message: "subdomain already exists",
-		}
+		return util.CreateCustomError(
+			"subdomain already exists",
+			http.StatusBadRequest,
+		)
 	}
 	if err = validateSubdomain(req.Subdomain); err != nil {
 		return err
@@ -77,37 +80,42 @@ func (b *BlogService) subdomainCheck(w http.ResponseWriter, r *http.Request) err
 
 func validateSubdomain(subdomain string) error {
 	if len(subdomain) < 1 || len(subdomain) > 63 {
-		return util.UserError{
-			Message: "Subdomain must be between 1 and 63 characters long",
-		}
+		return util.CreateCustomError(
+			"Subdomain must be between 1 and 63 characters long",
+			http.StatusBadRequest,
+		)
 	}
 	for _, r := range subdomain {
 		if unicode.IsSpace(r) {
-			return util.UserError{
-				Message: "Subdomain cannot contain spaces.",
-			}
+			return util.CreateCustomError(
+				"Subdomain cannot contain spaces.",
+				http.StatusBadRequest,
+			)
 		}
 	}
 	previousChar := ' ' /* start with a space to avoid consecutive check on the first character */
 	for _, r := range subdomain {
 		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-') {
-			return util.UserError{
-				Message: "Subdomain can only contain letters, numbers, and hyphens.",
-			}
+			return util.CreateCustomError(
+				"Subdomain can only contain letters, numbers, and hyphens.",
+				http.StatusBadRequest,
+			)
 		}
 		/* check for consecutive hyphens */
 		if r == '-' && previousChar == '-' {
-			return util.UserError{
-				Message: "Subdomain cannot contain consecutive hyphens.",
-			}
+			return util.CreateCustomError(
+				"Subdomain cannot contain consecutive hyphens.",
+				http.StatusBadRequest,
+			)
 		}
 		previousChar = r
 	}
 	/* check that it does not start or end with a hyphen */
 	if subdomain[0] == '-' || subdomain[len(subdomain)-1] == '-' {
-		return util.UserError{
-			Message: "Subdomain cannot start or end with a hyphen.",
-		}
+		return util.CreateCustomError(
+			"Subdomain cannot start or end with a hyphen.",
+			http.StatusBadRequest,
+		)
 	}
 	return nil
 }
@@ -120,20 +128,22 @@ func (b *BlogService) SubdomainSubmit() http.HandlerFunc {
 
 		if err := b.subdomainSubmit(w, r); err != nil {
 			log.Println("error submiting subdomain")
-			if userErr, ok := err.(util.UserError); ok {
-				log.Printf("user error: %v\n", userErr)
+			var customErr *util.CustomError
+			if errors.As(err, &customErr) {
+				log.Printf("user error: %v\n", customErr)
 				/* user error */
-				w.WriteHeader(userErr.Code)
-				response := map[string]string{"message": userErr.Message}
+				w.WriteHeader(customErr.Code)
+				response := map[string]string{"message": customErr.Error()}
+				json.NewEncoder(w).Encode(response)
+				return
+			} else {
+				log.Printf("Internal Server Error: %v\n", err)
+				/* generic error */
+				w.WriteHeader(http.StatusInternalServerError)
+				response := map[string]string{"message": "An unexpected error occurred"}
 				json.NewEncoder(w).Encode(response)
 				return
 			}
-			log.Printf("server error: %v\n", err)
-			/* generic error */
-			w.WriteHeader(http.StatusInternalServerError)
-			response := map[string]string{"message": "An unexpected error occurred"}
-			json.NewEncoder(w).Encode(response)
-			return
 		}
 		/* success */
 		w.WriteHeader(http.StatusOK)

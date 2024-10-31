@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -37,15 +38,16 @@ func (b *BlogService) CreateRepositoryBlog() http.HandlerFunc {
 		message := "Successfully created repository-based blog!"
 		url, err := b.createRepositoryBlog(w, r)
 		if err != nil {
-			userErr, ok := err.(util.UserError)
-			if !ok {
+			var customErr *util.CustomError
+			if errors.As(err, &customErr) {
+				log.Printf("Client Error: %v\n", customErr)
+				http.Error(w, customErr.Error(), http.StatusBadRequest)
+				return
+			} else {
 				log.Printf("Internal Server Error: %v\n", err)
 				http.Error(w, "", http.StatusInternalServerError)
 				return
 			}
-			log.Printf("Client Error: %v\n", userErr)
-			http.Error(w, userErr.Error(), http.StatusBadRequest)
-			return
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -79,10 +81,10 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 	var req CreateRepositoryBlogRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("could not decode body: %v", err)
-		return "", util.UserError{
-			Message: "error decoding request body",
-			Code:    http.StatusBadRequest,
-		}
+		return "", util.CreateCustomError(
+			"error decoding request body",
+			http.StatusBadRequest,
+		)
 	}
 	fmt.Printf("req: %v", req)
 
@@ -238,14 +240,16 @@ func (b *BlogService) CreateFolderBlog() http.HandlerFunc {
 		message := "Successfully created folder-based blog."
 		url, err := b.createFolderBlog(w, r)
 		if err != nil {
-			userErr, ok := err.(util.UserError)
-			if !ok {
+			var customErr *util.CustomError
+			if errors.As(err, &customErr) {
+				log.Printf("client error: %v\n", customErr)
+				message = customErr.Error()
+			} else {
 				/* internal error */
-				log.Printf("internal error: %v\n", err)
+				log.Printf("Internal Server Error: %v\n", err)
 				http.Error(w, "", http.StatusInternalServerError)
+				return
 			}
-			log.Printf("client error: %v\n", userErr)
-			message = userErr.Message
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -264,10 +268,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
 		log.Println("user not found")
-		return "", util.UserError{
-			Message: "",
-			Code:    http.StatusNotFound,
-		}
+		return "", util.CreateCustomError("", http.StatusNotFound)
 	}
 
 	req, err := parseCreateFolderBlogRequest(r)
@@ -329,37 +330,37 @@ func parseCreateFolderBlogRequest(r *http.Request) (createFolderBlogRequest, err
 	err := r.ParseMultipartForm(maxFileSize) /* 10MB limit */
 	if err != nil {
 		log.Printf("file too large: %v\n", err)
-		return createFolderBlogRequest{}, util.UserError{
-			Message: "File too large",
-			Code:    http.StatusBadRequest,
-		}
+		return createFolderBlogRequest{}, util.CreateCustomError(
+			"File too large",
+			http.StatusBadRequest,
+		)
 	}
 
 	subdomain := r.FormValue("subdomain")
 	if subdomain == "" {
 		log.Println("error reading subdomain")
-		return createFolderBlogRequest{}, util.UserError{
-			Message: "Subdomain is required",
-			Code:    http.StatusBadRequest,
-		}
+		return createFolderBlogRequest{}, util.CreateCustomError(
+			"Subdomain is required",
+			http.StatusBadRequest,
+		)
 	}
 
 	file, header, err := r.FormFile("folder")
 	if err != nil {
 		log.Printf("error reading file: %v\n", err)
-		return createFolderBlogRequest{}, util.UserError{
-			Message: "Invalid file",
-			Code:    http.StatusBadRequest,
-		}
+		return createFolderBlogRequest{}, util.CreateCustomError(
+			"Invalid file",
+			http.StatusBadRequest,
+		)
 	}
 	defer file.Close()
 
 	if !isValidFileType(header.Filename) {
 		log.Printf("invalid file extension for `%s'\n", header.Filename)
-		return createFolderBlogRequest{}, util.UserError{
-			Message: "Must upload a .zip file",
-			Code:    http.StatusBadRequest,
-		}
+		return createFolderBlogRequest{}, util.CreateCustomError(
+			"Must upload a .zip file",
+			http.StatusBadRequest,
+		)
 	}
 
 	/* create to tmp file */
@@ -378,10 +379,10 @@ func parseCreateFolderBlogRequest(r *http.Request) (createFolderBlogRequest, err
 	theme, err := validateTheme(r.FormValue("theme"))
 	if err != nil {
 		log.Printf("error reading theme")
-		return createFolderBlogRequest{}, util.UserError{
-			Message: "Invalid theme",
-			Code:    http.StatusBadRequest,
-		}
+		return createFolderBlogRequest{}, util.CreateCustomError(
+			"Invalid theme",
+			http.StatusBadRequest,
+		)
 	}
 
 	return createFolderBlogRequest{

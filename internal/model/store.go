@@ -139,10 +139,10 @@ func (s *Store) UpdateSubdomainTx(ctx context.Context, arg UpdateSubdomainTxPara
 			return fmt.Errorf("error checking if subdomain exists")
 		}
 		if exists {
-			return util.UserError{
-				Message: "subdomain already exists",
-				Code:    http.StatusBadRequest,
-			}
+			return util.CreateCustomError(
+				"subdomain already exists",
+				http.StatusBadRequest,
+			)
 		}
 
 		/* write new subdomain */

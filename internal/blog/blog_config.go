@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -293,10 +294,7 @@ func (b *BlogService) folderSubmit(w http.ResponseWriter, r *http.Request) error
 	_, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
 		log.Println("user not found")
-		return util.UserError{
-			Message: "",
-			Code:    http.StatusNotFound,
-		}
+		return util.CreateCustomError("", http.StatusNotFound)
 	}
 
 	src, err := parseFolderUpdateRequest(r)
@@ -349,28 +347,28 @@ func parseFolderUpdateRequest(r *http.Request) (string, error) {
 	err := r.ParseMultipartForm(maxFileSize) /* 10MB limit */
 	if err != nil {
 		log.Printf("file too large: %v\n", err)
-		return "", util.UserError{
-			Message: "File too large",
-			Code:    http.StatusBadRequest,
-		}
+		return "", util.CreateCustomError(
+			"File too large",
+			http.StatusBadRequest,
+		)
 	}
 
 	file, header, err := r.FormFile("folder")
 	if err != nil {
 		log.Printf("error reading file: %v\n", err)
-		return "", util.UserError{
-			Message: "Invalid file",
-			Code:    http.StatusBadRequest,
-		}
+		return "", util.CreateCustomError(
+			"Invalid file",
+			http.StatusBadRequest,
+		)
 	}
 	defer file.Close()
 
 	if !isValidFileType(header.Filename) {
 		log.Printf("invalid file extension for `%s'\n", header.Filename)
-		return "", util.UserError{
-			Message: "Must upload a .zip file",
-			Code:    http.StatusBadRequest,
-		}
+		return "", util.CreateCustomError(
+			"Must upload a .zip file",
+			http.StatusBadRequest,
+		)
 	}
 
 	/* create to tmp file */
@@ -400,23 +398,23 @@ func (b *BlogService) SetStatusSubmit() http.HandlerFunc {
 
 		change, err := b.setStatusSubmit(w, r)
 		if err != nil {
-			userErr, ok := err.(util.UserError)
-			if ok {
-				log.Printf("Client Error: %v\n", userErr)
+			var customErr *util.CustomError
+			if errors.As(err, &customErr) {
+				log.Printf("Client Error: %v\n", customErr)
 				w.WriteHeader(http.StatusBadRequest)
 				if err := json.NewEncoder(w).Encode(util.ErrorResponse{
-					Message: userErr.Error(),
+					Message: customErr.Error(),
 				}); err != nil {
 					log.Printf("Failed to encode response: %v\n", err)
 					http.Error(w, "", http.StatusInternalServerError)
 					return
 				}
+			} else {
+				log.Printf("Internal Server Error: %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				http.Error(w, "", http.StatusInternalServerError)
 				return
 			}
-			log.Printf("Internal Server Error: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -497,10 +495,10 @@ func validateStatusChange(request, current string) error {
 		)
 	}
 	if request == current {
-		return util.UserError{
-			Message: fmt.Sprintf("state is already %s", current),
-			Code:    http.StatusBadRequest,
-		}
+		return util.CreateCustomError(
+			fmt.Sprintf("state is already %s", current),
+			http.StatusBadRequest,
+		)
 	}
 	return nil
 }
