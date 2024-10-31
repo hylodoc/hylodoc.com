@@ -30,47 +30,27 @@ type BlogInfo struct {
 }
 
 func GetBlogsInfo(s *model.Store, userID int32) ([]BlogInfo, error) {
-	blogs, err := s.ListBlogsByUserID(context.TODO(), userID)
+	ids, err := s.ListBlogIDsByUserID(context.TODO(), userID)
 	if err != nil {
 		/* should not be possible to have an installation with no repositories */
-		return []BlogInfo{}, err
+		return []BlogInfo{}, fmt.Errorf("list error: %w", err)
 	}
 	var info []BlogInfo
-	for _, blog := range blogs {
-		info = append(info, buildBlogInfo(blog))
+	for _, id := range ids {
+		bi, err := getBlogInfo(s, id)
+		if err != nil {
+			return nil, fmt.Errorf("blog error: %w", err)
+		}
+		info = append(info, bi)
 	}
 	return info, nil
 }
 
-func buildBlogInfo(blog model.Blog) BlogInfo {
-	isRepository := false
-	url := ""
+func ghurl(blog model.Blog) string {
 	if blog.BlogType == model.BlogTypeRepository {
-		isRepository = true
-		url = blog.GhUrl.String
+		return blog.GhUrl.String
 	}
-	isLive := false
-	if blog.Status == model.BlogStatusLive {
-		isLive = true
-	}
-	return BlogInfo{
-		ID:                   blog.ID,
-		Domain:               buildDomain(blog.Subdomain),
-		Subdomain:            blog.Subdomain,
-		DomainUrl:            buildDomainUrl(blog.Subdomain),
-		RepositoryUrl:        url,
-		SubscriberMetricsUrl: buildSubscriberMetricsUrl(blog.ID),
-		MetricsUrl:           buildMetricsUrl(blog.ID),
-		ConfigUrl:            buildConfigUrl(blog.ID),
-		TestBranch:           blog.TestBranch.String,
-		LiveBranch:           blog.LiveBranch.String,
-		Theme:                string(blog.Theme),
-		Type:                 string(blog.BlogType),
-		Status:               string(blog.Status),
-		UpdatedAt:            blog.UpdatedAt,
-		IsRepository:         isRepository,
-		IsLive:               isLive,
-	}
+	return ""
 }
 
 func buildDomain(subdomain string) string {
@@ -114,7 +94,27 @@ func buildConfigUrl(blogID int32) string {
 func getBlogInfo(s *model.Store, blogID int32) (BlogInfo, error) {
 	blog, err := s.GetBlogByID(context.TODO(), blogID)
 	if err != nil {
-		return BlogInfo{}, err
+		return BlogInfo{}, fmt.Errorf("query error: %w", err)
 	}
-	return buildBlogInfo(blog), err
+	isLive, err := s.GetBlogIsLive(context.TODO(), blogID)
+	if err != nil {
+		return BlogInfo{}, fmt.Errorf("islive error: %w", err)
+	}
+	return BlogInfo{
+		ID:                   blog.ID,
+		Domain:               buildDomain(blog.Subdomain),
+		Subdomain:            blog.Subdomain,
+		DomainUrl:            buildDomainUrl(blog.Subdomain),
+		RepositoryUrl:        ghurl(blog),
+		SubscriberMetricsUrl: buildSubscriberMetricsUrl(blog.ID),
+		MetricsUrl:           buildMetricsUrl(blog.ID),
+		ConfigUrl:            buildConfigUrl(blog.ID),
+		TestBranch:           blog.TestBranch.String,
+		LiveBranch:           blog.LiveBranch.String,
+		Theme:                string(blog.Theme),
+		Type:                 string(blog.BlogType),
+		UpdatedAt:            blog.UpdatedAt,
+		IsRepository:         blog.BlogType == model.BlogTypeRepository,
+		IsLive:               isLive,
+	}, nil
 }

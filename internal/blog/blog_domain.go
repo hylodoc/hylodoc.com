@@ -175,7 +175,10 @@ func (b *BlogService) subdomainSubmit(w http.ResponseWriter, r *http.Request) er
 
 	/* take current blog offline */
 	if _, err := setBlogToOffline(blog, b.store); err != nil {
-		return fmt.Errorf("error taking subdomain `%s' offline: %w", blog.Subdomain, err)
+		return fmt.Errorf(
+			"error taking subdomain `%s' offline: %w",
+			blog.Subdomain, err,
+		)
 	}
 
 	if err = b.store.UpdateSubdomainTx(context.TODO(), model.UpdateSubdomainTxParams{
@@ -186,8 +189,11 @@ func (b *BlogService) subdomainSubmit(w http.ResponseWriter, r *http.Request) er
 	}
 
 	/* bring blog online */
-	if _, err := SetBlogToLive(blog, b.store); err != nil {
-		return fmt.Errorf("error bringing subdomain `%s' online: %w", blog.Subdomain, err)
+	if _, err := SetBlogToLive(&blog, b.store); err != nil {
+		return fmt.Errorf(
+			"error bringing subdomain `%s' online: %w",
+			blog.Subdomain, err,
+		)
 	}
 
 	return nil

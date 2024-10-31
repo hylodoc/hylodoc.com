@@ -17,6 +17,8 @@ services:
 
   prometheus:
     image: prom/prometheus
+    logging:
+      driver: none
     volumes:
       - './prometheus.yml:/etc/prometheus/prometheus.yml'
     ports:
@@ -26,6 +28,8 @@ services:
 
   grafana:
     image: grafana/grafana
+    logging:
+      driver: none
     ports:
       - "3000:3000"
     networks:
@@ -37,7 +41,7 @@ services:
     image: postgres:12-alpine
     container_name: postgres_container
     ports:
-      - '5432:5432'
+      - '65432:5432'
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secret

@@ -149,8 +149,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 	}
 
 	/* take blog live  */
-	_, err = SetBlogToLive(blog, b.store)
-	if err != nil {
+	if _, err := SetBlogToLive(&blog, b.store); err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
 	return buildDomainUrl(blog.Subdomain), nil
@@ -312,8 +311,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	}
 
 	/* take blog live  */
-	_, err = SetBlogToLive(blog, b.store)
-	if err != nil {
+	if _, err := SetBlogToLive(&blog, b.store); err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
 	return buildDomainUrl(blog.Subdomain), nil

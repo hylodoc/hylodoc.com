@@ -25,7 +25,7 @@ func (uwm *SubdomainMiddleware) RouteToSubdomains(next http.Handler) http.Handle
 		log.Println("received request for: ", r.URL)
 		filepath, err := getblogfilepath(r, uwm.store)
 		if err != nil {
-			log.Println("cannot get blog filepath", err)
+			log.Println("no subdomain found: ", err)
 			next.ServeHTTP(w, r)
 			return
 		}

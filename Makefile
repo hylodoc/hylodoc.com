@@ -1,15 +1,14 @@
 .PHONY: $(PROGSTACK) $(REPOSITORIES) $(DB) $(BIN) 
 
-DOCKER=$(SUDO) docker
-
+DOCKER = $(SUDO) docker
 GO = go
 BIN = ${CURDIR}/bin
 SOURCES := $(shell find $(CURDIR) -name '*.go')
 PROGSTACK = $(BIN)/progstack
 
-$(PROGSTACK): $(BIN) $(SOURCES) db test
-	@printf 'GO\t$@\n'
-	@$(GO) build -o $@
+$(PROGSTACK): $(BIN) $(SOURCES) db get build.sh
+	@printf 'BUILD\t$@\n'
+	@./build.sh $@
 
 get: go.mod go.sum
 	@printf 'GO\tmod tidy\n'
@@ -28,7 +27,7 @@ db: $(DBDIR)/sqlc.yaml $(dbfiles)
 	@printf 'SQLC\t$<\n'
 	@sqlc generate -f $<
 
-up: $(PROGSTACK)
+up: $(PROGSTACK) test
 	@echo 'launching docker containers...'
 	$(DOCKER) compose up --build
 

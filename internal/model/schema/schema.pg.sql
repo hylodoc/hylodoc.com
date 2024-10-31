@@ -109,7 +109,6 @@ CREATE TABLE repositories (
 		ON DELETE CASCADE -- delete repositories when installation deleted
 );
 
-CREATE TYPE blog_status AS ENUM ('live', 'offline');
 CREATE TYPE blog_type AS ENUM ('repository', 'folder');
 CREATE TYPE blog_theme AS ENUM ('lit', 'latex');
 
@@ -125,7 +124,6 @@ CREATE TABLE blogs (
 	subdomain		VARCHAR(255)	NOT NULL	UNIQUE,
 	from_address		VARCHAR(255)	NOT NULL,
 	blog_type		blog_type	NOT NULL,
-	status			blog_status	NOT NULL			DEFAULT('offline'),
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 
@@ -154,9 +152,11 @@ CREATE TABLE blogs (
 CREATE TABLE generations (
 	id		SERIAL		PRIMARY KEY,
 	blog		INTEGER		NOT NULL	REFERENCES blogs,
-	created_at	TIMESTAMPTZ	NOT NULL	DEFAULT(now())
+	created_at	TIMESTAMPTZ	NOT NULL	DEFAULT(now()),
+	active		BOOLEAN		NOT NULL	DEFAULT(true)
 );
 CREATE INDEX ON generations(blog);
+CREATE UNIQUE INDEX ON generations(blog) WHERE active = true;
 CREATE INDEX ON generations(created_at);
 
 CREATE TABLE bindings (
@@ -166,6 +166,20 @@ CREATE TABLE bindings (
 
 	PRIMARY KEY (gen, url)
 );
+
+CREATE TABLE _r_posts (
+	url	VARCHAR(1000)	NOT NULL,
+	blog	INTEGER		NOT NULL	REFERENCES blogs,
+
+	PRIMARY KEY (url, blog)
+);
+CREATE VIEW posts AS
+	SELECT p.url, p.blog, (bind.url IS NOT NULL) is_active
+	FROM _r_posts p
+	INNER JOIN generations g ON g.blog = p.blog
+	LEFT JOIN bindings bind ON (bind.gen = g.id AND bind.url = p.url)
+	WHERE g.active = true;
+
 
 -- blog subscriber lists
 

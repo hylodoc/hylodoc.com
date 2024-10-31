@@ -101,46 +101,73 @@ func ConvertCentsToDollars(cents int64) string {
 
 /* Launch Blog */
 
-type LaunchUserBlogParams struct {
-	ID             int32
-	RepositoryPath string
-	Subdomain      string
-	Theme          string
-}
-
-func launchUserBlog(s *model.Store, params LaunchUserBlogParams) error {
-	if _, err := os.Stat(params.RepositoryPath); err != nil {
+func launchUserBlog(s *model.Store, b *model.Blog) error {
+	if _, err := os.Stat(b.RepositoryPath); err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("repository at `%s' does not exist on disk: %w", params.RepositoryPath, err)
+			return fmt.Errorf(
+				"repository at `%s' does not exist on disk: %w",
+				b.RepositoryPath, err,
+			)
 		}
 		return err
 	}
 	bindings, err := ssg.GenerateSiteWithBindings(
-		params.RepositoryPath,
+		b.RepositoryPath,
 		filepath.Join(
 			config.Config.Progstack.WebsitesPath,
-			params.Subdomain,
+			b.Subdomain,
 		),
-		config.Config.ProgstackSsg.Themes[params.Theme].Path,
+		config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
 		"algol_nu",
 	)
 	if err != nil {
 		return fmt.Errorf("error generating site: %w", err)
 	}
-	gen, err := s.InsertGeneration(context.TODO(), params.ID)
+	gen, err := s.InsertGeneration(context.TODO(), b.ID)
 	if err != nil {
 		return fmt.Errorf("error inserting generation: %w", err)
 	}
 	for url, file := range bindings {
-		if err := s.InsertBinding(context.TODO(),
+		if err := s.InsertBinding(
+			context.TODO(),
 			model.InsertBindingParams{
 				Gen:  gen,
 				Url:  url,
-				File: file,
+				File: file.Path(),
 			},
 		); err != nil {
 			return fmt.Errorf("error inserting binding: %w", err)
 		}
+		if file.IsPost() {
+			if err := ensurePostExists(s, url, b.ID); err != nil {
+				return fmt.Errorf(
+					"error ensuring post exists: %w", err,
+				)
+			}
+		}
+	}
+	return nil
+}
+
+func ensurePostExists(s *model.Store, url string, blogid int32) error {
+	_, err := s.GetPostExists(
+		context.TODO(),
+		model.GetPostExistsParams{
+			Url:  url,
+			Blog: blogid,
+		},
+	)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("error checking if post exists: %w", err)
+		}
+		return s.InsertRPost(
+			context.TODO(),
+			model.InsertRPostParams{
+				Url:  url,
+				Blog: blogid,
+			},
+		)
 	}
 	return nil
 }
@@ -343,7 +370,7 @@ func (b *BlogService) folderSubmit(w http.ResponseWriter, r *http.Request) error
 	}
 
 	/* take blog live  */
-	_, err = SetBlogToLive(blog, b.store)
+	_, err = SetBlogToLive(&blog, b.store)
 	if err != nil {
 		return fmt.Errorf("error setting blog to live: %w", err)
 	}
@@ -417,7 +444,7 @@ func (b *BlogService) SetStatusSubmit() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		change, err := b.setStatusSubmit(w, r)
+		change, err := b.setStatusSubmit(r)
 		if err != nil {
 			var customErr *util.CustomError
 			if errors.As(err, &customErr) {
@@ -456,28 +483,32 @@ func (b *BlogService) SetStatusSubmit() http.HandlerFunc {
 }
 
 type SetStatusRequest struct {
-	Status string `json:"status"`
+	IsLive bool `json:"is_live"`
 }
 
-func (b *BlogService) setStatusSubmit(w http.ResponseWriter, r *http.Request) (statusChangeResponse, error) {
+func (b *BlogService) setStatusSubmit(
+	r *http.Request,
+) (*statusChangeResponse, error) {
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
-		return statusChangeResponse{}, fmt.Errorf("no user found")
+		return nil, fmt.Errorf("no user found")
 	}
 	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
-		return statusChangeResponse{}, err
+		return nil, fmt.Errorf("cannot parse blog id: %w", err)
 	}
 
 	var req SetStatusRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return statusChangeResponse{}, fmt.Errorf("error decoding body: %w", err)
+		return nil, fmt.Errorf("error decoding body: %w", err)
 	}
 
-	change, err := handleStatusChange(int32(intBlogID), req.Status, sesh.GetEmail(), b.store)
+	change, err := handleStatusChange(
+		int32(intBlogID), req.IsLive, sesh.GetEmail(), b.store,
+	)
 	if err != nil {
-		return statusChangeResponse{}, err
+		return nil, fmt.Errorf("error handling status change: %w", err)
 	}
 	return change, nil
 }
@@ -487,84 +518,63 @@ type statusChangeResponse struct {
 	IsLive bool
 }
 
-func handleStatusChange(blogID int32, status, email string, s *model.Store) (statusChangeResponse, error) {
+func handleStatusChange(
+	blogID int32, islive bool, email string, s *model.Store,
+) (*statusChangeResponse, error) {
 	blog, err := s.GetBlogByID(context.TODO(), blogID)
 	if err != nil {
-		return statusChangeResponse{}, fmt.Errorf("error getting blog `%d': %w", blogID, err)
+		return nil, fmt.Errorf("error getting blog `%d': %w", blogID, err)
 	}
-
-	if err := validateStatusChange(status, string(blog.Status)); err != nil {
-		return statusChangeResponse{}, err
+	if err := validateStatusChange(blogID, islive, s); err != nil {
+		return nil, fmt.Errorf("invalid status change: %w", err)
 	}
-
-	switch status {
-	case "live":
-		return SetBlogToLive(blog, s)
-	case "offline":
+	if islive {
+		return SetBlogToLive(&blog, s)
+	} else {
 		return setBlogToOffline(blog, s)
-	default:
-		return statusChangeResponse{}, fmt.Errorf("invalid status: %s", status)
 	}
 }
 
-func validateStatusChange(request, current string) error {
-	if request != string(model.BlogStatusLive) && request != string(model.BlogStatusOffline) {
-		return fmt.Errorf(
-			"request needs to either be `%s' or `%s'",
-			model.BlogStatusLive,
-			model.BlogStatusOffline,
-		)
+func validateStatusChange(blogID int32, islive bool, s *model.Store) error {
+	blogIsLive, err := s.GetBlogIsLive(context.TODO(), blogID)
+	if err != nil {
+		return fmt.Errorf("islive error: %w", err)
 	}
-	if request == current {
+	if islive == blogIsLive {
 		return util.CreateCustomError(
-			fmt.Sprintf("state is already %s", current),
+			fmt.Sprintf("cannot update to same state"),
 			http.StatusBadRequest,
 		)
 	}
 	return nil
 }
 
-func SetBlogToLive(blog model.Blog, s *model.Store) (statusChangeResponse, error) {
-	fmt.Printf("repo disk path: %s\n", blog.RepositoryPath)
-
-	if err := launchUserBlog(s, LaunchUserBlogParams{
-		ID:             blog.ID,
-		RepositoryPath: blog.RepositoryPath,
-		Subdomain:      blog.Subdomain,
-		Theme:          string(blog.Theme),
-	}); err != nil {
-		return statusChangeResponse{}, fmt.Errorf("error launching blog `%d': %w", blog.ID, err)
+func SetBlogToLive(b *model.Blog, s *model.Store) (*statusChangeResponse, error) {
+	log.Printf("repo disk path: %s\n", b.RepositoryPath)
+	if err := launchUserBlog(s, b); err != nil {
+		return nil, fmt.Errorf("error launching blog `%d': %w", b.ID, err)
 	}
-
-	/* update status to live */
-	if err := s.SetBlogStatusByID(context.TODO(), model.SetBlogStatusByIDParams{
-		ID:     blog.ID,
-		Status: model.BlogStatusLive,
-	}); err != nil {
-		return statusChangeResponse{}, fmt.Errorf("error setting status to %s: %w", model.BlogStatusLive, err)
-	}
-	return statusChangeResponse{
-		Domain: blog.Subdomain,
+	return &statusChangeResponse{
+		Domain: b.Subdomain,
 		IsLive: true,
 	}, nil
 }
 
-func setBlogToOffline(blog model.Blog, s *model.Store) (statusChangeResponse, error) {
+func setBlogToOffline(blog model.Blog, s *model.Store) (*statusChangeResponse, error) {
 	site := filepath.Join(
 		config.Config.Progstack.WebsitesPath,
 		blog.Subdomain,
 	)
 	if err := os.RemoveAll(site); err != nil {
-		return statusChangeResponse{}, fmt.Errorf("error deleting website `%s' from disk: %w", blog.Subdomain, err)
+		return nil, fmt.Errorf(
+			"error deleting website `%s' from disk: %w",
+			blog.Subdomain, err,
+		)
 	}
-	err := s.SetBlogStatusByID(context.TODO(), model.SetBlogStatusByIDParams{
-		ID:     blog.ID,
-		Status: model.BlogStatusOffline,
-	})
-	if err != nil {
-		return statusChangeResponse{}, fmt.Errorf("error setting status to `%s': %w", model.BlogStatusOffline, err)
+	if err := s.DeactivateGenerations(context.TODO(), blog.ID); err != nil {
+		return nil, fmt.Errorf("deactivate error: %w", err)
 	}
-	return statusChangeResponse{
+	return &statusChangeResponse{
 		Domain: blog.Subdomain,
 		IsLive: false,
 	}, nil

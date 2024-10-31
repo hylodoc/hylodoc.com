@@ -12,22 +12,21 @@ import (
 )
 
 func UserBytes(s *model.Store, userID int32) (int64, error) {
-	blogs, err := s.ListBlogsByUserID(context.TODO(), userID)
+	paths, err := s.ListBlogRepoPathsByUserID(context.TODO(), userID)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return 0, err
 		}
 		return 0, nil
 	}
-
 	/* loop over repos */
 	var totalBytes int64
-	for _, blog := range blogs {
-		bytes, err := dirBytes(blog.RepositoryPath)
+	for _, path := range paths {
+		bytes, err := dirBytes(path)
 		if err != nil {
-			return 0, fmt.Errorf("error calculating usage for user `%d' blogID `%d'\n", userID, blog.ID)
+			return 0, fmt.Errorf("error calculating usage for user `%d' path `%s': %w", userID, path, err)
 		}
-		log.Printf("blogID `%d' used `%d' bytes\n", blog.ID, bytes)
+		log.Printf("path `%s' used `%d' bytes\n", path, bytes)
 		totalBytes += bytes
 	}
 	log.Printf("user `%d' total usage is `%d' bytes\n", totalBytes, userID)

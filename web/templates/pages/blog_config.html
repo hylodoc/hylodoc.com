@@ -395,14 +395,14 @@
 
 		const blogStatus = document.querySelector('input[name="status"]:checked');
 		console.log(blogStatus.value);
-		submitStatus(blogStatus.value);
+		submitStatus(blogStatus.value == "live");
 	}
 
-	function submitStatus(status) {
+	function submitStatus(is_live) {
 		fetch("set-status", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ status })
+			body: JSON.stringify({ is_live: is_live })
 		})
 		.then(response => response.json().then(data => {
 			/* check for http errors */

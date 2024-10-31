@@ -371,8 +371,7 @@ func handlePush(c *httpclient.Client, resendClient *resend.Client, s *model.Stor
 	}
 
 	/* take blog live  */
-	_, err = blog.SetBlogToLive(b, s)
-	if err != nil {
+	if _, err = blog.SetBlogToLive(&b, s); err != nil {
 		return fmt.Errorf("error setting blog to live: %w", err)
 	}
 	return nil

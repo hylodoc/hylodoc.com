@@ -45,10 +45,22 @@ SELECT *
 FROM blogs
 WHERE gh_repository_id = $1 AND blog_type = 'repository';
 
--- name: ListBlogsByUserID :many
-SELECT *
+-- name: ListBlogIDsByUserID :many
+SELECT id
 FROM blogs b
 WHERE user_id = $1;
+
+-- name: ListBlogRepoPathsByUserID :many
+SELECT repository_path
+FROM blogs b
+WHERE user_id = $1;
+
+-- name: GetBlogIsLive :one
+SELECT EXISTS (
+	SELECT 1
+	FROM generations
+	WHERE blog = $1 AND active = true
+);
 
 -- name: ListBlogsForInstallationByGhInstallationID :many
 SELECT *
@@ -73,12 +85,6 @@ WHERE id = $2;
 UPDATE blogs
 SET
 	live_branch = $1
-WHERE id = $2;
-
--- name: SetBlogStatusByID :exec
-UPDATE blogs
-SET
-	status = $1
 WHERE id = $2;
 
 -- name: DeleteBlogWithGhRepositoryID :exec
