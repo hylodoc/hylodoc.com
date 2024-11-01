@@ -99,6 +99,7 @@ func Serve() {
 	authR.HandleFunc("/subdomain-check", blogService.SubdomainCheck())
 	authR.HandleFunc("/create-new-blog", userService.CreateNewBlog())
 	authR.HandleFunc("/repository-flow", userService.RepositoryFlow())
+	authR.HandleFunc("/github-installation", userService.GithubInstallation())
 	authR.HandleFunc("/folder-flow", userService.FolderFlow())
 	authR.HandleFunc("/create-repository-blog", blogService.CreateRepositoryBlog())
 	authR.HandleFunc("/create-folder-blog", blogService.CreateFolderBlog())

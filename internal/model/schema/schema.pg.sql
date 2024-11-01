@@ -27,6 +27,7 @@ CREATE TABLE users (
 	id			SERIAL				PRIMARY KEY,
 	username		VARCHAR(255)	NOT NULL	UNIQUE,
 	email			VARCHAR(255)	NOT NULL	UNIQUE,		-- Login email
+	gh_awaiting_update	BOOLEAN		NOT NULL			DEFAULT(false),
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now())
 );
