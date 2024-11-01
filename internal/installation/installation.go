@@ -96,27 +96,53 @@ func handleInstallation(c *httpclient.Client, s *model.Store, body []byte) error
 	str, _ := eventToJSON(event)
 	log.Printf("installation event: %s\n", str)
 
-	/* XXX: is this safe given that we validated the request with the
-	* webhook? */
-	ghUserID := event.Sender.ID
-	user, err := s.GetUserByGhUserID(context.TODO(), ghUserID)
-	if err != nil {
-		if err != sql.ErrNoRows {
-			return fmt.Errorf("error getting user with ghUserID `%d' (in event) from db: %w", ghUserID, err)
-		}
+	if err := handleInstallationAction(c, s, event); err != nil {
+		return fmt.Errorf("error handling installation action: %w", err)
 	}
 
-	ghInstallationID := event.Installation.ID
-	switch event.Action {
-	case "created":
-		return handleInstallationCreated(c, s, ghInstallationID, user.ID, user.GhEmail)
-	case "deleted":
-		return handleInstallationDeleted(c, s, ghInstallationID, user.ID)
-	default:
-		log.Printf("unhandled event action: %s\n", event.Action)
+	user, err := s.GetUserByGhUserID(context.TODO(), event.Sender.ID)
+	if err != nil {
+		return fmt.Errorf(
+			"error getting user with ghUserID `%d': %w",
+			event.Sender.ID, err,
+		)
+	}
+	if err := s.UpdateAwaitingGithubUpdate(
+		context.TODO(),
+		model.UpdateAwaitingGithubUpdateParams{
+			ID:               user.ID,
+			GhAwaitingUpdate: false,
+		},
+	); err != nil {
+		return fmt.Errorf("error updating awaitingGithubUpdate: %w", err)
 	}
 
 	return nil
+}
+
+func handleInstallationAction(
+	c *httpclient.Client, s *model.Store, event InstallationEvent,
+) error {
+	user, err := s.GetUserByGhUserID(context.TODO(), event.Sender.ID)
+	if err != nil {
+		return fmt.Errorf(
+			"error getting user with ghUserID `%d': %w",
+			event.Sender.ID, err,
+		)
+	}
+	switch event.Action {
+	case "created":
+		return handleInstallationCreated(
+			c, s, event.Installation.ID, user.ID, user.GhEmail,
+		)
+	case "deleted":
+		return handleInstallationDeleted(
+			c, s, event.Installation.ID, user.ID,
+		)
+	default:
+		log.Printf("unhandled event action: %s\n", event.Action)
+		return nil
+	}
 }
 
 func handleInstallationCreated(c *httpclient.Client, s *model.Store, ghInstallationID int64, userID int32, ghEmail string) error {
@@ -247,31 +273,75 @@ func handleInstallationRepositories(c *httpclient.Client, s *model.Store, body [
 	str, _ := eventToJSON(event)
 	log.Printf("installationRepositoriesEvent: %s\n", str)
 
-	ghUserID := event.Sender.ID
-	user, err := s.GetUserByGhUserID(context.TODO(), ghUserID)
-	if err != nil {
-		if err != sql.ErrNoRows {
-			return fmt.Errorf("error getting user with ghUserID `%d' (in event) from db: %w", ghUserID, err)
-		}
-	}
-	ghInstallationID := event.Installation.ID
-
 	/* check that installation exists */
-	_, err = s.GetInstallationByGithubInstallationID(context.TODO(), ghInstallationID)
+	_, err := s.GetInstallationByGithubInstallationID(
+		context.TODO(), event.Installation.ID,
+	)
 	if err != nil {
-		return fmt.Errorf("error getting installation with ghInstallationID: %w", err)
+		return fmt.Errorf(
+			"error getting installation with ghInstallationID: %w",
+			err,
+		)
 	}
 
-	switch event.Action {
-	case "added":
-		return handleInstallationRepositoriesAdded(c, s, ghInstallationID, event.RepositoriesAdded, user.ID, user.GhEmail)
-	case "removed":
-		return handleInstallationRepositoriesRemoved(c, s, ghInstallationID, event.RepositoriesRemoved)
-	default:
-		log.Printf("unhandled event action: %s\n", event.Action)
+	if err := handleInstallationRepositoriesAction(c, s, event); err != nil {
+		return fmt.Errorf(
+			"error handling installation repositories action: %w",
+			err,
+		)
+	}
+
+	user, err := s.GetUserByGhUserID(context.TODO(), event.Sender.ID)
+	if err != nil {
+		return fmt.Errorf(
+			"error getting user with ghUserID `%d': %w",
+			event.Sender.ID, err,
+		)
+	}
+	if err := s.UpdateAwaitingGithubUpdate(
+		context.TODO(),
+		model.UpdateAwaitingGithubUpdateParams{
+			ID:               user.ID,
+			GhAwaitingUpdate: false,
+		},
+	); err != nil {
+		return fmt.Errorf("error updating awaitingGithubUpdate: %w", err)
 	}
 
 	return nil
+}
+
+func handleInstallationRepositoriesAction(
+	c *httpclient.Client, s *model.Store, event InstallationRepositoriesEvent,
+) error {
+	user, err := s.GetUserByGhUserID(context.TODO(), event.Sender.ID)
+	if err != nil {
+		return fmt.Errorf(
+			"error getting user with ghUserID `%d': %w",
+			event.Sender.ID, err,
+		)
+	}
+	switch event.Action {
+	case "added":
+		return handleInstallationRepositoriesAdded(
+			c,
+			s,
+			event.Installation.ID,
+			event.RepositoriesAdded,
+			user.ID,
+			user.GhEmail,
+		)
+	case "removed":
+		return handleInstallationRepositoriesRemoved(
+			c,
+			s,
+			event.Installation.ID,
+			event.RepositoriesRemoved,
+		)
+	default:
+		log.Printf("unhandled event action: %s\n", event.Action)
+		return nil
+	}
 }
 
 func handleInstallationRepositoriesAdded(c *httpclient.Client, s *model.Store, ghInstallationID int64, repos []Repository, userID int32, email string) error {

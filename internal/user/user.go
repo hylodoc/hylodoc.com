@@ -3,10 +3,12 @@ package user
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
@@ -132,6 +134,95 @@ func (u *UserService) FolderFlow() http.HandlerFunc {
 	}
 }
 
+func (u *UserService) GithubInstallation() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := u.githubInstallation(w, r); err != nil {
+			var customErr *util.CustomError
+			if errors.As(err, &customErr) {
+				http.Error(
+					w, customErr.Error(), customErr.Code,
+				)
+			} else {
+				http.Error(
+					w,
+					"Internal Server Error",
+					http.StatusInternalServerError,
+				)
+			}
+			return
+		}
+	}
+}
+
+func (u *UserService) githubInstallation(w http.ResponseWriter, r *http.Request) error {
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	if !ok {
+		return util.CreateCustomError(
+			"user not found",
+			http.StatusNotFound,
+		)
+	}
+
+	if err := u.store.UpdateAwaitingGithubUpdate(
+		context.TODO(),
+		model.UpdateAwaitingGithubUpdateParams{
+			ID:               sesh.GetUserID(),
+			GhAwaitingUpdate: true,
+		},
+	); err != nil {
+		return fmt.Errorf("error updating awaiting: %w", err)
+	}
+
+	http.Redirect(
+		w,
+		r,
+		fmt.Sprintf(
+			installation.GhInstallUrlTemplate,
+			config.Config.Github.AppName,
+		),
+		http.StatusTemporaryRedirect,
+	)
+	return nil
+}
+
+func (u *UserService) awaitupdate(r *http.Request) error {
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	if !ok {
+		return util.CreateCustomError(
+			"user not found",
+			http.StatusNotFound,
+		)
+	}
+	id := sesh.GetUserID()
+
+	/* TODO: get from config */
+	var (
+		timeout = 5 * time.Second
+		step    = 100 * time.Millisecond
+	)
+	for until := time.Now().Add(timeout); time.Now().Before(until); time.Sleep(step) {
+		awaiting, err := u.store.IsAwaitingGithubUpdate(
+			context.TODO(), id,
+		)
+		if err != nil {
+			return fmt.Errorf("error checking if awaiting: %w", err)
+		}
+		if !awaiting {
+			return nil
+		}
+	}
+	if err := u.store.UpdateAwaitingGithubUpdate(
+		context.TODO(),
+		model.UpdateAwaitingGithubUpdateParams{
+			ID:               id,
+			GhAwaitingUpdate: false,
+		},
+	); err != nil {
+		return fmt.Errorf("error updating awaitingGithubUpdate: %w", err)
+	}
+	return fmt.Errorf("timeout")
+}
+
 type Repository struct {
 	Value int64
 	Name  string
@@ -139,59 +230,75 @@ type Repository struct {
 
 func (u *UserService) RepositoryFlow() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("create new blog handler...")
-
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			log.Println("no user found")
-			http.Error(w, "user not found", http.StatusNotFound)
-			return
-		}
-
-		repos, err := u.store.ListOrderedRepositoriesByUserID(context.TODO(), sesh.GetUserID())
-		if err != nil {
-			if err != sql.ErrNoRows {
-				log.Printf("error getting repositories: %v", err)
-				http.Error(w, "", http.StatusInternalServerError)
-				return
+		if err := u.repositoryFlow(w, r); err != nil {
+			var customErr *util.CustomError
+			if errors.As(err, &customErr) {
+				http.Error(
+					w, customErr.Error(), customErr.Code,
+				)
+			} else {
+				http.Error(
+					w,
+					"Internal Server Error",
+					http.StatusInternalServerError,
+				)
 			}
-		}
-
-		details, err := getAccountDetails(u.store, sesh)
-		if err != nil {
-			log.Printf("error getting acount details: %v", err)
-			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
-
-		githubInstallAppUrl := fmt.Sprintf(installation.GhInstallUrlTemplate, config.Config.Github.AppName)
-		util.ExecTemplate(w, []string{"blog_repository_flow.html"},
-			util.PageInfo{
-				Data: struct {
-					Title               string
-					UserInfo            *session.UserInfo
-					AccountDetails      AccountDetails
-					GithubInstallAppUrl string
-					ServiceName         string
-					Repositories        []Repository
-					Themes              []string
-				}{
-					Title:               "Repository Flow",
-					UserInfo:            session.ConvertSessionToUserInfo(sesh),
-					AccountDetails:      details,
-					GithubInstallAppUrl: githubInstallAppUrl,
-					ServiceName:         config.Config.Progstack.ServiceName,
-					Repositories:        buildRepositoriesInfo(repos),
-					Themes:              blog.BuildThemes(config.Config.ProgstackSsg.Themes),
-				},
-			},
-			template.FuncMap{},
-		)
 	}
 }
 
+func (u *UserService) repositoryFlow(w http.ResponseWriter, r *http.Request) error {
+	if err := u.awaitupdate(r); err != nil {
+		return fmt.Errorf("error awaiting update: %w", err)
+	}
+
+	log.Println("create new blog handler...")
+
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	if !ok {
+		return util.CreateCustomError(
+			"user not found", http.StatusNotFound,
+		)
+	}
+
+	repos, err := u.store.ListOrderedRepositoriesByUserID(
+		context.TODO(), sesh.GetUserID(),
+	)
+	if err != nil {
+		return fmt.Errorf("error getting repositories: %w", err)
+	}
+
+	details, err := getAccountDetails(u.store, sesh)
+	if err != nil {
+		return fmt.Errorf("error getting acount details: %w", err)
+	}
+
+	util.ExecTemplate(w, []string{"blog_repository_flow.html"},
+		util.PageInfo{
+			Data: struct {
+				Title          string
+				UserInfo       *session.UserInfo
+				AccountDetails AccountDetails
+				ServiceName    string
+				Repositories   []Repository
+				Themes         []string
+			}{
+				Title:          "Repository Flow",
+				UserInfo:       session.ConvertSessionToUserInfo(sesh),
+				AccountDetails: details,
+				ServiceName:    config.Config.Progstack.ServiceName,
+				Repositories:   buildRepositoriesInfo(repos),
+				Themes:         blog.BuildThemes(config.Config.ProgstackSsg.Themes),
+			},
+		},
+		template.FuncMap{},
+	)
+	return nil
+}
+
 func buildRepositoriesInfo(repos []model.Repository) []Repository {
-	res := make([]Repository, len(repos))
+	var res []Repository
 	for _, repo := range repos {
 		res = append(res, Repository{
 			Value: repo.RepositoryID,

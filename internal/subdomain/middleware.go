@@ -23,15 +23,22 @@ func (uwm *SubdomainMiddleware) RouteToSubdomains(next http.Handler) http.Handle
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("running subdomain middleware...")
 		log.Println("received request for: ", r.URL)
-		filepath, err := getblogfilepath(r, uwm.store)
-		if err != nil {
+		if err := rendersubdomainpath(w, r, uwm.store); err != nil {
 			log.Println("no subdomain found: ", err)
 			next.ServeHTTP(w, r)
 			return
 		}
-		log.Println("filepath", filepath)
-		http.ServeFile(w, r, filepath)
 	})
+}
+
+func rendersubdomainpath(w http.ResponseWriter, r *http.Request, s *model.Store) error {
+	filepath, err := getblogfilepath(r, s)
+	if err != nil {
+		return fmt.Errorf("cannot get filepath: %w", err)
+	}
+	log.Println("filepath", filepath)
+	http.ServeFile(w, r, filepath)
+	return nil
 }
 
 func getblogfilepath(r *http.Request, s *model.Store) (string, error) {
