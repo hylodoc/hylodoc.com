@@ -41,14 +41,6 @@ func (u *UserService) Home() http.HandlerFunc {
 			return
 		}
 
-		/* get account details */
-		details, err := getAccountDetails(u.store, sesh)
-		if err != nil {
-			log.Printf("error getting acount details: %v", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-
 		blogs, err := blog.GetBlogsInfo(u.store, sesh.GetUserID())
 		if err != nil {
 			log.Printf("error getting blogs for user `%d': %v\n", sesh.GetUserID(), err)
@@ -63,13 +55,11 @@ func (u *UserService) Home() http.HandlerFunc {
 					Title               string
 					UserInfo            *session.UserInfo
 					GithubInstallAppUrl string
-					AccountDetails      AccountDetails
 					Blogs               []blog.BlogInfo
 				}{
 					Title:               "Home",
 					UserInfo:            session.ConvertSessionToUserInfo(sesh),
 					GithubInstallAppUrl: githubInstallAppUrl,
-					AccountDetails:      details,
 					Blogs:               blogs,
 				},
 			},
@@ -233,10 +223,12 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 		if err := u.repositoryFlow(w, r); err != nil {
 			var customErr *util.CustomError
 			if errors.As(err, &customErr) {
+				log.Printf("custom error: %v", err)
 				http.Error(
 					w, customErr.Error(), customErr.Code,
 				)
 			} else {
+				log.Printf("error with repository flow: %v", err)
 				http.Error(
 					w,
 					"Internal Server Error",
@@ -319,6 +311,11 @@ type AccountDetails struct {
 	StorageLimit    string
 }
 
+type StorageDetails struct {
+	Used  string
+	Limit string
+}
+
 type Subscription struct {
 	IsSubscribed       bool
 	Plan               string
@@ -338,9 +335,16 @@ func (u *UserService) Account() http.HandlerFunc {
 			return
 		}
 
-		details, err := getAccountDetails(u.store, sesh)
+		accountDetails, err := getAccountDetails(u.store, sesh)
 		if err != nil {
-			log.Printf("error getting acount details: %v", err)
+			log.Printf("error getting account details: %v", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+
+		storageDetails, err := getStorageDetails(u.store, sesh)
+		if err != nil {
+			log.Printf("error getting account details: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -351,10 +355,12 @@ func (u *UserService) Account() http.HandlerFunc {
 					Title          string
 					UserInfo       *session.UserInfo
 					AccountDetails AccountDetails
+					StorageDetails StorageDetails
 				}{
 					Title:          "Home",
 					UserInfo:       session.ConvertSessionToUserInfo(sesh),
-					AccountDetails: details,
+					AccountDetails: accountDetails,
+					StorageDetails: storageDetails,
 				},
 			},
 			template.FuncMap{},
@@ -362,14 +368,21 @@ func (u *UserService) Account() http.HandlerFunc {
 	}
 }
 
-func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails, error) {
+func getStorageDetails(s *model.Store, session *session.Session) (StorageDetails, error) {
 	/* calculate storage */
-	userBytes, err := UserBytes(s, session.GetUserID())
+	userBytes, err := userBytes(s, session.GetUserID())
 	if err != nil {
-		return AccountDetails{}, err
+		return StorageDetails{}, err
 	}
 	userMegaBytes := float64(userBytes) / (1024 * 1024)
 
+	return StorageDetails{
+		Used:  fmt.Sprintf("%.2f", userMegaBytes),
+		Limit: "10",
+	}, nil
+}
+
+func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails, error) {
 	/* get github info */
 	accountDetails := AccountDetails{
 		Username:        session.GetUsername(),
@@ -377,8 +390,6 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 		IsLinked:        false,
 		HasInstallation: false,
 		GithubEmail:     "",
-		StorageUsed:     fmt.Sprintf("%.2f", userMegaBytes),
-		StorageLimit:    "10",
 	}
 	linked := true
 	ghAccount, err := s.GetGithubAccountByUserID(context.TODO(), session.GetUserID())
