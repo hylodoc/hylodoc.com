@@ -30,7 +30,7 @@ func TestMetricsMiddlewareSuccess(t *testing.T) {
 	})
 
 	/* wrap handler in middleware */
-	middleware := MetricsMiddleware(successHandler)
+	middleware := Middleware(successHandler)
 
 	/* test server */
 	server := httptest.NewServer(middleware)
@@ -67,7 +67,7 @@ func TestMetricsMiddlewareError(t *testing.T) {
 	})
 
 	/* wrap handler in middleware */
-	middleware := MetricsMiddleware(errorHandler)
+	middleware := Middleware(errorHandler)
 
 	/* test server */
 	server := httptest.NewServer(middleware)

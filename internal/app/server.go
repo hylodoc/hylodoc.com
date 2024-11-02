@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/resend/resend-go/v2"
+	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
@@ -41,21 +42,27 @@ func Serve() {
 	if err != nil {
 		log.Fatal("could not connect to db: %w", err)
 	}
-	client := httpclient.NewHttpClient(clientTimeout)
+	httpClient := httpclient.NewHttpClient(clientTimeout)
+	mixpanelClient := analytics.NewMixpanelClientWrapper(
+		config.Config.Mixpanel.Token,
+	)
 	store := model.NewStore(db)
 	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
 
-	/* init middleware */
-	subdomainMiddleware := subdomain.NewSubdomainMiddleware(store)
-	sessionMiddleware := session.NewSessionMiddleware(store)
-	blogMiddleware := blog.NewBlogMiddleware(store)
-	billingService := billing.NewBillingService(store)
-
 	/* init services */
-	authService := auth.NewAuthService(client, resendClient, store, &config.Config.Github)
-	userService := user.NewUserService(store)
-	installService := installation.NewInstallationService(client, resendClient, store, &config.Config)
-	blogService := blog.NewBlogService(client, store, resendClient)
+	sessionService := session.NewSessionService(store)
+	subdomainService := subdomain.NewSubdomainService(store)
+	authService := auth.NewAuthService(
+		httpClient, resendClient, store, mixpanelClient,
+	)
+	userService := user.NewUserService(store, mixpanelClient)
+	billingService := billing.NewBillingService(store, mixpanelClient)
+	installationService := installation.NewInstallationService(
+		httpClient, resendClient, store,
+	)
+	blogService := blog.NewBlogService(
+		httpClient, store, resendClient, mixpanelClient,
+	)
 
 	/* init metrics */
 	metrics.Initialize()
@@ -63,20 +70,17 @@ func Serve() {
 	/* routes */
 	r := mux.NewRouter()
 
-	/* NOTE: userWebsite middleware currently runs before main application */
-	r.Use(logging.LoggingMiddleware)
-
-	r.Use(subdomainMiddleware.RouteToSubdomains)
-
-	r.Use(metrics.MetricsMiddleware)
-
-	r.Use(sessionMiddleware.SessionMiddleware)
+	r.Use(sessionService.Middleware)
+	r.Use(logging.Middleware)
+	r.Use(subdomainService.Middleware)
+	r.Use(metrics.Middleware)
 
 	/* public routes */
-	r.HandleFunc("/", index())
 	r.Handle("/metrics", metrics.Handler())
-	r.HandleFunc("/register", register())
-	r.HandleFunc("/login", login())
+
+	r.HandleFunc("/", index(mixpanelClient))
+	r.HandleFunc("/register", authService.Register())
+	r.HandleFunc("/login", authService.Login())
 	r.HandleFunc("/gh/login", authService.GithubLogin())
 	r.HandleFunc("/gh/oauthcallback", authService.GithubOAuthCallback())
 	r.HandleFunc("/gh/linkcallback", authService.GithubLinkCallback())
@@ -84,10 +88,9 @@ func Serve() {
 	r.HandleFunc("/magic/registercallback", authService.MagicRegisterCallback())
 	r.HandleFunc("/magic/login", authService.MagicLogin())
 	r.HandleFunc("/magic/logincallback", authService.MagicLoginCallback())
-	r.HandleFunc("/gh/installcallback", installService.InstallationCallback())
+	r.HandleFunc("/gh/installcallback", installationService.InstallationCallback())
 	r.HandleFunc("/stripe/webhook", billingService.StripeWebhook())
 
-	/* XXX: should operate on subdomain since we route with that, then we can get the associated blog info */
 	r.HandleFunc("/blogs/{blogID}/subscribe", blogService.SubscribeToBlog()).Methods("POST")
 	r.HandleFunc("/blogs/{blogID}/unsubscribe", blogService.UnsubscribeFromBlog())
 
@@ -113,7 +116,7 @@ func Serve() {
 	authR.HandleFunc("/stripe/billing-portal", billingService.BillingPortal())
 
 	blogR := authR.PathPrefix("/blogs/{blogID}").Subrouter()
-	blogR.Use(blogMiddleware.AuthoriseBlog)
+	blogR.Use(blogService.Middleware)
 	blogR.HandleFunc("/config", blogService.Config())
 	blogR.HandleFunc("/set-subdomain", blogService.SubdomainSubmit())
 	blogR.HandleFunc("/set-theme", blogService.ThemeSubmit())
@@ -141,11 +144,12 @@ func Serve() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", listeningPort), r))
 }
 
-func index() http.HandlerFunc {
+func index(mixpanel *analytics.MixpanelClientWrapper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("Index handler...")
-		/* XXX: add metrics */
+
+		mixpanel.Track("Index", r)
 
 		/* get email/username from context */
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
@@ -163,66 +167,6 @@ func index() http.HandlerFunc {
 		/* get repositories for unauth session */
 
 		util.ExecTemplate(w, []string{"index.html"},
-			util.PageInfo{
-				Data: struct {
-					Title    string
-					UserInfo *session.UserInfo
-				}{
-					Title:    "Progstack - blogging for devs",
-					UserInfo: session.ConvertSessionToUserInfo(sesh),
-				},
-			},
-			template.FuncMap{},
-			logger,
-		)
-	}
-}
-
-func register() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("Register handler...")
-		/* XXX: add metrics */
-
-		/* get email/username from context */
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Printf("No Session")
-			http.Redirect(w, r, "/user/", http.StatusSeeOther)
-			return
-		}
-
-		util.ExecTemplate(w, []string{"register.html"},
-			util.PageInfo{
-				Data: struct {
-					Title    string
-					UserInfo *session.UserInfo
-				}{
-					Title:    "Progstack - blogging for devs",
-					UserInfo: session.ConvertSessionToUserInfo(sesh),
-				},
-			},
-			template.FuncMap{},
-			logger,
-		)
-	}
-}
-
-func login() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("Login handler...")
-		/* XXX: add metrics */
-
-		/* get email/username from context */
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Println("No auth session")
-			http.Redirect(w, r, "/user/", http.StatusSeeOther)
-			return
-		}
-
-		util.ExecTemplate(w, []string{"login.html"},
 			util.PageInfo{
 				Data: struct {
 					Title    string

@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 
+	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
@@ -18,20 +19,25 @@ import (
 )
 
 type BillingService struct {
-	store *model.Store
+	store    *model.Store
+	mixpanel *analytics.MixpanelClientWrapper
 }
 
-func NewBillingService(s *model.Store) *BillingService {
+func NewBillingService(
+	s *model.Store, m *analytics.MixpanelClientWrapper,
+) *BillingService {
 	return &BillingService{
-		store: s,
+		store:    s,
+		mixpanel: m,
 	}
 }
 
 func (b *BillingService) Subscriptions() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
-
 		logger.Println("Subscriptions handler...")
+
+		b.mixpanel.Track("Subscriptions", r)
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
@@ -68,8 +74,9 @@ func ConvertCentsToDollars(cents int64) string {
 func (b *BillingService) CreateCheckoutSession() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
-
 		logger.Println("CreateCheckoutSession handler...")
+
+		b.mixpanel.Track("CreateCheckoutSession", r)
 
 		url, err := b.createCheckoutSession(w, r)
 		if err != nil {
@@ -147,8 +154,9 @@ type SuccessParams struct {
 func (b *BillingService) Success() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
-
 		logger.Println("Payment success!")
+
+		b.mixpanel.Track("PaymentSuccess", r)
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
@@ -186,6 +194,8 @@ func (b *BillingService) Cancel() http.HandlerFunc {
 		logger := logging.Logger(r)
 		logger.Printf("Payment Cancel handler...")
 
+		b.mixpanel.Track("PaymentCancel", r)
+
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			logger.Println("No auth session")
@@ -213,6 +223,8 @@ func (b *BillingService) BillingPortal() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("BillingPortal handler...")
+
+		b.mixpanel.Track("BillingPortal", r)
 
 		url, err := b.billingPortal(w, r)
 		if err != nil {

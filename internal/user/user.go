@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
@@ -20,12 +21,16 @@ import (
 )
 
 type UserService struct {
-	store *model.Store
+	store    *model.Store
+	mixpanel *analytics.MixpanelClientWrapper
 }
 
-func NewUserService(s *model.Store) *UserService {
+func NewUserService(
+	s *model.Store, m *analytics.MixpanelClientWrapper,
+) *UserService {
 	return &UserService{
-		store: s,
+		store:    s,
+		mixpanel: m,
 	}
 }
 
@@ -33,7 +38,8 @@ func (u *UserService) Home() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("Home handler...")
-		/* XXX: add metrics */
+
+		u.mixpanel.Track("Home", r)
 
 		/* get session */
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
@@ -76,6 +82,8 @@ func (u *UserService) CreateNewBlog() http.HandlerFunc {
 		logger := logging.Logger(r)
 		logger.Println("CreateNewBlog handler...")
 
+		u.mixpanel.Track("CreateNewBlog", r)
+
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			logger.Println("No auth session")
@@ -102,8 +110,9 @@ func (u *UserService) CreateNewBlog() http.HandlerFunc {
 func (u *UserService) FolderFlow() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
-
 		logger.Printf("FolderFlow handler...")
+
+		u.mixpanel.Track("FolderFlow", r)
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
@@ -136,6 +145,8 @@ func (u *UserService) GithubInstallation() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Printf("GithubInstallation handler...")
+
+		u.mixpanel.Track("GithubInstallation", r)
 
 		if err := u.githubInstallation(w, r); err != nil {
 			var customErr *util.CustomError
@@ -235,6 +246,8 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("RepositoryFlow handler...")
+
+		u.mixpanel.Track("RepositoryFlow", r)
 
 		if err := u.repositoryFlow(w, r); err != nil {
 			var customErr *util.CustomError
@@ -345,6 +358,8 @@ func (u *UserService) Account() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("Account handler...")
+
+		u.mixpanel.Track("Account", r)
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
@@ -479,6 +494,8 @@ func (u *UserService) Delete() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("User Delete handler...")
+
+		u.mixpanel.Track("Delete", r)
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {

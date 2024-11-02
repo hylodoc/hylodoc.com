@@ -34,15 +34,15 @@ type InstallationService struct {
 	client       *httpclient.Client
 	resendClient *resend.Client
 	store        *model.Store
-	config       *config.Configuration
 }
 
-func NewInstallationService(c *httpclient.Client, r *resend.Client, s *model.Store, config *config.Configuration) *InstallationService {
+func NewInstallationService(
+	c *httpclient.Client, r *resend.Client, s *model.Store,
+) *InstallationService {
 	return &InstallationService{
 		client:       c,
 		resendClient: r,
 		store:        s,
-		config:       config,
 	}
 }
 
@@ -50,8 +50,6 @@ func (i *InstallationService) InstallationCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("InstallationCallback handler...")
-
-		/* XXX: metrics */
 
 		if err := i.installationCallback(w, r); err != nil {
 			logger.Printf("error in installation callback: %v\n", err)
@@ -64,7 +62,7 @@ func (i *InstallationService) InstallationCallback() http.HandlerFunc {
 
 func (i *InstallationService) installationCallback(w http.ResponseWriter, r *http.Request) error {
 	/* validate authenticity using Github webhook secret */
-	if err := validateSignature(r, i.config.Github.WebhookSecret); err != nil {
+	if err := validateSignature(r, config.Config.Github.WebhookSecret); err != nil {
 		return fmt.Errorf("error validating github signature: %w", err)
 	}
 

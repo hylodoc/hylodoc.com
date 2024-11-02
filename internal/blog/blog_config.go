@@ -17,6 +17,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack-ssg/pkg/ssg"
+	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/logging"
@@ -29,13 +30,18 @@ type BlogService struct {
 	client       *httpclient.Client
 	store        *model.Store
 	resendClient *resend.Client
+	mixpanel     *analytics.MixpanelClientWrapper
 }
 
-func NewBlogService(client *httpclient.Client, store *model.Store, resendClient *resend.Client) *BlogService {
+func NewBlogService(
+	client *httpclient.Client, store *model.Store,
+	resendClient *resend.Client, mixpanel *analytics.MixpanelClientWrapper,
+) *BlogService {
 	return &BlogService{
 		client:       client,
 		store:        store,
 		resendClient: resendClient,
+		mixpanel:     mixpanel,
 	}
 }
 
@@ -44,6 +50,8 @@ func (b *BlogService) Config() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("Blog Config handler...")
+
+		b.mixpanel.Track("Config", r)
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
@@ -202,6 +210,8 @@ func (b *BlogService) ThemeSubmit() http.HandlerFunc {
 		logger := logging.Logger(r)
 		logger.Println("ThemeSubmit handler...")
 
+		b.mixpanel.Track("ThemeSubmit", r)
+
 		if err := b.themeSubmit(w, r); err != nil {
 			logger.Printf("error updating theme: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -253,6 +263,8 @@ func (b *BlogService) TestBranchSubmit() http.HandlerFunc {
 		logger := logging.Logger(r)
 		logger.Println("TestBranchSubmit handler...")
 
+		b.mixpanel.Track("TestBranchSubmit", r)
+
 		if err := b.testBranchSubmit(w, r); err != nil {
 			logger.Printf("error updating test branch: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -300,6 +312,8 @@ func (b *BlogService) LiveBranchSubmit() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("LiveBranchSubmit handler...")
+
+		b.mixpanel.Track("LiveBranchSubmit", r)
 
 		if err := b.liveBranchSubmit(w, r); err != nil {
 			logger.Printf("Error updating live branch: %v", err)
@@ -352,6 +366,8 @@ func (b *BlogService) FolderSubmit() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("FolderSubmit handler...")
+
+		b.mixpanel.Track("FolderSubmit", r)
 
 		if err := b.folderSubmit(w, r); err != nil {
 			logger.Printf("error update folder: %v", err)
@@ -472,6 +488,8 @@ func (b *BlogService) SetStatusSubmit() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("SetStatusSubmit handler...")
+
+		b.mixpanel.Track("SetStatusSubmit", r)
 
 		w.Header().Set("Content-Type", "application/json")
 

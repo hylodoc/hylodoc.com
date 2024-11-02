@@ -24,6 +24,11 @@ type SiteData struct {
 
 func (b *BlogService) SiteMetrics() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.Logger(r)
+		logger.Println("SiteMetrics handler...")
+
+		b.mixpanel.Track("SiteMetrics", r)
+
 		if err := b.siteMetrics(w, r); err != nil {
 			var customErr *util.CustomError
 			if errors.As(err, &customErr) {

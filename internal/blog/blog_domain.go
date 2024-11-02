@@ -27,8 +27,9 @@ type SubdomainCheckResponse struct {
 func (b *BlogService) SubdomainCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
-
 		logger.Println("SubdomainCheck handler...")
+
+		b.mixpanel.Track("SubdomainCheck", r)
 
 		available := true
 		message := "Subdomain is available"
@@ -131,7 +132,7 @@ func (b *BlogService) SubdomainSubmit() http.HandlerFunc {
 		logger := logging.Logger(r)
 		logger.Println("SubdomainSubmit handler...")
 
-		/* XXX: metrics */
+		b.mixpanel.Track("SubdomainSubmit", r)
 
 		if err := b.subdomainSubmit(w, r); err != nil {
 			logger.Println("Error submiting subdomain")

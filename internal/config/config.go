@@ -18,6 +18,7 @@ type Configuration struct {
 	Db           DbParams           `mapstructure:"postgres"`
 	Resend       ResendParams       `mapstructure:"resend"`
 	Stripe       StripeParams       `mapstructure:"stripe"`
+	Mixpanel     MixpanelParams     `mapstructure:"mixpanel"`
 }
 
 type ProgstackParams struct {
@@ -70,6 +71,10 @@ type StripeParams struct {
 	SecretKey            string `mapstructure:"secret_key"`
 	WebhookSigningSecret string `mapstructure:"webhook_signing_secret"`
 	Plans                []Plan `mapstructure:"plans"`
+}
+
+type MixpanelParams struct {
+	Token string `mapstructure:"token"`
 }
 
 type Plan struct {

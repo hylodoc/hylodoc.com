@@ -12,6 +12,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/lib/pq v1.10.9
+	github.com/mixpanel/mixpanel-go v1.2.1
 	github.com/prometheus/client_golang v1.20.5
 	github.com/resend/resend-go/v2 v2.13.0
 	github.com/spf13/cobra v1.8.1
