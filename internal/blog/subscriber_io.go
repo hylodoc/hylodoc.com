@@ -16,16 +16,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
 func (b *BlogService) SubscribeToBlog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("subscribe to blog handler...")
+		logger := logging.Logger(r)
+		logger.Println("SubscribeToBlog handler...")
 
 		if err := b.subscribeToBlog(w, r); err != nil {
-			log.Printf("error subscribing to blog: %v", err)
+			logger.Printf("Error subscribing to blog: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -46,6 +48,8 @@ func (sr *SubscribeRequest) validate() error {
 }
 
 func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) error {
+	logger := logging.Logger(r)
+
 	/* extract BlogID from path */
 	vars := mux.Vars(r)
 	blogID := vars["blogID"]
@@ -72,7 +76,7 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 		return fmt.Errorf("error converting string path var to blogID: %w", err)
 	}
 
-	log.Printf("subscribing email `%s' to blog with id: `%d'", req.Email, intBlogID)
+	logger.Printf("subscribing email `%s' to blog with id: `%d'", req.Email, intBlogID)
 	/* first check if exists */
 
 	err = b.store.CreateSubscriberTx(context.TODO(), model.CreateSubscriberTxParams{
@@ -87,9 +91,11 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 
 func (b *BlogService) UnsubscribeFromBlog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("unsubscribe from blog handler...")
+		logger := logging.Logger(r)
+
+		logger.Println("unsubscribe from blog handler...")
 		if err := b.unsubscribeFromBlog(w, r); err != nil {
-			log.Printf("error in unsubscribeFromBlog handler: %v\n", err)
+			logger.Printf("error in unsubscribeFromBlog handler: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -141,19 +147,20 @@ func (b *BlogService) ImportSubscribers() http.HandlerFunc {
 
 func (b *BlogService) EditSubscriber() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("edit subscriber handler...")
+		logger := logging.Logger(r)
+		logger.Println("edit subscriber handler...")
 
 		email := r.URL.Query().Get("email")
 
 		blogID := mux.Vars(r)["blogID"]
 		intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 		if err != nil {
-			log.Printf("could not parse blogID: %v", err)
+			logger.Printf("could not parse blogID: %v", err)
 			http.Error(w, "", http.StatusBadRequest)
 			return
 		}
 
-		log.Printf("blogID: %s, mail: %s\n", email, blogID)
+		logger.Printf("blogID: %s, mail: %s\n", email, blogID)
 
 		util.ExecTemplate(w, []string{"subscriber_edit.html"},
 			util.PageInfo{
@@ -166,6 +173,7 @@ func (b *BlogService) EditSubscriber() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }
@@ -182,10 +190,12 @@ func buildRemoveSubscriberUrl(blogID int32, email string) string {
 
 func (b *BlogService) DeleteSubscriber() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("delete subscriber handler...")
+		logger := logging.Logger(r)
+
+		logger.Println("DeleteSubscriber handler...")
 		url, err := b.deleteSubscriber(w, r)
 		if err != nil {
-			log.Printf("error deleting subscriber: %v\n", err)
+			logger.Printf("Error deleting subscriber: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -194,6 +204,8 @@ func (b *BlogService) DeleteSubscriber() http.HandlerFunc {
 }
 
 func (b *BlogService) deleteSubscriber(w http.ResponseWriter, r *http.Request) (string, error) {
+	logger := logging.Logger(r)
+
 	email := r.URL.Query().Get("email")
 
 	blogID := mux.Vars(r)["blogID"]
@@ -202,7 +214,7 @@ func (b *BlogService) deleteSubscriber(w http.ResponseWriter, r *http.Request) (
 		return "", fmt.Errorf("error converting string path var to blogID: %w", err)
 	}
 
-	log.Printf("deleting subscriber `%s' for blogID `%s'\n", email, blogID)
+	logger.Printf("deleting subscriber `%s' for blogID `%s'\n", email, blogID)
 	if err := b.store.DeleteSubscriberByEmail(context.TODO(), model.DeleteSubscriberByEmailParams{
 		BlogID: int32(intBlogID),
 		Email:  email,
@@ -214,9 +226,12 @@ func (b *BlogService) deleteSubscriber(w http.ResponseWriter, r *http.Request) (
 
 func (b *BlogService) ExportSubscribers() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.Logger(r)
+		logger.Println("ExportSubscribers handler...")
+
 		csvData, err := b.exportSubscribers(w, r)
 		if err != nil {
-			log.Printf("error exporting subsribers: %v", err)
+			logger.Printf("Error exporting subsribers: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}

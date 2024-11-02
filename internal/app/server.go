@@ -15,6 +15,7 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/installation"
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/metrics"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
@@ -63,6 +64,8 @@ func Serve() {
 	r := mux.NewRouter()
 
 	/* NOTE: userWebsite middleware currently runs before main application */
+	r.Use(logging.LoggingMiddleware)
+
 	r.Use(subdomainMiddleware.RouteToSubdomains)
 
 	r.Use(metrics.MetricsMiddleware)
@@ -140,18 +143,19 @@ func Serve() {
 
 func index() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("index handler...")
+		logger := logging.Logger(r)
+		logger.Println("Index handler...")
 		/* XXX: add metrics */
 
 		/* get email/username from context */
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
-			log.Printf("session not found")
+			logger.Println("No session")
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
 		if sesh.IsAuthenticated() {
-			log.Printf("user authenticated redirecting home...")
+			logger.Println("Redirecting unauthenticated user")
 			http.Redirect(w, r, "/user/", http.StatusSeeOther)
 			return
 		}
@@ -169,18 +173,21 @@ func index() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }
 
 func register() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("register handler...")
+		logger := logging.Logger(r)
+		logger.Println("Register handler...")
 		/* XXX: add metrics */
 
 		/* get email/username from context */
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
+			logger.Printf("No Session")
 			http.Redirect(w, r, "/user/", http.StatusSeeOther)
 			return
 		}
@@ -196,18 +203,21 @@ func register() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }
 
 func login() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("login handler...")
+		logger := logging.Logger(r)
+		logger.Println("Login handler...")
 		/* XXX: add metrics */
 
 		/* get email/username from context */
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
+			logger.Println("No auth session")
 			http.Redirect(w, r, "/user/", http.StatusSeeOther)
 			return
 		}
@@ -223,6 +233,7 @@ func login() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }

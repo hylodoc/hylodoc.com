@@ -17,6 +17,7 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/httpclient"
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/util"
 )
@@ -47,10 +48,13 @@ func NewInstallationService(c *httpclient.Client, r *resend.Client, s *model.Sto
 
 func (i *InstallationService) InstallationCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.Logger(r)
+		logger.Println("InstallationCallback handler...")
+
 		/* XXX: metrics */
 
 		if err := i.installationCallback(w, r); err != nil {
-			log.Printf("error in installation callback: %v\n", err)
+			logger.Printf("error in installation callback: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -59,8 +63,6 @@ func (i *InstallationService) InstallationCallback() http.HandlerFunc {
 }
 
 func (i *InstallationService) installationCallback(w http.ResponseWriter, r *http.Request) error {
-	log.Println("installationCallback handler...")
-
 	/* validate authenticity using Github webhook secret */
 	if err := validateSignature(r, i.config.Github.WebhookSecret); err != nil {
 		return fmt.Errorf("error validating github signature: %w", err)
@@ -72,31 +74,34 @@ func (i *InstallationService) installationCallback(w http.ResponseWriter, r *htt
 	}
 
 	/* handle kinds of events */
+	logger := logging.Logger(r)
 	eventType := r.Header.Get("X-GitHub-Event")
 	switch eventType {
 	case "installation":
-		return handleInstallation(i.client, i.store, body)
+		return handleInstallation(i.client, i.store, body, logger)
 	case "installation_repositories":
-		return handleInstallationRepositories(i.client, i.store, body)
+		return handleInstallationRepositories(i.client, i.store, body, logger)
 	case "push":
-		return handlePush(i.client, i.resendClient, i.store, body)
+		return handlePush(i.client, i.resendClient, i.store, body, logger)
 	default:
-		log.Printf("unhandled event type: %s\n", eventType)
+		logging.Logger(r).Printf("unhandled event type: %s\n", eventType)
 	}
 	return nil
 }
 
-func handleInstallation(c *httpclient.Client, s *model.Store, body []byte) error {
-	log.Println("handling installation event...")
+func handleInstallation(
+	c *httpclient.Client, s *model.Store, body []byte, logger *log.Logger,
+) error {
+	logger.Println("handling installation event...")
 
 	var event InstallationEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		return err
 	}
 	str, _ := eventToJSON(event)
-	log.Printf("installation event: %s\n", str)
+	logger.Printf("installation event: %s\n", str)
 
-	if err := handleInstallationAction(c, s, event); err != nil {
+	if err := handleInstallationAction(c, s, event, logger); err != nil {
 		return fmt.Errorf("error handling installation action: %w", err)
 	}
 
@@ -122,6 +127,7 @@ func handleInstallation(c *httpclient.Client, s *model.Store, body []byte) error
 
 func handleInstallationAction(
 	c *httpclient.Client, s *model.Store, event InstallationEvent,
+	logger *log.Logger,
 ) error {
 	user, err := s.GetUserByGhUserID(context.TODO(), event.Sender.ID)
 	if err != nil {
@@ -134,19 +140,23 @@ func handleInstallationAction(
 	case "created":
 		return handleInstallationCreated(
 			c, s, event.Installation.ID, user.ID, user.GhEmail,
+			logger,
 		)
 	case "deleted":
 		return handleInstallationDeleted(
-			c, s, event.Installation.ID, user.ID,
+			c, s, event.Installation.ID, user.ID, logger,
 		)
 	default:
-		log.Printf("unhandled event action: %s\n", event.Action)
+		logger.Printf("unhandled event action: %s\n", event.Action)
 		return nil
 	}
 }
 
-func handleInstallationCreated(c *httpclient.Client, s *model.Store, ghInstallationID int64, userID int32, ghEmail string) error {
-	log.Println("handling installation created event...")
+func handleInstallationCreated(
+	c *httpclient.Client, s *model.Store, ghInstallationID int64,
+	userID int32, ghEmail string, logger *log.Logger,
+) error {
+	logger.Println("handling installation created event...")
 	/* get access token */
 	accessToken, err := auth.GetInstallationAccessToken(
 		c,
@@ -159,12 +169,12 @@ func handleInstallationCreated(c *httpclient.Client, s *model.Store, ghInstallat
 	}
 
 	/* get repositories from Github */
-	repos, err := getReposDetails(c, accessToken)
+	repos, err := getReposDetails(c, accessToken, logger)
 	if err != nil {
 		return fmt.Errorf("error getting repositories: %w", err)
 	}
 	str, _ := eventToJSON(repos)
-	log.Printf("repos: %s\n", str)
+	logger.Printf("repos: %s\n", str)
 
 	/* write installation and repos to db Tx */
 	createInstallationTxParams := buildCreateInstallationTxParams(ghInstallationID, userID, ghEmail, repos)
@@ -198,8 +208,10 @@ type InstallationRepositoriesResponse struct {
 	Repositories []Repository `json:"repositories"` /* XXX: reusing from events */
 }
 
-func getReposDetails(c *httpclient.Client, accessToken string) ([]Repository, error) {
-	log.Println("getting repositories details...")
+func getReposDetails(
+	c *httpclient.Client, accessToken string, logger *log.Logger,
+) ([]Repository, error) {
+	logger.Println("getting repositories details...")
 	req, err := util.NewRequestBuilder("GET", ghInstallationRepositoriesUrl).
 		WithHeader("Authorization", fmt.Sprintf("Bearer %s", accessToken)).
 		WithHeader("Accept", "application/vnd.github+json").
@@ -216,10 +228,9 @@ func getReposDetails(c *httpclient.Client, accessToken string) ([]Repository, er
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Println("error unpacking body: ", err)
+		logger.Printf("error unpacking body: %v\n", err)
 		return []Repository{}, err
 	}
-	log.Printf("body: %s", body)
 
 	var reposResponse InstallationRepositoriesResponse
 	if err := json.Unmarshal(body, &reposResponse); err != nil {
@@ -228,50 +239,55 @@ func getReposDetails(c *httpclient.Client, accessToken string) ([]Repository, er
 	return reposResponse.Repositories, nil
 }
 
-func handleInstallationDeleted(c *httpclient.Client, s *model.Store, ghInstallationID int64, userID int32) error {
-	log.Println("handling installation deleted event...")
+func handleInstallationDeleted(
+	c *httpclient.Client, s *model.Store, ghInstallationID int64,
+	userID int32, logger *log.Logger,
+) error {
+	logger.Println("handling installation deleted event...")
 
 	/* fetch repos associated with installation */
-	log.Printf("deleting installation %d for user %d...", ghInstallationID, userID)
+	logger.Printf("deleting installation %d for user %d...", ghInstallationID, userID)
 	repos, err := s.ListBlogsForInstallationByGhInstallationID(context.TODO(), ghInstallationID)
 	if err != nil {
 		return fmt.Errorf("error getting repositories for installation %d: %w", ghInstallationID, err)
 	}
 	/* delete the repos on disk */
-	log.Println("deleting repos from disk...")
+	logger.Println("deleting repos from disk...")
 	for _, repo := range repos {
 		path := fmt.Sprintf("%s/%d/%s", config.Config.Progstack.RepositoriesPath, userID, repo.FullName)
-		log.Printf("deleting repo at `%s' from disk...\n", path)
+		logger.Printf("deleting repo at `%s' from disk...\n", path)
 		if err := os.RemoveAll(path); err != nil {
 			return fmt.Errorf("error deleting repo `%d' from disk: %w", repo.ID, err)
 		}
 	}
 	/* delete generated websites */
-	log.Println("deleting generated websites from disk...")
+	logger.Println("deleting generated websites from disk...")
 	for _, repo := range repos {
 		path := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, repo.Subdomain)
-		log.Printf("deleting website at `%s' from disk...\n", path)
+		logger.Printf("deleting website at `%s' from disk...\n", path)
 		if err := os.RemoveAll(path); err != nil {
 			return fmt.Errorf("error deleting website `%s' from disk: %w", repo.Subdomain, err)
 		}
 	}
 	/* cascade delete the installation and associated repos */
-	log.Printf("deleting installation with ghInstallationID `%d'...\n", ghInstallationID)
+	logger.Printf("deleting installation with ghInstallationID `%d'...\n", ghInstallationID)
 	if err = s.DeleteInstallationWithGithubInstallationID(context.TODO(), ghInstallationID); err != nil {
 		return fmt.Errorf("error deleting installation: %w", err)
 	}
 	return nil
 }
 
-func handleInstallationRepositories(c *httpclient.Client, s *model.Store, body []byte) error {
-	log.Println("handling installation repositories event...")
+func handleInstallationRepositories(
+	c *httpclient.Client, s *model.Store, body []byte, logger *log.Logger,
+) error {
+	logger.Println("handling installation repositories event...")
 
 	var event InstallationRepositoriesEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		return fmt.Errorf("error unmarshaling InstallationRepositoriesEvent: %w", err)
 	}
 	str, _ := eventToJSON(event)
-	log.Printf("installationRepositoriesEvent: %s\n", str)
+	logger.Printf("installationRepositoriesEvent: %s\n", str)
 
 	/* check that installation exists */
 	_, err := s.GetInstallationByGithubInstallationID(
@@ -284,7 +300,7 @@ func handleInstallationRepositories(c *httpclient.Client, s *model.Store, body [
 		)
 	}
 
-	if err := handleInstallationRepositoriesAction(c, s, event); err != nil {
+	if err := handleInstallationRepositoriesAction(c, s, event, logger); err != nil {
 		return fmt.Errorf(
 			"error handling installation repositories action: %w",
 			err,
@@ -313,6 +329,7 @@ func handleInstallationRepositories(c *httpclient.Client, s *model.Store, body [
 
 func handleInstallationRepositoriesAction(
 	c *httpclient.Client, s *model.Store, event InstallationRepositoriesEvent,
+	logger *log.Logger,
 ) error {
 	user, err := s.GetUserByGhUserID(context.TODO(), event.Sender.ID)
 	if err != nil {
@@ -330,6 +347,7 @@ func handleInstallationRepositoriesAction(
 			event.RepositoriesAdded,
 			user.ID,
 			user.GhEmail,
+			logger,
 		)
 	case "removed":
 		return handleInstallationRepositoriesRemoved(
@@ -337,15 +355,19 @@ func handleInstallationRepositoriesAction(
 			s,
 			event.Installation.ID,
 			event.RepositoriesRemoved,
+			logger,
 		)
 	default:
-		log.Printf("unhandled event action: %s\n", event.Action)
+		logger.Printf("unhandled event action: %s\n", event.Action)
 		return nil
 	}
 }
 
-func handleInstallationRepositoriesAdded(c *httpclient.Client, s *model.Store, ghInstallationID int64, repos []Repository, userID int32, email string) error {
-	log.Println("handling repositories added event...")
+func handleInstallationRepositoriesAdded(
+	c *httpclient.Client, s *model.Store, ghInstallationID int64,
+	repos []Repository, userID int32, email string, logger *log.Logger,
+) error {
+	logger.Println("handling repositories added event...")
 
 	for _, repo := range repos {
 		_, err := s.CreateRepository(context.TODO(), model.CreateRepositoryParams{
@@ -363,27 +385,30 @@ func handleInstallationRepositoriesAdded(c *httpclient.Client, s *model.Store, g
 	return nil
 }
 
-func handleInstallationRepositoriesRemoved(c *httpclient.Client, s *model.Store, ghInstallationID int64, repos []Repository) error {
-	log.Println("handling repositories removed event...")
+func handleInstallationRepositoriesRemoved(
+	c *httpclient.Client, s *model.Store, ghInstallationID int64,
+	repos []Repository, logger *log.Logger,
+) error {
+	logger.Println("handling repositories removed event...")
 
-	log.Println("deleting websites from disk...")
 	/* delete generated sites from disk, generated sites need subdomain */
+	logger.Println("deleting websites from disk...")
 	for _, repo := range repos {
 		path := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, repo.FullName)
 		if err := os.RemoveAll(path); err != nil {
 			return fmt.Errorf("error deleting repo `%s' from disk: %w", path, err)
 		}
 	}
-	log.Println("deleting repositories from disk...")
 	/* delete repostories removed from disk */
+	logger.Println("deleting repositories from disk...")
 	for _, repo := range repos {
 		path := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, repo.FullName)
 		if err := os.RemoveAll(path); err != nil {
 			return fmt.Errorf("error deleting repo `%s' from disk: %w", path, err)
 		}
 	}
-	log.Println("deleting blogs from db...")
 	/* delete blogs removed from db */
+	logger.Println("deleting blogs from db...")
 	for _, repo := range repos {
 		if err := s.DeleteRepositoryWithGhRepositoryID(context.TODO(), repo.ID); err != nil {
 			return fmt.Errorf("error deleting repository with ghRepositoryID `%d': %w", repo.ID, err)
@@ -392,15 +417,18 @@ func handleInstallationRepositoriesRemoved(c *httpclient.Client, s *model.Store,
 	return nil
 }
 
-func handlePush(c *httpclient.Client, resendClient *resend.Client, s *model.Store, body []byte) error {
-	log.Println("handling push event...")
+func handlePush(
+	c *httpclient.Client, resendClient *resend.Client, s *model.Store,
+	body []byte, logger *log.Logger,
+) error {
+	logger.Println("handling push event...")
 
 	var event PushEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		return fmt.Errorf("error unmarshaling push event: %w", err)
 	}
 	str, _ := eventToJSON(event)
-	log.Printf("push event: %s\n", str)
+	logger.Printf("push event: %s\n", str)
 
 	/* validate that blog exists for repository */
 	b, err := s.GetBlogByGhRepositoryID(context.TODO(), sql.NullInt64{
@@ -409,11 +437,17 @@ func handlePush(c *httpclient.Client, resendClient *resend.Client, s *model.Stor
 	})
 	if err != nil {
 		if err != sql.ErrNoRows {
-			return fmt.Errorf("error getting blog for repository event: %w", err)
+			return fmt.Errorf(
+				"error getting blog for repository event: %w",
+				err,
+			)
 		}
 		/* this can happen if user pushes to repo after installing
 		* application without having created an associated blog*/
-		log.Printf("no associated blog with repositoryID `%d'\n", event.Repository.ID)
+		logger.Printf(
+			"no associated blog with repositoryID `%d'\n",
+			event.Repository.ID,
+		)
 		return nil
 	}
 
@@ -427,8 +461,8 @@ func handlePush(c *httpclient.Client, resendClient *resend.Client, s *model.Stor
 		return fmt.Errorf("blog has no live branch configured")
 	}
 
-	log.Printf("event branch: `%s'\n", branchName)
-	log.Printf("live branch: `%s'\n", b.LiveBranch.String)
+	logger.Printf("event branch: `%s'\n", branchName)
+	logger.Printf("live branch: `%s'\n", b.LiveBranch.String)
 
 	if branchName != b.LiveBranch.String {
 		/* event does not match live branch */
@@ -436,15 +470,15 @@ func handlePush(c *httpclient.Client, resendClient *resend.Client, s *model.Stor
 	}
 
 	/* pull latest changes if event is on live branch */
-	if err := blog.UpdateRepositoryOnDisk(c, s, event.Repository.ID); err != nil {
+	if err := blog.UpdateRepositoryOnDisk(
+		c, s, event.Repository.ID, logger,
+	); err != nil {
 		return fmt.Errorf("error pulling latest changes: %w", err)
 	}
-
 	return nil
 }
 
 func getEventBranchName(event PushEvent) (string, error) {
-	log.Printf("Ref: `%s'\n", event.Ref)
 	if event.Ref != "" {
 		refParts := strings.Split(event.Ref, "/")
 		if len(refParts) > 2 && refParts[1] == "heads" {
@@ -454,13 +488,14 @@ func getEventBranchName(event PushEvent) (string, error) {
 	return "", fmt.Errorf("could not get extract branch name")
 }
 
-func sendNewPostUpdateEmailsForBlog(ghRepositoryID int64, c *resend.Client, s *model.Store) error {
+func sendNewPostUpdateEmailsForBlog(
+	ghRepositoryID int64, c *resend.Client, s *model.Store,
+) error {
 	/* build parameters */
 	paramsList, err := buildNewPostUpdateParamsList(ghRepositoryID, s)
 	if err != nil {
 		return fmt.Errorf("error building newPostUpdatesParamsList: %w", err)
 	}
-
 	/* send emails for all parameter */
 	for _, params := range paramsList {
 		err := email.SendNewPostUpdate(c, params)
@@ -471,24 +506,34 @@ func sendNewPostUpdateEmailsForBlog(ghRepositoryID int64, c *resend.Client, s *m
 	return nil
 }
 
-func buildNewPostUpdateParamsList(ghRepositoryID int64, s *model.Store) ([]email.NewPostUpdateParams, error) {
+func buildNewPostUpdateParamsList(
+	ghRepositoryID int64, s *model.Store,
+) ([]email.NewPostUpdateParams, error) {
 	/* get blog */
 	blog, err := s.GetBlogByGhRepositoryID(context.TODO(), sql.NullInt64{
 		Valid: true,
 		Int64: ghRepositoryID,
 	})
 	if err != nil {
-		return []email.NewPostUpdateParams{}, fmt.Errorf("error getting blog with ghRepositoryID `%d': %w", ghRepositoryID, err)
+		return []email.NewPostUpdateParams{}, fmt.Errorf(
+			"error getting blog with ghRepositoryID `%d': %w",
+			ghRepositoryID,
+			err,
+		)
 	}
-	log.Printf("sending new post update emails for blog with id: `%d'\n", blog.ID)
-
 	/* list active subscribers */
-	subscribers, err := s.ListActiveSubscribersForGhRepositoryID(context.TODO(), sql.NullInt64{
-		Valid: true,
-		Int64: ghRepositoryID,
-	})
+	subscribers, err := s.ListActiveSubscribersForGhRepositoryID(
+		context.TODO(),
+		sql.NullInt64{
+			Valid: true,
+			Int64: ghRepositoryID,
+		},
+	)
 	if err != nil {
-		return []email.NewPostUpdateParams{}, fmt.Errorf("error getting active subscriber list: %w", err)
+		return []email.NewPostUpdateParams{}, fmt.Errorf(
+			"error getting active subscriber list: %w",
+			err,
+		)
 	}
 
 	/* build details */
@@ -511,7 +556,6 @@ func buildNewPostUpdateParamsList(ghRepositoryID int64, s *model.Store) ([]email
 			To:               subscriber.Email,
 			UnsubscribeToken: subscriber.UnsubscribeToken.String(),
 		}
-		log.Printf("sending email to subscriber: `%s'\n", subscriberParams.To)
 
 		paramsList = append(paramsList, email.NewPostUpdateParams{
 			Blog:       blogParams,

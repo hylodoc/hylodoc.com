@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"unicode"
 
 	"github.com/gorilla/mux"
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/util"
 )
@@ -26,18 +26,20 @@ type SubdomainCheckResponse struct {
 
 func (b *BlogService) SubdomainCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("check subdomain handler...")
+		logger := logging.Logger(r)
+
+		logger.Println("SubdomainCheck handler...")
 
 		available := true
 		message := "Subdomain is available"
 		if err := b.subdomainCheck(w, r); err != nil {
 			var customErr *util.CustomError
 			if errors.As(err, &customErr) {
-				log.Printf("client error: %v\n", customErr)
+				logger.Printf("Client error: %v\n", customErr)
 				available = false
 				message = customErr.Error()
 			} else {
-				log.Printf("internal server error: %v\n", err)
+				logger.Printf("Internal Server Error: %v\n", err)
 				http.Error(w, "", http.StatusInternalServerError)
 				return
 			}
@@ -49,8 +51,12 @@ func (b *BlogService) SubdomainCheck() http.HandlerFunc {
 			Available: available,
 			Message:   message,
 		}); err != nil {
-			log.Printf("failed to encode response: %v", err)
-			http.Error(w, "failed to encode response", http.StatusInternalServerError)
+			logger.Printf("Error encoding reponse: %v\n", err)
+			http.Error(
+				w,
+				"Error encoding reponse",
+				http.StatusInternalServerError,
+			)
 			return
 		}
 	}
@@ -122,22 +128,23 @@ func validateSubdomain(subdomain string) error {
 
 func (b *BlogService) SubdomainSubmit() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("submit subdomain handler...")
+		logger := logging.Logger(r)
+		logger.Println("SubdomainSubmit handler...")
 
 		/* XXX: metrics */
 
 		if err := b.subdomainSubmit(w, r); err != nil {
-			log.Println("error submiting subdomain")
+			logger.Println("Error submiting subdomain")
 			var customErr *util.CustomError
 			if errors.As(err, &customErr) {
-				log.Printf("user error: %v\n", customErr)
+				logger.Printf("Custom error: %v\n", customErr)
 				/* user error */
 				w.WriteHeader(customErr.Code)
 				response := map[string]string{"message": customErr.Error()}
 				json.NewEncoder(w).Encode(response)
 				return
 			} else {
-				log.Printf("Internal Server Error: %v\n", err)
+				logger.Printf("Internal Server Error: %v\n", err)
 				/* generic error */
 				w.WriteHeader(http.StatusInternalServerError)
 				response := map[string]string{"message": "An unexpected error occurred"}
@@ -153,6 +160,8 @@ func (b *BlogService) SubdomainSubmit() http.HandlerFunc {
 }
 
 func (b *BlogService) subdomainSubmit(w http.ResponseWriter, r *http.Request) error {
+	logger := logging.Logger(r)
+
 	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -189,7 +198,7 @@ func (b *BlogService) subdomainSubmit(w http.ResponseWriter, r *http.Request) er
 	}
 
 	/* bring blog online */
-	if _, err := setBlogToLive(&blog, b.store); err != nil {
+	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
 		return fmt.Errorf(
 			"error bringing subdomain `%s' online: %w",
 			blog.Subdomain, err,

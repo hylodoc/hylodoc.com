@@ -19,6 +19,7 @@ import (
 	"github.com/xr0-org/progstack-ssg/pkg/ssg"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
@@ -41,7 +42,8 @@ func NewBlogService(client *httpclient.Client, store *model.Store, resendClient 
 /* Blog configuration page */
 func (b *BlogService) Config() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("blog config handler...")
+		logger := logging.Logger(r)
+		logger.Println("Blog Config handler...")
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
@@ -51,14 +53,14 @@ func (b *BlogService) Config() http.HandlerFunc {
 		blogID := mux.Vars(r)["blogID"]
 		intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 		if err != nil {
-			log.Printf("error converting string path var to blogID: %v\n", err)
+			logging.Logger(r).Printf("error converting string path var to blogID: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
 
 		blogInfo, err := getBlogInfo(b.store, int32(intBlogID))
 		if err != nil {
-			log.Printf("error getting blog for user `%d': %v\n", sesh.GetUserID(), err)
+			logging.Logger(r).Printf("error getting blog for user `%d': %v\n", sesh.GetUserID(), err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -82,6 +84,7 @@ func (b *BlogService) Config() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }
@@ -176,10 +179,11 @@ func ensurePostExists(s *model.Store, url string, blogid int32) error {
 
 func (b *BlogService) ThemeSubmit() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("theme submit handler...")
+		logger := logging.Logger(r)
+		logger.Println("ThemeSubmit handler...")
 
 		if err := b.themeSubmit(w, r); err != nil {
-			log.Printf("error updating theme: %v", err)
+			logger.Printf("error updating theme: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			response := map[string]string{"message": "An unexpected error occured"}
 			json.NewEncoder(w).Encode(response)
@@ -226,10 +230,11 @@ func (b *BlogService) themeSubmit(w http.ResponseWriter, r *http.Request) error 
 
 func (b *BlogService) TestBranchSubmit() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("test branch submit handler...")
+		logger := logging.Logger(r)
+		logger.Println("TestBranchSubmit handler...")
 
 		if err := b.testBranchSubmit(w, r); err != nil {
-			log.Printf("error updating test branch: %v", err)
+			logger.Printf("error updating test branch: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			response := map[string]string{"message": "An unexpected error occurred"}
 			json.NewEncoder(w).Encode(response)
@@ -256,7 +261,7 @@ func (b *BlogService) testBranchSubmit(w http.ResponseWriter, r *http.Request) e
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return fmt.Errorf("error decoding body: %w", err)
 	}
-	log.Printf("test branch: %s\n", req.Branch)
+	logging.Logger(r).Printf("test branch: %s\n", req.Branch)
 
 	/* XXX: validate input before writing to db */
 	if err := b.store.SetTestBranchByID(context.TODO(), model.SetTestBranchByIDParams{
@@ -273,11 +278,11 @@ func (b *BlogService) testBranchSubmit(w http.ResponseWriter, r *http.Request) e
 
 func (b *BlogService) LiveBranchSubmit() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("live branch submit handler...")
+		logger := logging.Logger(r)
+		logger.Println("LiveBranchSubmit handler...")
 
 		if err := b.liveBranchSubmit(w, r); err != nil {
-			/* XXX: custom error handling of codes */
-			log.Printf("error updating live branch: %v", err)
+			logger.Printf("Error updating live branch: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			response := map[string]string{"message": "An unexpected error occurred"}
 			json.NewEncoder(w).Encode(response)
@@ -294,6 +299,8 @@ type LiveBranchRequest struct {
 }
 
 func (b *BlogService) liveBranchSubmit(w http.ResponseWriter, r *http.Request) error {
+	logger := logging.Logger(r)
+
 	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -305,7 +312,7 @@ func (b *BlogService) liveBranchSubmit(w http.ResponseWriter, r *http.Request) e
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return fmt.Errorf("error decoding body: %w", err)
 	}
-	log.Printf("live branch: %s\n", req.Branch)
+	logger.Printf("live branch: %s\n", req.Branch)
 
 	/* XXX: validate input before wrinting to db */
 	err = b.store.SetLiveBranchByID(context.TODO(), model.SetLiveBranchByIDParams{
@@ -323,10 +330,11 @@ func (b *BlogService) liveBranchSubmit(w http.ResponseWriter, r *http.Request) e
 
 func (b *BlogService) FolderSubmit() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("folder submit handler...")
+		logger := logging.Logger(r)
+		logger.Println("FolderSubmit handler...")
 
 		if err := b.folderSubmit(w, r); err != nil {
-			log.Printf("error update folder: %v", err)
+			logger.Printf("error update folder: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			response := map[string]string{"message": "An unexpected error occured"}
 			json.NewEncoder(w).Encode(response)
@@ -339,9 +347,11 @@ func (b *BlogService) FolderSubmit() http.HandlerFunc {
 }
 
 func (b *BlogService) folderSubmit(w http.ResponseWriter, r *http.Request) error {
+	logger := logging.Logger(r)
+
 	_, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
-		log.Println("user not found")
+		logger.Println("user not found")
 		return util.CreateCustomError("", http.StatusNotFound)
 	}
 
@@ -361,8 +371,8 @@ func (b *BlogService) folderSubmit(w http.ResponseWriter, r *http.Request) error
 		return fmt.Errorf("error getting blog `%d': %w", intBlogID, err)
 	}
 
-	log.Printf("src: %s\n", src)
-	log.Printf("dst: %s\n", blog.RepositoryPath)
+	logger.Printf("src: %s\n", src)
+	logger.Printf("dst: %s\n", blog.RepositoryPath)
 
 	/* extract to appropriate path for folders */
 	if err := clearAndExtract(src, blog.RepositoryPath); err != nil {
@@ -370,7 +380,7 @@ func (b *BlogService) folderSubmit(w http.ResponseWriter, r *http.Request) error
 	}
 
 	/* take blog live  */
-	_, err = setBlogToLive(&blog, b.store)
+	_, err = setBlogToLive(&blog, b.store, logger)
 	if err != nil {
 		return fmt.Errorf("error setting blog to live: %w", err)
 	}
@@ -394,7 +404,7 @@ func parseFolderUpdateRequest(r *http.Request) (string, error) {
 	/* XXX: Add subscription based file size limits */
 	err := r.ParseMultipartForm(maxFileSize) /* 10MB limit */
 	if err != nil {
-		log.Printf("file too large: %v\n", err)
+		logging.Logger(r).Printf("file too large: %v\n", err)
 		return "", util.CreateCustomError(
 			"File too large",
 			http.StatusBadRequest,
@@ -403,7 +413,7 @@ func parseFolderUpdateRequest(r *http.Request) (string, error) {
 
 	file, header, err := r.FormFile("folder")
 	if err != nil {
-		log.Printf("error reading file: %v\n", err)
+		logging.Logger(r).Printf("error reading file: %v\n", err)
 		return "", util.CreateCustomError(
 			"Invalid file",
 			http.StatusBadRequest,
@@ -412,7 +422,7 @@ func parseFolderUpdateRequest(r *http.Request) (string, error) {
 	defer file.Close()
 
 	if !isValidFileType(header.Filename) {
-		log.Printf("invalid file extension for `%s'\n", header.Filename)
+		logging.Logger(r).Printf("invalid file extension for `%s'\n", header.Filename)
 		return "", util.CreateCustomError(
 			"Must upload a .zip file",
 			http.StatusBadRequest,
@@ -440,7 +450,8 @@ type SetStatusSubmitResponse struct {
 
 func (b *BlogService) SetStatusSubmit() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("set status handler...")
+		logger := logging.Logger(r)
+		logger.Println("SetStatusSubmit handler...")
 
 		w.Header().Set("Content-Type", "application/json")
 
@@ -448,17 +459,17 @@ func (b *BlogService) SetStatusSubmit() http.HandlerFunc {
 		if err != nil {
 			var customErr *util.CustomError
 			if errors.As(err, &customErr) {
-				log.Printf("Client Error: %v\n", customErr)
+				logger.Printf("Client Error: %v\n", customErr)
 				w.WriteHeader(http.StatusBadRequest)
 				if err := json.NewEncoder(w).Encode(util.ErrorResponse{
 					Message: customErr.Error(),
 				}); err != nil {
-					log.Printf("Failed to encode response: %v\n", err)
+					logging.Logger(r).Printf("Failed to encode response: %v\n", err)
 					http.Error(w, "", http.StatusInternalServerError)
 					return
 				}
 			} else {
-				log.Printf("Internal Server Error: %v", err)
+				logger.Printf("Internal Server Error: %v", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				http.Error(w, "", http.StatusInternalServerError)
 				return
@@ -475,7 +486,7 @@ func (b *BlogService) SetStatusSubmit() http.HandlerFunc {
 		if err = json.NewEncoder(w).Encode(SetStatusSubmitResponse{
 			Message: message,
 		}); err != nil {
-			log.Printf("Failed to encode response: %v\n", err)
+			logger.Printf("Failed to encode response: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -489,6 +500,8 @@ type SetStatusRequest struct {
 func (b *BlogService) setStatusSubmit(
 	r *http.Request,
 ) (*statusChangeResponse, error) {
+	logger := logging.Logger(r)
+
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
 		return nil, fmt.Errorf("no user found")
@@ -505,7 +518,7 @@ func (b *BlogService) setStatusSubmit(
 	}
 
 	change, err := handleStatusChange(
-		int32(intBlogID), req.IsLive, sesh.GetEmail(), b.store,
+		int32(intBlogID), req.IsLive, sesh.GetEmail(), b.store, logger,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error handling status change: %w", err)
@@ -519,7 +532,7 @@ type statusChangeResponse struct {
 }
 
 func handleStatusChange(
-	blogID int32, islive bool, email string, s *model.Store,
+	blogID int32, islive bool, email string, s *model.Store, logger *log.Logger,
 ) (*statusChangeResponse, error) {
 	blog, err := s.GetBlogByID(context.TODO(), blogID)
 	if err != nil {
@@ -529,7 +542,7 @@ func handleStatusChange(
 		return nil, fmt.Errorf("invalid status change: %w", err)
 	}
 	if islive {
-		return setBlogToLive(&blog, s)
+		return setBlogToLive(&blog, s, logger)
 	} else {
 		return setBlogToOffline(blog, s)
 	}
@@ -549,8 +562,8 @@ func validateStatusChange(blogID int32, islive bool, s *model.Store) error {
 	return nil
 }
 
-func setBlogToLive(b *model.Blog, s *model.Store) (*statusChangeResponse, error) {
-	log.Printf("repo disk path: %s\n", b.RepositoryPath)
+func setBlogToLive(b *model.Blog, s *model.Store, logger *log.Logger) (*statusChangeResponse, error) {
+	logger.Printf("repo disk path: %s\n", b.RepositoryPath)
 	if err := launchUserBlog(s, b); err != nil {
 		return nil, fmt.Errorf("error launching blog `%d': %w", b.ID, err)
 	}

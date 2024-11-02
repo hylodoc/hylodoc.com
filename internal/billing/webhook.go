@@ -14,15 +14,17 @@ import (
 	"github.com/stripe/stripe-go/v72/checkout/session"
 	"github.com/stripe/stripe-go/v72/webhook"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
 func (b *BillingService) StripeWebhook() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("stripe webhook...")
+		logger := logging.Logger(r)
+		logger.Println("Stripe webhook...")
 
 		if err := b.stripeWebhook(w, r); err != nil {
-			log.Printf("error processing event: %v\n", err)
+			logger.Printf("error processing event: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 
 			return
@@ -32,6 +34,8 @@ func (b *BillingService) StripeWebhook() http.HandlerFunc {
 }
 
 func (b *BillingService) stripeWebhook(w http.ResponseWriter, r *http.Request) error {
+	logger := logging.Logger(r)
+
 	const MaxBodyBytes = int64(65536)
 	r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
 	payload, err := ioutil.ReadAll(r.Body)
@@ -39,33 +43,33 @@ func (b *BillingService) stripeWebhook(w http.ResponseWriter, r *http.Request) e
 		return fmt.Errorf("error reading body: %w", err)
 	}
 
-	log.Println("verifying stripe event signature...")
+	logger.Println("verifying stripe event signature...")
 	_, err = webhook.ConstructEvent(payload, r.Header.Get("Stripe-Signature"), config.Config.Stripe.WebhookSigningSecret)
 	if err != nil {
 		fmt.Errorf("error verifying webhook signature: %w", err)
 	}
-	log.Println("stripe event signature verified.")
+	logger.Println("stripe event signature verified.")
 
 	event := stripe.Event{}
 	if err := json.Unmarshal(payload, &event); err != nil {
 		return fmt.Errorf("error unpacking payload into event: %w", err)
 	}
-	log.Printf("%s\n", eventString(&event))
+	logger.Printf("%s\n", eventString(&event))
 
 	switch event.Type {
 	case "checkout.session.completed":
-		return handleCheckoutSessionCompleted(b.store, &event)
+		return handleCheckoutSessionCompleted(b.store, &event, logger)
 	case "checkout.session.expired":
-		return handleCheckoutSessionExpired(b.store, &event)
+		return handleCheckoutSessionExpired(b.store, &event, logger)
 	case "customer.subscription.created":
-		return handleCustomerSubscriptionCreated(b.store, &event)
+		return handleCustomerSubscriptionCreated(b.store, &event, logger)
 	case "customer.subscription.deleted":
-		return handleCustomerSubscriptionDeleted(b.store, &event)
+		return handleCustomerSubscriptionDeleted(b.store, &event, logger)
 	case "customer.subscription.updated":
-		return handleCustomerSubscriptionUpdated(b.store, &event)
+		return handleCustomerSubscriptionUpdated(b.store, &event, logger)
 	default:
-		log.Printf("unhandled event type: %s\n", event.Type)
-		log.Printf("event: %v\n", event)
+		logger.Printf("unhandled event type: %s\n", event.Type)
+		logger.Printf("event: %v\n", event)
 	}
 	return nil
 }
@@ -75,14 +79,16 @@ type CheckoutSessionCompletedEvent struct {
 	SubscriptionID string `json:"subscription"`
 }
 
-func handleCheckoutSessionCompleted(s *model.Store, e *stripe.Event) error {
-	log.Println("checkout.session.completed event...")
+func handleCheckoutSessionCompleted(
+	s *model.Store, e *stripe.Event, logger *log.Logger,
+) error {
+	logger.Println("checkout.session.completed event...")
 
 	var checkoutSession stripe.CheckoutSession
 	if err := json.Unmarshal(e.Data.Raw, &checkoutSession); err != nil {
 		return fmt.Errorf("error unmarshaling: %w", err)
 	}
-	log.Printf("checkout.session.completed event: %v\n", checkoutSession)
+	logger.Printf("checkout.session.completed event: %v\n", checkoutSession)
 
 	checkoutSessionID := checkoutSession.ID
 
@@ -92,7 +98,7 @@ func handleCheckoutSessionCompleted(s *model.Store, e *stripe.Event) error {
 		if err != sql.ErrNoRows {
 			return fmt.Errorf("error getting pending session: %w", err)
 		}
-		log.Println("no pending session with user")
+		logger.Println("no pending session with user")
 		return nil
 	}
 
@@ -102,7 +108,7 @@ func handleCheckoutSessionCompleted(s *model.Store, e *stripe.Event) error {
 	params.AddExpand("line_items")
 	expandedSession, err := session.Get(checkoutSessionID, params)
 	if err != nil {
-		log.Fatalf("Failed to retrieve checkout session: %v", err)
+		return fmt.Errorf("Failed to retrieve checkout session: %w", err)
 	}
 	if expandedSession.Subscription == nil {
 		return fmt.Errorf("no subscription: %w", err)
@@ -135,44 +141,52 @@ func handleCheckoutSessionCompleted(s *model.Store, e *stripe.Event) error {
 	return nil
 }
 
-func handleCheckoutSessionExpired(s *model.Store, e *stripe.Event) error {
-	log.Println("checkout.session.expired event...")
+func handleCheckoutSessionExpired(
+	s *model.Store, e *stripe.Event, logger *log.Logger,
+) error {
+	logger.Println("checkout.session.expired event...")
 
 	/* XXX: handle*/
 
 	return nil
 }
 
-func handleCustomerSubscriptionCreated(s *model.Store, e *stripe.Event) error {
-	log.Println("customer.subscription.created event...")
+func handleCustomerSubscriptionCreated(
+	s *model.Store, e *stripe.Event, logger *log.Logger,
+) error {
+	logger.Println("customer.subscription.created event...")
 
 	var sub stripe.Subscription
 	if err := json.Unmarshal(e.Data.Raw, &sub); err != nil {
 		return fmt.Errorf("error unmarshalling: %w", err)
 	}
-	log.Printf("customer.subscription.created event: %v", sub)
+	logger.Printf("customer.subscription.created event: %v", sub)
 
 	/* XXX: we handle this on the checkout session completed event */
 
 	return nil
 }
 
-func handleCustomerSubscriptionDeleted(s *model.Store, e *stripe.Event) error {
-	log.Println("customer.subscription.deleted event...")
+func handleCustomerSubscriptionDeleted(
+	s *model.Store, e *stripe.Event, logger *log.Logger,
+) error {
+	logger.Println("customer.subscription.deleted event...")
 
 	/* handle subscription deleted */
 
 	return nil
 }
 
-func handleCustomerSubscriptionUpdated(s *model.Store, e *stripe.Event) error {
-	log.Println("customer.subscription.updated event...")
+func handleCustomerSubscriptionUpdated(
+	s *model.Store, e *stripe.Event, logger *log.Logger,
+) error {
+	logger.Println("customer.subscription.updated event...")
 
 	var sub stripe.Subscription
 	if err := json.Unmarshal(e.Data.Raw, &sub); err != nil {
 		return fmt.Errorf("error unmarshalling: %w", err)
 	}
-	log.Printf("customer.subscription.updated event: %v", sub)
+	logger.Printf("customer.subscription.updated event: %v", sub)
 
 	_, err := s.UpdateStripeSubscription(context.TODO(), model.UpdateStripeSubscriptionParams{
 		StripeSubscriptionID: sub.ID,

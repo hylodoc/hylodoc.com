@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -26,10 +25,8 @@ func userBytes(s *model.Store, userID int32) (int64, error) {
 		if err != nil {
 			return 0, fmt.Errorf("error calculating usage for user `%d' path `%s': %w", userID, path, err)
 		}
-		log.Printf("path `%s' used `%d' bytes\n", path, bytes)
 		totalBytes += bytes
 	}
-	log.Printf("user `%d' total usage is `%d' bytes\n", totalBytes, userID)
 	return totalBytes, nil
 }
 
@@ -39,7 +36,6 @@ func dirBytes(repopath string) (int64, error) {
 
 	if err := filepath.Walk(repopath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			log.Printf("err: %v\n", err)
 			return err
 		}
 		if !info.IsDir() {
@@ -47,7 +43,6 @@ func dirBytes(repopath string) (int64, error) {
 		}
 		return nil
 	}); err != nil {
-		log.Printf("error: %v\n", err)
 		return 0, err
 	}
 	return usage, nil

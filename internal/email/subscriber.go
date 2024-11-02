@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"html/template"
-	"log"
 	"net/url"
 	"strings"
 
@@ -50,8 +49,6 @@ type PostParams struct {
 }
 
 func SendNewPostUpdate(client *resend.Client, params NewPostUpdateParams) error {
-	log.Println("sending newPostUpdate email...")
-
 	from := params.Blog.From
 	to := params.Subscriber.To
 	subject := params.Post.Subject
@@ -60,22 +57,19 @@ func SendNewPostUpdate(client *resend.Client, params NewPostUpdateParams) error 
 		return fmt.Errorf("error building newPostUpdateText: %w", err)
 	}
 
-	sent, err := client.Emails.SendWithContext(context.TODO(), &resend.SendEmailRequest{
+	_, err = client.Emails.SendWithContext(context.TODO(), &resend.SendEmailRequest{
 		From:    from,
 		To:      []string{to},
 		Subject: subject,
 		Text:    text,
 	})
 	if err != nil {
-		log.Printf("email response: %v", sent)
 		return fmt.Errorf("error sending email to `%s: %w", to, err)
 	}
 	return nil
 }
 
 func newPostUpdateText(params NewPostUpdateParams) (string, error) {
-	log.Println("parsing newPostUpdateTemplate...")
-
 	tmpl, err := template.New("email").Parse(newPostUpdateTemplate)
 	if err != nil {
 		return "", fmt.Errorf("error parsing newPostUpdateTemplate: %w", err)
@@ -103,10 +97,6 @@ func newPostUpdateText(params NewPostUpdateParams) (string, error) {
 }
 
 func buildUnsubscribeLink(blogID int32, blogSubdomain, unsubscribeToken string) (string, error) {
-	log.Println("building unsubscribe link...")
-
-	/* build base url */
-	log.Printf("protocol: %s\n", config.Config.Progstack.Protocol)
 	base := fmt.Sprintf(
 		unsubscribeLinkTemplate,
 		config.Config.Progstack.Protocol,
@@ -114,7 +104,6 @@ func buildUnsubscribeLink(blogID int32, blogSubdomain, unsubscribeToken string) 
 		config.Config.Progstack.ServiceName,
 		blogID,
 	)
-	log.Printf("unsubscribe link base: %s\n", base)
 
 	/* add token as query parameter */
 	u, err := url.Parse(base)
@@ -126,7 +115,5 @@ func buildUnsubscribeLink(blogID int32, blogSubdomain, unsubscribeToken string) 
 	u.RawQuery = params.Encode()
 
 	link := u.String()
-	log.Printf("unsubscribe link: %s\n", link)
-
 	return link, nil
 }

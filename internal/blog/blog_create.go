@@ -19,6 +19,7 @@ import (
 	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
@@ -33,18 +34,19 @@ type CreateBlogResponse struct {
 
 func (b *BlogService) CreateRepositoryBlog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("create blog handler...")
+		logger := logging.Logger(r)
+		logger.Println("CreateRepositoryBlog handler...")
 
 		message := "Successfully created repository-based blog!"
 		url, err := b.createRepositoryBlog(w, r)
 		if err != nil {
 			var customErr *util.CustomError
 			if errors.As(err, &customErr) {
-				log.Printf("Client Error: %v\n", customErr)
+				logger.Printf("Client Error: %v\n", customErr)
 				http.Error(w, customErr.Error(), http.StatusBadRequest)
 				return
 			} else {
-				log.Printf("Internal Server Error: %v\n", err)
+				logger.Printf("Internal Server Error: %v\n", err)
 				http.Error(w, "", http.StatusInternalServerError)
 				return
 			}
@@ -56,7 +58,7 @@ func (b *BlogService) CreateRepositoryBlog() http.HandlerFunc {
 			Url:     url,
 			Message: message,
 		}); err != nil {
-			log.Printf("failed to encode response: %v\n", err)
+			logger.Printf("Error encoding response: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -73,6 +75,8 @@ type CreateRepositoryBlogRequest struct {
 }
 
 func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Request) (string, error) {
+	logger := logging.Logger(r)
+
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
 		return "", fmt.Errorf("user not found")
@@ -80,7 +84,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 
 	var req CreateRepositoryBlogRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("could not decode body: %v", err)
+		logger.Printf("Error decoding body: %v\n", err)
 		return "", util.CreateCustomError(
 			"error decoding request body",
 			http.StatusBadRequest,
@@ -144,7 +148,9 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 	}
 
 	/* pull latest changes for live branch */
-	if err := UpdateRepositoryOnDisk(b.client, b.store, blog.GhRepositoryID.Int64); err != nil {
+	if err := UpdateRepositoryOnDisk(
+		b.client, b.store, blog.GhRepositoryID.Int64, logger,
+	); err != nil {
 		return "", fmt.Errorf("error pulling latest changes on live branch: %w", err)
 	}
 
@@ -176,8 +182,11 @@ func buildRepositoryPath(repoFullName string) string {
 	)
 }
 
-func UpdateRepositoryOnDisk(c *httpclient.Client, s *model.Store, ghRepositoryId int64) error {
-	log.Printf("updating repository `%d' on disk...", ghRepositoryId)
+func UpdateRepositoryOnDisk(
+	c *httpclient.Client, s *model.Store, ghRepositoryId int64,
+	logger *log.Logger,
+) error {
+	logger.Printf("updating repository `%d' on disk...", ghRepositoryId)
 
 	/* get repository */
 	repo, err := s.GetRepositoryByGhRepositoryID(context.TODO(), ghRepositoryId)
@@ -196,7 +205,7 @@ func UpdateRepositoryOnDisk(c *httpclient.Client, s *model.Store, ghRepositoryId
 		}
 		/* XXX: can happen if user pushes to repo after installing
 		* application without having created an associated blog*/
-		log.Printf("no associated blog with repositoryID `%d'\n", ghRepositoryId)
+		logger.Printf("No associated blog with repositoryID `%d'\n", ghRepositoryId)
 		return nil
 	}
 
@@ -215,7 +224,9 @@ func UpdateRepositoryOnDisk(c *httpclient.Client, s *model.Store, ghRepositoryId
 	}
 
 	/* download live branch tarball */
-	tmpFile, err := downloadRepoTarball(c, repo.FullName, blog.LiveBranch.String, accessToken)
+	logger.Println("downloading repo tarball...")
+	tmpFile, err := downloadRepoTarball(
+		c, repo.FullName, blog.LiveBranch.String, accessToken)
 	if err != nil {
 		return fmt.Errorf("error downloading tarball for at url: %s: %w", repo.FullName, err)
 	}
@@ -227,7 +238,7 @@ func UpdateRepositoryOnDisk(c *httpclient.Client, s *model.Store, ghRepositoryId
 	}
 
 	/* take blog live  */
-	if _, err := setBlogToLive(&blog, s); err != nil {
+	if _, err := setBlogToLive(&blog, s, logger); err != nil {
 		return fmt.Errorf("error setting blog to live: %w", err)
 	}
 	return nil
@@ -235,18 +246,19 @@ func UpdateRepositoryOnDisk(c *httpclient.Client, s *model.Store, ghRepositoryId
 
 func (b *BlogService) CreateFolderBlog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("create folder blog handler...")
+		logger := logging.Logger(r)
+		logger.Println("CreateFolderBlog handler...")
 
 		message := "Successfully created folder-based blog."
 		url, err := b.createFolderBlog(w, r)
 		if err != nil {
 			var customErr *util.CustomError
 			if errors.As(err, &customErr) {
-				log.Printf("client error: %v\n", customErr)
+				logger.Printf("Client Error: %v\n", customErr)
 				message = customErr.Error()
 			} else {
 				/* internal error */
-				log.Printf("Internal Server Error: %v\n", err)
+				logger.Printf("Internal Server Error: %v\n", err)
 				http.Error(w, "", http.StatusInternalServerError)
 				return
 			}
@@ -258,16 +270,19 @@ func (b *BlogService) CreateFolderBlog() http.HandlerFunc {
 			Url:     url,
 			Message: message,
 		}); err != nil {
-			http.Error(w, "failed to encode repsonse", http.StatusInternalServerError)
+			logger.Printf("Error encoding response: %v", err)
+			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
 	}
 }
 
 func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (string, error) {
+	logger := logging.Logger(r)
+
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
-		log.Println("user not found")
+		logger.Println("No auth session")
 		return "", util.CreateCustomError("", http.StatusNotFound)
 	}
 
@@ -279,8 +294,8 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	userIDString := strconv.FormatInt(int64(sesh.GetUserID()), 10)
 	dst := buildFolderPath(userIDString)
 
-	log.Printf("src: %s\n", req.src)
-	log.Printf("dst: %s\n", dst)
+	logger.Printf("src: %s\n", req.src)
+	logger.Printf("dst: %s\n", dst)
 
 	/* extract to disk for folders */
 	if err := extractZip(req.src, dst); err != nil {
@@ -308,11 +323,17 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		BlogID: blog.ID,
 		Email:  sesh.GetEmail(),
 	}); err != nil {
-		return "", fmt.Errorf("error adding email `%s' for user `%d' as subscriber to blog `%d': %w", sesh.GetEmail(), sesh.GetUserID(), blog.ID, err)
+		return "", fmt.Errorf(
+			"error adding email `%s' for user `%d' as subscriber to blog `%d': %w",
+			sesh.GetEmail(),
+			sesh.GetUserID(),
+			blog.ID,
+			err,
+		)
 	}
 
 	/* take blog live  */
-	if _, err := setBlogToLive(&blog, b.store); err != nil {
+	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
 	return buildDomainUrl(blog.Subdomain), nil
@@ -325,10 +346,12 @@ type createFolderBlogRequest struct {
 }
 
 func parseCreateFolderBlogRequest(r *http.Request) (createFolderBlogRequest, error) {
+	logger := logging.Logger(r)
+
 	/* XXX: Add subscription based file size limits */
 	err := r.ParseMultipartForm(maxFileSize) /* 10MB limit */
 	if err != nil {
-		log.Printf("file too large: %v\n", err)
+		logger.Printf("Error File too large: %v\n", err)
 		return createFolderBlogRequest{}, util.CreateCustomError(
 			"File too large",
 			http.StatusBadRequest,
@@ -337,7 +360,7 @@ func parseCreateFolderBlogRequest(r *http.Request) (createFolderBlogRequest, err
 
 	subdomain := r.FormValue("subdomain")
 	if subdomain == "" {
-		log.Println("error reading subdomain")
+		logger.Println("error reading subdomain")
 		return createFolderBlogRequest{}, util.CreateCustomError(
 			"Subdomain is required",
 			http.StatusBadRequest,
@@ -346,7 +369,7 @@ func parseCreateFolderBlogRequest(r *http.Request) (createFolderBlogRequest, err
 
 	file, header, err := r.FormFile("folder")
 	if err != nil {
-		log.Printf("error reading file: %v\n", err)
+		logger.Printf("Error reading file: %v\n", err)
 		return createFolderBlogRequest{}, util.CreateCustomError(
 			"Invalid file",
 			http.StatusBadRequest,
@@ -355,7 +378,7 @@ func parseCreateFolderBlogRequest(r *http.Request) (createFolderBlogRequest, err
 	defer file.Close()
 
 	if !isValidFileType(header.Filename) {
-		log.Printf("invalid file extension for `%s'\n", header.Filename)
+		logger.Printf("Invalid file extension for `%s'\n", header.Filename)
 		return createFolderBlogRequest{}, util.CreateCustomError(
 			"Must upload a .zip file",
 			http.StatusBadRequest,
@@ -377,7 +400,7 @@ func parseCreateFolderBlogRequest(r *http.Request) (createFolderBlogRequest, err
 	/* theme */
 	theme, err := validateTheme(r.FormValue("theme"))
 	if err != nil {
-		log.Printf("error reading theme")
+		logger.Printf("Error reading theme")
 		return createFolderBlogRequest{}, util.CreateCustomError(
 			"Invalid theme",
 			http.StatusBadRequest,

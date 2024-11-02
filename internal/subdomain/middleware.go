@@ -3,11 +3,11 @@ package subdomain
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
 
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
@@ -21,27 +21,33 @@ func NewSubdomainMiddleware(s *model.Store) *SubdomainMiddleware {
 
 func (uwm *SubdomainMiddleware) RouteToSubdomains(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("running subdomain middleware...")
-		log.Println("received request for: ", r.URL)
+		logger := logging.Logger(r)
+
+		logger.Println("running subdomain middleware...")
+		logger.Println("received request for: ", r.URL)
 		if err := rendersubdomainpath(w, r, uwm.store); err != nil {
-			log.Println("no subdomain found: ", err)
+			logger.Println("no subdomain found: ")
 			next.ServeHTTP(w, r)
 			return
 		}
 	})
 }
 
-func rendersubdomainpath(w http.ResponseWriter, r *http.Request, s *model.Store) error {
+func rendersubdomainpath(
+	w http.ResponseWriter, r *http.Request, s *model.Store,
+) error {
 	filepath, err := getblogfilepath(r, s)
 	if err != nil {
 		return fmt.Errorf("cannot get filepath: %w", err)
 	}
-	log.Println("filepath", filepath)
+	logging.Logger(r).Println("filepath", filepath)
 	http.ServeFile(w, r, filepath)
 	return nil
 }
 
 func getblogfilepath(r *http.Request, s *model.Store) (string, error) {
+	logger := logging.Logger(r)
+
 	/* XXX: bit dodge but with local development we have subdomains like
 	* http://<subdomain>.localhost:7999 whic should also route
 	* correctly so we split on both "." and ":" */
@@ -58,8 +64,8 @@ func getblogfilepath(r *http.Request, s *model.Store) (string, error) {
 	subdomain := parts[0]
 	url := r.URL.Path
 
-	log.Println("subdomain", subdomain)
-	log.Println("url", url)
+	logger.Println("subdomain", subdomain)
+	logger.Println("url", url)
 
 	gen, err := s.GetLastGenerationBySubdomain(context.TODO(), subdomain)
 	if err != nil {
@@ -77,7 +83,7 @@ func getblogfilepath(r *http.Request, s *model.Store) (string, error) {
 
 func gethostorxforwardedhost(r *http.Request) string {
 	host := r.Header.Get("X-Forwarded-Host")
-	log.Printf("X-Forwarded-Host: %s\n", host)
+	logging.Logger(r).Printf("X-Forwarded-Host: %s\n", host)
 	if host == "" {
 		return r.Host // Fallback to the Host header
 	}

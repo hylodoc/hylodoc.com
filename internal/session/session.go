@@ -31,8 +31,11 @@ type Session struct {
 	expiresAt    time.Time `json:"expires_at"`
 }
 
-func CreateUnauthSession(s *model.Store, w http.ResponseWriter, expiresAt time.Time) (*Session, error) {
-	log.Println("creating unauth session...")
+func CreateUnauthSession(
+	s *model.Store, w http.ResponseWriter, expiresAt time.Time,
+	logger *log.Logger,
+) (*Session, error) {
+	logger.Println("Creating unauth session...")
 
 	unauthSession, err := s.CreateUnauthSession(context.TODO(), expiresAt)
 	if err != nil {
@@ -54,8 +57,11 @@ func CreateUnauthSession(s *model.Store, w http.ResponseWriter, expiresAt time.T
 	}, nil
 }
 
-func CreateAuthSession(s *model.Store, w http.ResponseWriter, userID int32, expiresAt time.Time) (*Session, error) {
-	log.Println("creating auth session...")
+func CreateAuthSession(
+	s *model.Store, w http.ResponseWriter, userID int32, expiresAt time.Time,
+	logger *log.Logger,
+) (*Session, error) {
+	logger.Println("Creating auth session...")
 
 	authSession, err := s.CreateAuthSession(context.TODO(), model.CreateAuthSessionParams{
 		UserID:    userID,
@@ -100,8 +106,11 @@ func convertRowToSession(row model.GetAuthSessionRow) *Session {
 	}
 }
 
-func EndAuthSession(s *model.Store, w http.ResponseWriter, sessionID string) error {
-	log.Println("ending auth session...")
+func EndAuthSession(
+	s *model.Store, w http.ResponseWriter, sessionID string,
+	logger *log.Logger,
+) error {
+	logger.Println("ending auth session...")
 
 	uuid, err := uuid.Parse(sessionID)
 	if err != nil {

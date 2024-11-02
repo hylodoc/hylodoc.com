@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
@@ -29,12 +29,14 @@ func NewBillingService(s *model.Store) *BillingService {
 
 func (b *BillingService) Subscriptions() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("subscriptions...")
+		logger := logging.Logger(r)
+
+		logger.Println("Subscriptions handler...")
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
-			log.Println("user not found")
-			http.Error(w, "user not found", http.StatusUnauthorized)
+			logger.Println("No auth session")
+			http.Error(w, "No auth session", http.StatusUnauthorized)
 			return
 		}
 
@@ -53,6 +55,7 @@ func (b *BillingService) Subscriptions() http.HandlerFunc {
 			template.FuncMap{
 				"centsToDollars": ConvertCentsToDollars,
 			},
+			logger,
 		)
 	}
 }
@@ -64,27 +67,31 @@ func ConvertCentsToDollars(cents int64) string {
 
 func (b *BillingService) CreateCheckoutSession() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("createCheckoutSession handler..")
+		logger := logging.Logger(r)
+
+		logger.Println("CreateCheckoutSession handler...")
 
 		url, err := b.createCheckoutSession(w, r)
 		if err != nil {
-			log.Printf("error creating checkout session: %v", err)
+			logger.Printf("Error creating checkout session: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
-		log.Println("redirecting user to stripe for payment...")
+		logger.Println("Redirecting to stripe for payment...")
 		http.Redirect(w, r, url, http.StatusSeeOther)
 	}
 }
 
 func (b *BillingService) createCheckoutSession(w http.ResponseWriter, r *http.Request) (string, error) {
+	logger := logging.Logger(r)
+
 	userSession, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
 		return "", fmt.Errorf("error getting session")
 	}
 
 	priceID := r.FormValue("plan")
-	log.Printf("got priceID: %s\n", priceID)
+	logger.Printf("PriceID: %s\n", priceID)
 
 	params := &stripe.CheckoutSessionParams{
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
@@ -139,11 +146,14 @@ type SuccessParams struct {
 
 func (b *BillingService) Success() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("payment success...")
+		logger := logging.Logger(r)
+
+		logger.Println("Payment success!")
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
-			http.Error(w, "User not found", http.StatusUnauthorized)
+			logger.Println("No auth session")
+			http.Error(w, "", http.StatusNotFound)
 			return
 		}
 
@@ -166,16 +176,19 @@ func (b *BillingService) Success() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }
 
 func (b *BillingService) Cancel() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("payment cancel...")
+		logger := logging.Logger(r)
+		logger.Printf("Payment Cancel handler...")
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
+			logger.Println("No auth session")
 			http.Error(w, "User not found", http.StatusUnauthorized)
 			return
 		}
@@ -191,22 +204,24 @@ func (b *BillingService) Cancel() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }
 
 func (b *BillingService) BillingPortal() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("choose subscription...")
+		logger := logging.Logger(r)
+		logger.Println("BillingPortal handler...")
 
 		url, err := b.billingPortal(w, r)
 		if err != nil {
-			log.Printf("error redirecting to billing portal: %v", err)
+			logger.Printf("error redirecting to billing portal: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
 
-		log.Println("redirecting user to billing portal...")
+		logger.Println("Redirecting User to billing portal...")
 		http.Redirect(w, r, url, http.StatusSeeOther)
 	}
 }

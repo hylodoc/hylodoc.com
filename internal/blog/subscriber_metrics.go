@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
@@ -36,21 +36,23 @@ type Subscriber struct {
 
 func (b *BlogService) SubscriberMetrics() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("subscriber metrics handler...")
+		logger := logging.Logger(r)
+		logger.Println("SubscriberMetrics handler...")
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
+			logger.Println("No auth session")
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
 
 		data, err := b.subscriberMetrics(w, r)
 		if err != nil {
-			log.Printf("error getting subscriber metrics: %v", err)
+			logger.Printf("Error getting subscriber metrics: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
-		log.Printf("subscribers: %v\n", data)
+		logger.Printf("subscribers: %v\n", data)
 
 		util.ExecTemplate(w, []string{"subscriber_metrics.html", "subscribers.html"},
 			util.PageInfo{
@@ -65,6 +67,7 @@ func (b *BlogService) SubscriberMetrics() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }

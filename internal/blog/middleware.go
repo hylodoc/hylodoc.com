@@ -2,11 +2,11 @@ package blog
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 )
@@ -23,12 +23,14 @@ func NewBlogMiddleware(s *model.Store) *BlogMiddleware {
 
 func (bm *BlogMiddleware) AuthoriseBlog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("running blog middleware...")
+		logger := logging.Logger(r)
+
+		logger.Println("Running blog authorisation middleware...")
 		/* authorise blog */
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
-			log.Println("error getting session from context")
-			http.Error(w, "User not found", http.StatusUnauthorized)
+			logger.Println("No auth session")
+			http.Error(w, "", http.StatusNotFound)
 			return
 		}
 		/* blogID and userID */
@@ -37,7 +39,7 @@ func (bm *BlogMiddleware) AuthoriseBlog(next http.Handler) http.Handler {
 
 		intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 		if err != nil {
-			log.Printf("error converting string path var to blogID: %v\n", err)
+			logger.Printf("Error converting string path var to blogID: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -46,12 +48,12 @@ func (bm *BlogMiddleware) AuthoriseBlog(next http.Handler) http.Handler {
 			UserID: userID,
 		})
 		if err != nil {
-			log.Printf("error checking blog ownership: %v\n", err)
+			logger.Printf("Error checking blog ownership: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
 		if !userOwnsBlog {
-			log.Printf("user `%d' does not own blog `%d'\n", userID, intBlogID)
+			logger.Printf("User `%d' does not own blog `%d'\n", userID, intBlogID)
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}

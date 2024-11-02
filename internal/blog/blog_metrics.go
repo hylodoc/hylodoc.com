@@ -2,10 +2,10 @@ package blog
 
 import (
 	"html/template"
-	"log"
 	"net/http"
 	"time"
 
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
@@ -29,15 +29,18 @@ type EmailData struct {
 
 func (b *BlogService) SiteMetrics() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.Logger(r)
+
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
+			logger.Println("No session")
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
 
 		data, err := b.siteMetrics(w, r)
 		if err != nil {
-			log.Printf("error getting subscriber metrics: %v", err)
+			logger.Printf("Error getting subscriber metrics: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -56,6 +59,7 @@ func (b *BlogService) SiteMetrics() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }

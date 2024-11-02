@@ -3,7 +3,6 @@ package email
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/config"
@@ -24,14 +23,13 @@ func SendRegisterLink(c *resend.Client, params MagicLinkParams) error {
 	link := buildRegisterLink(params.Token)
 	body := fmt.Sprintf("Click here to register: %s", link)
 
-	sent, err := c.Emails.SendWithContext(context.TODO(), &resend.SendEmailRequest{
+	_, err := c.Emails.SendWithContext(context.TODO(), &resend.SendEmailRequest{
 		From:    config.Config.Progstack.FromEmail,
 		To:      []string{params.To},
 		Subject: magicRegisterLinkSubject,
 		Text:    body,
 	})
 	if err != nil {
-		log.Printf("email response: %v", sent)
 		return fmt.Errorf("error sending register email to `%s: %w", to, err)
 	}
 
@@ -53,14 +51,13 @@ func SendLoginLink(c *resend.Client, params MagicLinkParams) error {
 	link := buildLoginLink(params.Token)
 	body := fmt.Sprintf("Click here to login: %s", link)
 
-	sent, err := c.Emails.SendWithContext(context.TODO(), &resend.SendEmailRequest{
+	_, err := c.Emails.SendWithContext(context.TODO(), &resend.SendEmailRequest{
 		From:    config.Config.Progstack.FromEmail,
 		To:      []string{params.To},
 		Subject: magicLoginLinkSubject,
 		Text:    body,
 	})
 	if err != nil {
-		log.Printf("email response: %v", sent)
 		return fmt.Errorf("error sending login email to `%s: %w", to, err)
 	}
 

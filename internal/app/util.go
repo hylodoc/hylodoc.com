@@ -4,12 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"net"
 )
 
 func HashIp(ip string) (string, error) {
-	log.Println("ip: ", ip)
 	parsedIp := net.ParseIP(ip)
 	if parsedIp == nil {
 		return "", fmt.Errorf("invalid IP address: %s", ip)

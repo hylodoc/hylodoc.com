@@ -2,10 +2,10 @@ package session
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"time"
 
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
@@ -25,7 +25,8 @@ func NewSessionMiddleware(s *model.Store) *SessionMiddleware {
 
 func (a *SessionMiddleware) SessionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("running session middleware...")
+		logger := logging.Logger(r)
+		logger.Println("Session middleware...")
 
 		/* ignore /metrics used by prometheus */
 		if r.URL.Path == "/metrics" {
@@ -35,11 +36,13 @@ func (a *SessionMiddleware) SessionMiddleware(next http.Handler) http.Handler {
 
 		cookie, err := r.Cookie(CookieName)
 		if err != nil {
-			log.Printf("error getting cookie: %v", err)
+			logger.Printf("Error getting cookie: %v", err)
 			/* create unauth session */
-			session, err := CreateUnauthSession(a.store, w, unauthSessionDuration)
+			session, err := CreateUnauthSession(
+				a.store, w, unauthSessionDuration, logger,
+			)
 			if err != nil {
-				log.Printf("error creating unauth session: %v", err)
+				logger.Printf("Error creating unauth session: %v", err)
 				http.Error(w, "", http.StatusInternalServerError)
 				return
 			}
@@ -51,7 +54,7 @@ func (a *SessionMiddleware) SessionMiddleware(next http.Handler) http.Handler {
 		/* cookie exists retrieve session */
 		session, err := GetSession(a.store, w, cookie.Value)
 		if err != nil {
-			log.Printf("error getting session: %v", err)
+			logger.Printf("Error getting session: %v", err)
 			/* expire cookie if error */
 			http.SetCookie(w, &http.Cookie{
 				Name:     CookieName,
@@ -65,7 +68,7 @@ func (a *SessionMiddleware) SessionMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		if session.expiresAt.Before(time.Now()) {
-			log.Println("session expired")
+			logger.Println("session expired")
 			/* expire cookie if session expired */
 			http.SetCookie(w, &http.Cookie{
 				Name:     CookieName,

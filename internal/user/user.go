@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/installation"
+	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
@@ -31,19 +31,21 @@ func NewUserService(s *model.Store) *UserService {
 
 func (u *UserService) Home() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("home handler...")
+		logger := logging.Logger(r)
+		logger.Println("Home handler...")
 		/* XXX: add metrics */
 
 		/* get session */
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
-			http.Error(w, "User not found", http.StatusUnauthorized)
+			logger.Println("No auth session")
+			http.Error(w, "", http.StatusNotFound)
 			return
 		}
 
 		blogs, err := blog.GetBlogsInfo(u.store, sesh.GetUserID())
 		if err != nil {
-			log.Printf("error getting blogs for user `%d': %v\n", sesh.GetUserID(), err)
+			logger.Printf("Error getting blogs for user `%d': %v\n", sesh.GetUserID(), err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -64,17 +66,19 @@ func (u *UserService) Home() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }
 
 func (u *UserService) CreateNewBlog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("respository flow handler...")
+		logger := logging.Logger(r)
+		logger.Println("CreateNewBlog handler...")
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
-			log.Println("no user found")
+			logger.Println("No auth session")
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
@@ -90,17 +94,20 @@ func (u *UserService) CreateNewBlog() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }
 
 func (u *UserService) FolderFlow() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("folder flow handler...")
+		logger := logging.Logger(r)
+
+		logger.Printf("FolderFlow handler...")
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
-			log.Println("no user found")
+			logger.Println("No auth session")
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
@@ -120,19 +127,25 @@ func (u *UserService) FolderFlow() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }
 
 func (u *UserService) GithubInstallation() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.Logger(r)
+		logger.Printf("GithubInstallation handler...")
+
 		if err := u.githubInstallation(w, r); err != nil {
 			var customErr *util.CustomError
 			if errors.As(err, &customErr) {
+				logger.Printf("Custom Error: %v\n", customErr)
 				http.Error(
 					w, customErr.Error(), customErr.Code,
 				)
 			} else {
+				logger.Printf("Internal Server Error: %v\n", err)
 				http.Error(
 					w,
 					"Internal Server Error",
@@ -220,15 +233,18 @@ type Repository struct {
 
 func (u *UserService) RepositoryFlow() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.Logger(r)
+		logger.Println("RepositoryFlow handler...")
+
 		if err := u.repositoryFlow(w, r); err != nil {
 			var customErr *util.CustomError
 			if errors.As(err, &customErr) {
-				log.Printf("custom error: %v", err)
+				logger.Printf("Custom Error: %v\n", customErr)
 				http.Error(
 					w, customErr.Error(), customErr.Code,
 				)
 			} else {
-				log.Printf("error with repository flow: %v", err)
+				logger.Printf("Internal Server Error: %v\n", err)
 				http.Error(
 					w,
 					"Internal Server Error",
@@ -241,11 +257,11 @@ func (u *UserService) RepositoryFlow() http.HandlerFunc {
 }
 
 func (u *UserService) repositoryFlow(w http.ResponseWriter, r *http.Request) error {
+	logger := logging.Logger(r)
+
 	if err := u.awaitupdate(r); err != nil {
 		return fmt.Errorf("error awaiting update: %w", err)
 	}
-
-	log.Println("create new blog handler...")
 
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	if !ok {
@@ -285,6 +301,7 @@ func (u *UserService) repositoryFlow(w http.ResponseWriter, r *http.Request) err
 			},
 		},
 		template.FuncMap{},
+		logger,
 	)
 	return nil
 }
@@ -326,25 +343,26 @@ type Subscription struct {
 
 func (u *UserService) Account() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("account handler...")
+		logger := logging.Logger(r)
+		logger.Println("Account handler...")
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
-			log.Printf("user auth session not found\n")
+			logger.Println("No auth session")
 			http.Error(w, "", http.StatusUnauthorized)
 			return
 		}
 
 		accountDetails, err := getAccountDetails(u.store, sesh)
 		if err != nil {
-			log.Printf("error getting account details: %v", err)
+			logger.Printf("Error getting account details: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
 
 		storageDetails, err := getStorageDetails(u.store, sesh)
 		if err != nil {
-			log.Printf("error getting account details: %v", err)
+			logger.Printf("Error getting storage details: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
@@ -364,6 +382,7 @@ func (u *UserService) Account() http.HandlerFunc {
 				},
 			},
 			template.FuncMap{},
+			logger,
 		)
 	}
 }
@@ -392,10 +411,14 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 		GithubEmail:     "",
 	}
 	linked := true
-	ghAccount, err := s.GetGithubAccountByUserID(context.TODO(), session.GetUserID())
+	ghAccount, err := s.GetGithubAccountByUserID(
+		context.TODO(), session.GetUserID(),
+	)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			return AccountDetails{}, fmt.Errorf("error getting account details: %w", err)
+			return AccountDetails{}, fmt.Errorf(
+				"error getting account details: %w", err,
+			)
 		}
 		/* no linked Github account*/
 		linked = false
@@ -405,9 +428,13 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 		accountDetails.GithubEmail = ghAccount.GhEmail
 	}
 
-	hasInstallation, err := s.InstallationExistsForUserID(context.TODO(), session.GetUserID())
+	hasInstallation, err := s.InstallationExistsForUserID(
+		context.TODO(), session.GetUserID(),
+	)
 	if err != nil {
-		return AccountDetails{}, fmt.Errorf("error checking if user has installation: %w", err)
+		return AccountDetails{}, fmt.Errorf(
+			"error checking if user has installation: %w", err,
+		)
 	}
 	if hasInstallation {
 		accountDetails.HasInstallation = true
@@ -418,10 +445,15 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 		IsSubscribed: false,
 	}
 	subscribed := true
-	sub, err := s.GetStripeSubscriptionByUserID(context.TODO(), session.GetUserID())
+	sub, err := s.GetStripeSubscriptionByUserID(
+		context.TODO(), session.GetUserID(),
+	)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			return AccountDetails{}, fmt.Errorf("error getting stripe subscription details: %w", err)
+			return AccountDetails{}, fmt.Errorf(
+				"error getting stripe subscription details: %w",
+				err,
+			)
 		}
 		/* no sub */
 		subscribed = false
@@ -431,8 +463,12 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 	if subscribed {
 		subscription.IsSubscribed = true
 		subscription.Plan = "basic" /* XXX: fix */
-		subscription.CurrentPeriodStart = sub.CurrentPeriodStart.Format("Jan 02 2006 03:04PM")
-		subscription.CurrentPeriodEnd = sub.CurrentPeriodEnd.Format("Jan 02 2006 03:04PM")
+		subscription.CurrentPeriodStart = sub.CurrentPeriodStart.Format(
+			"Jan 02 2006 03:04PM",
+		)
+		subscription.CurrentPeriodEnd = sub.CurrentPeriodEnd.Format(
+			"Jan 02 2006 03:04PM",
+		)
 		subscription.Amount = billing.ConvertCentsToDollars(sub.Amount)
 	}
 	accountDetails.Subscription = subscription
@@ -441,19 +477,20 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 
 func (u *UserService) Delete() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("user delete handler...")
+		logger := logging.Logger(r)
+		logger.Println("User Delete handler...")
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
-			log.Printf("user auth session not found\n")
-			http.Error(w, "", http.StatusUnauthorized)
+			logger.Println("No auth session")
+			http.Error(w, "", http.StatusNotFound)
 			return
 		}
 
 		/* XXX: need to call stripe to stop billing */
 
 		if err := u.store.DeleteUserByUserID(context.TODO(), sesh.GetUserID()); err != nil {
-			log.Printf("error deleting user: %v", err)
+			logger.Printf("Error deleting user: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}

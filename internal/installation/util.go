@@ -7,14 +7,16 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
+
+	"github.com/xr0-org/progstack/internal/logging"
 )
 
 /* validates that an event actually comes from our GithubApp by using the webhook
 * secret configured on the GithubApp */
 func validateSignature(r *http.Request, secret string) error {
-	log.Println("validating github signature...")
+	logger := logging.Logger(r)
+	logger.Println("Validating github signature...")
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return fmt.Errorf("error reading body: %w", err)

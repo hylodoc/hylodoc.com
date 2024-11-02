@@ -7,6 +7,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/xr0-org/progstack/internal/logging"
 )
 
 var (
@@ -112,31 +113,56 @@ func (rw *responseWriterWithStatus) Write(b []byte) (int, error) {
 
 func MetricsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("metrics middleware...")
+		logger := logging.Logger(r)
+
+		logger.Printf("metrics middleware")
 
 		start := time.Now()
 
 		/* custom responseWriter to capture code */
-		rec := &responseWriterWithStatus{ResponseWriter: w, statusCode: 0}
+		rec := &responseWriterWithStatus{
+			ResponseWriter: w,
+			statusCode:     0,
+		}
 
 		next.ServeHTTP(rec, r)
 		duration := time.Since(start).Seconds()
 
-		httpRequestTotal.WithLabelValues(r.Method, r.URL.Path, http.StatusText(rec.statusCode), "none").Inc()
+		httpRequestTotal.WithLabelValues(
+			r.Method,
+			r.URL.Path,
+			http.StatusText(rec.statusCode),
+			"none",
+		).Inc()
 
 		/* handle errors */
 		if rec.statusCode >= 200 && rec.statusCode < 400 {
-			httpRequestSuccessTotal.WithLabelValues(r.Method, r.URL.Path, http.StatusText(rec.statusCode), "none").Inc()
+			httpRequestSuccessTotal.WithLabelValues(
+				r.Method,
+				r.URL.Path,
+				http.StatusText(rec.statusCode),
+				"none",
+			).Inc()
 		} else {
-			errorType := classifyError(rec.statusCode)
-			httpRequestErrorsTotal.WithLabelValues(r.Method, r.URL.Path, http.StatusText(rec.statusCode), errorType).Inc()
+			errorType := classifyError(rec.statusCode, logger)
+			httpRequestErrorsTotal.WithLabelValues(
+				r.Method,
+				r.URL.Path,
+				http.StatusText(rec.statusCode),
+				errorType,
+			).Inc()
 		}
 
-		httpRequestDuration.WithLabelValues(r.Method, r.URL.Path, http.StatusText(rec.statusCode), "none").Observe(duration)
+		httpRequestDuration.WithLabelValues(
+			r.Method,
+			r.URL.Path,
+			http.StatusText(rec.statusCode),
+			"none",
+		).Observe(duration)
 	})
 }
 
-func classifyError(statusCode int) string {
+func classifyError(statusCode int, logger *log.Logger) string {
 	switch {
 	case statusCode == http.StatusNotFound:
 		return "not_found"
@@ -145,7 +171,7 @@ func classifyError(statusCode int) string {
 	case statusCode >= 500:
 		return "internal"
 	default:
-		log.Printf("unknown error type: %d", statusCode)
+		logger.Printf("unknown error type: %d", statusCode)
 		return "unknown"
 	}
 }

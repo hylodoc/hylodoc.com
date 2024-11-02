@@ -3,7 +3,6 @@ package blog
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -16,12 +15,11 @@ const (
 	ghRepositoriesTarballUrlTemplate = "https://api.github.com/repos/%s/tarball/%s"
 )
 
-func downloadRepoTarball(c *httpclient.Client, repoFullName, branch, accessToken string) (string, error) {
-	log.Println("downloading repo tarball...")
-
+func downloadRepoTarball(
+	c *httpclient.Client, repoFullName, branch, accessToken string,
+) (string, error) {
 	/* build request */
 	tarballUrl := buildTarballUrl(repoFullName, branch)
-	log.Printf("tarballUrl: %s\n", tarballUrl)
 	req, err := util.NewRequestBuilder("GET", tarballUrl).
 		WithHeader("Authorization", fmt.Sprintf("Bearer %s", accessToken)).
 		WithHeader("Accept", "application/vnd.github+json").
@@ -59,21 +57,15 @@ func buildTarballUrl(repoFullName, branch string) string {
 }
 
 func extractTarball(src, dst string) error {
-	log.Println("extracting tarball...")
-	log.Printf("extracting tarball from src `%s' to dst `%s'", src, dst)
-
 	/* remove dst dir */
 	if _, err := os.Stat(dst); err == nil {
-		log.Printf("destination directory `%s' already exists; removing it", dst)
 		if err := os.RemoveAll(dst); err != nil {
-			log.Printf("error removing destination directory: %v\n", err)
 			return fmt.Errorf("error removing destination directory: %w", err)
 		}
 	}
 
 	/* create fresh dst dir */
 	if err := os.MkdirAll(dst, os.ModePerm); err != nil {
-		log.Printf("error creating destination directory: %v\n", err)
 		return fmt.Errorf("error creating destination directory: %w", err)
 	}
 
@@ -86,7 +78,6 @@ func extractTarball(src, dst string) error {
 	* elsewhere ) */
 	cmd := exec.Command("tar", "--strip-components=1", "-xzf", src, "-C", dst)
 	if err := cmd.Run(); err != nil {
-		log.Printf("error extracting tar file: %v\n", err)
 		return fmt.Errorf("error extraction tar file: %w", err)
 	}
 	return nil
