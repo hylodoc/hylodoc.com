@@ -3,10 +3,14 @@ package blog
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/util"
 )
@@ -18,6 +22,8 @@ const (
 func downloadRepoTarball(
 	c *httpclient.Client, repoFullName, branch, accessToken string,
 ) (string, error) {
+	log.Println("downloading repo tarball...")
+
 	/* build request */
 	tarballUrl := buildTarballUrl(repoFullName, branch)
 	req, err := util.NewRequestBuilder("GET", tarballUrl).
@@ -81,4 +87,26 @@ func extractTarball(src, dst string) error {
 		return fmt.Errorf("error extraction tar file: %w", err)
 	}
 	return nil
+}
+
+func cloneRepo(
+	dst, repoURL, branch, token string,
+) error {
+	if _, err := os.Stat(dst); err == nil {
+		log.Printf("destination directory `%s' already exists; removing it\n", dst)
+		if err := os.RemoveAll(dst); err != nil {
+			return fmt.Errorf("error removing destination directory: %w", err)
+		}
+	}
+	auth := &githttp.BasicAuth{Username: "github", Password: token}
+	_, err := git.PlainClone(
+		dst,
+		false,
+		&git.CloneOptions{
+			URL:           repoURL,
+			Auth:          auth,
+			ReferenceName: plumbing.ReferenceName(branch),
+		},
+	)
+	return err
 }

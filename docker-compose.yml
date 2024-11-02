@@ -8,6 +8,7 @@ services:
       - '7999:7999'
     volumes:
       - './repositories:/app/repositories'
+      - './websites:/app/websites'
       - './folders:/app/folders'
     depends_on:
       postgres:

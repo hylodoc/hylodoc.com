@@ -5,6 +5,7 @@
 		<tr>
 			<th>Post</th>
 			<th>Date</th>
+			<th>Visits</th>
 			<th>Deliveries</th>
 			<th>Opens</th>
 			<th>Open Rate</th>
@@ -14,7 +15,14 @@
 		{{ range . }}
 			<tr>
 				<td><a href="{{ .Url }}" target="_blank">{{ .Title }}</a></td>
-				<td>{{ .Date.Format "2006-01-02" }}</td>
+				<td>
+					{{ if .Date }}
+						{{ .Date.Format "2006-01-02" }}
+					{{ else }}
+						N/A
+					{{ end }}
+				</td>
+				<td>{{ .Visits }}</td>
 				<td>{{ .EmailData.Deliveries }}</td>
 				<td>{{ .EmailData.Opens }}</td>
 				<td>{{ .EmailData.OpenRate }}</td>

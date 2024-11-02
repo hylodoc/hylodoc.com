@@ -223,18 +223,13 @@ func UpdateRepositoryOnDisk(
 		return fmt.Errorf("no live branch configured for blog `%d'", blog.ID)
 	}
 
-	/* download live branch tarball */
-	logger.Println("downloading repo tarball...")
-	tmpFile, err := downloadRepoTarball(
-		c, repo.FullName, blog.LiveBranch.String, accessToken)
-	if err != nil {
-		return fmt.Errorf("error downloading tarball for at url: %s: %w", repo.FullName, err)
-	}
-
-	/* extract tarball to destination should store under user */
-	tmpDst := buildRepositoryPath(repo.FullName)
-	if err = extractTarball(tmpFile, tmpDst); err != nil {
-		return fmt.Errorf("error extracting tarball to destination for `%s': %w", repo.FullName, err)
+	if err := cloneRepo(
+		buildRepositoryPath(repo.FullName),
+		repo.Url,
+		blog.LiveBranch.String,
+		accessToken,
+	); err != nil {
+		return fmt.Errorf("clone error: %w", err)
 	}
 
 	/* take blog live  */

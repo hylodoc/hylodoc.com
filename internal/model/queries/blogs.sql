@@ -45,6 +45,11 @@ SELECT *
 FROM blogs
 WHERE gh_repository_id = $1 AND blog_type = 'repository';
 
+-- name: GetBlogIDBySubdomain :one
+SELECT id
+FROM blogs
+WHERE subdomain = @subdomain::VARCHAR;
+
 -- name: ListBlogIDsByUserID :many
 SELECT id
 FROM blogs b

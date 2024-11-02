@@ -142,7 +142,9 @@ func launchUserBlog(s *model.Store, b *model.Blog) error {
 			return fmt.Errorf("error inserting binding: %w", err)
 		}
 		if file.IsPost() {
-			if err := ensurePostExists(s, url, b.ID); err != nil {
+			if err := upsertPostDetails(
+				s, url, b.ID, file,
+			); err != nil {
 				return fmt.Errorf(
 					"error ensuring post exists: %w", err,
 				)
@@ -152,7 +154,10 @@ func launchUserBlog(s *model.Store, b *model.Blog) error {
 	return nil
 }
 
-func ensurePostExists(s *model.Store, url string, blogid int32) error {
+func upsertPostDetails(
+	s *model.Store, url string, blogid int32, file ssg.File,
+) error {
+	published := publishedat(file)
 	_, err := s.GetPostExists(
 		context.TODO(),
 		model.GetPostExistsParams{
@@ -167,12 +172,27 @@ func ensurePostExists(s *model.Store, url string, blogid int32) error {
 		return s.InsertRPost(
 			context.TODO(),
 			model.InsertRPostParams{
-				Url:  url,
-				Blog: blogid,
+				Url:         url,
+				Blog:        blogid,
+				PublishedAt: published,
+				Title:       file.PostTitle(),
 			},
 		)
 	}
-	return nil
+	return s.UpdateRPost(
+		context.TODO(),
+		model.UpdateRPostParams{
+			Url:         url,
+			Blog:        blogid,
+			PublishedAt: published,
+			Title:       file.PostTitle(),
+		},
+	)
+}
+
+func publishedat(file ssg.File) sql.NullTime {
+	t, ok := file.PostTime()
+	return sql.NullTime{t, ok}
 }
 
 /* Theme */

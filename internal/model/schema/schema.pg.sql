@@ -169,17 +169,32 @@ CREATE TABLE bindings (
 );
 
 CREATE TABLE _r_posts (
-	url	VARCHAR(1000)	NOT NULL,
-	blog	INTEGER		NOT NULL	REFERENCES blogs,
+	url		VARCHAR(1000)	NOT NULL,
+	blog		INTEGER		NOT NULL	REFERENCES blogs,
+	published_at	TIMESTAMPTZ,
+	title		VARCHAR(1000)	NOT NULL,
 
 	PRIMARY KEY (url, blog)
 );
+CREATE INDEX ON _r_posts(published_at);
 CREATE VIEW posts AS
-	SELECT p.url, p.blog, (bind.url IS NOT NULL) is_active
+	SELECT
+		p.url, p.blog, p.title, (bind.url IS NOT NULL) is_active,
+		p.published_at
 	FROM _r_posts p
 	INNER JOIN generations g ON g.blog = p.blog
 	LEFT JOIN bindings bind ON (bind.gen = g.id AND bind.url = p.url)
 	WHERE g.active = true;
+
+CREATE TABLE visits (
+	id	SERIAL		PRIMARY KEY,
+	url	VARCHAR(1000)	NOT NULL,
+	blog	INTEGER		NOT NULL	REFERENCES blogs ON DELETE CASCADE,
+	time	TIMESTAMPTZ	NOT NULL	DEFAULT(now())
+);
+CREATE INDEX ON visits(url);
+CREATE INDEX ON visits(blog);
+CREATE INDEX ON visits(time);
 
 
 -- blog subscriber lists
