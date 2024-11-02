@@ -13,17 +13,17 @@ const (
 	CtxSessionKey = "session"
 )
 
-type SessionMiddleware struct {
+type SessionService struct {
 	store *model.Store
 }
 
-func NewSessionMiddleware(s *model.Store) *SessionMiddleware {
-	return &SessionMiddleware{
+func NewSessionService(s *model.Store) *SessionService {
+	return &SessionService{
 		store: s,
 	}
 }
 
-func (a *SessionMiddleware) SessionMiddleware(next http.Handler) http.Handler {
+func (s *SessionService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("Session middleware...")
@@ -39,7 +39,7 @@ func (a *SessionMiddleware) SessionMiddleware(next http.Handler) http.Handler {
 			logger.Printf("Error getting cookie: %v", err)
 			/* create unauth session */
 			session, err := CreateUnauthSession(
-				a.store, w, unauthSessionDuration, logger,
+				s.store, w, unauthSessionDuration, logger,
 			)
 			if err != nil {
 				logger.Printf("Error creating unauth session: %v", err)
@@ -52,7 +52,7 @@ func (a *SessionMiddleware) SessionMiddleware(next http.Handler) http.Handler {
 		}
 
 		/* cookie exists retrieve session */
-		session, err := GetSession(a.store, w, cookie.Value)
+		session, err := GetSession(s.store, w, cookie.Value)
 		if err != nil {
 			logger.Printf("Error getting session: %v", err)
 			/* expire cookie if error */

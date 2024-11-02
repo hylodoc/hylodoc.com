@@ -11,17 +11,7 @@ import (
 	"github.com/xr0-org/progstack/internal/session"
 )
 
-type BlogMiddleware struct {
-	store *model.Store
-}
-
-func NewBlogMiddleware(s *model.Store) *BlogMiddleware {
-	return &BlogMiddleware{
-		store: s,
-	}
-}
-
-func (bm *BlogMiddleware) AuthoriseBlog(next http.Handler) http.Handler {
+func (b *BlogService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 
@@ -43,10 +33,11 @@ func (bm *BlogMiddleware) AuthoriseBlog(next http.Handler) http.Handler {
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
-		userOwnsBlog, err := bm.store.CheckBlogOwnership(context.TODO(), model.CheckBlogOwnershipParams{
-			ID:     int32(intBlogID),
-			UserID: userID,
-		})
+		userOwnsBlog, err := b.store.CheckBlogOwnership(
+			context.TODO(), model.CheckBlogOwnershipParams{
+				ID:     int32(intBlogID),
+				UserID: userID,
+			})
 		if err != nil {
 			logger.Printf("Error checking blog ownership: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)

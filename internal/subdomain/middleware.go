@@ -9,20 +9,20 @@ import (
 	"github.com/xr0-org/progstack/internal/model"
 )
 
-type SubdomainMiddleware struct {
+type SubdomainService struct {
 	store *model.Store
 }
 
-func NewSubdomainMiddleware(s *model.Store) *SubdomainMiddleware {
-	return &SubdomainMiddleware{store: s}
+func NewSubdomainService(s *model.Store) *SubdomainService {
+	return &SubdomainService{store: s}
 }
 
-func (uwm *SubdomainMiddleware) RouteToSubdomains(next http.Handler) http.Handler {
+func (ss *SubdomainService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("running subdomain middleware...")
 		logger.Println("received request for: ", r.URL)
-		if err := rendersubdomainpath(w, r, uwm.store); err != nil {
+		if err := ss.middleware(w, r); err != nil {
 			logger.Println("no subdomain found: ")
 			if !errors.Is(err, errNoSubdomain) {
 				/* TODO: escalate worse error */
@@ -35,17 +35,17 @@ func (uwm *SubdomainMiddleware) RouteToSubdomains(next http.Handler) http.Handle
 	})
 }
 
-func rendersubdomainpath(
-	w http.ResponseWriter, r *http.Request, s *model.Store,
+func (ss *SubdomainService) middleware(
+	w http.ResponseWriter, r *http.Request,
 ) error {
 	req, err := parseRequest(r)
 	if err != nil {
 		return fmt.Errorf("cannot parse request: %w", err)
 	}
-	if err := req.recordvisit(s); err != nil {
+	if err := req.recordvisit(ss.store); err != nil {
 		return fmt.Errorf("cannot record visit: %w", err)
 	}
-	filepath, err := req.getfilepath(s)
+	filepath, err := req.getfilepath(ss.store)
 	if err != nil {
 		return fmt.Errorf("cannot get filepath: %w", err)
 	}

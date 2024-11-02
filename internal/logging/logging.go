@@ -16,7 +16,7 @@ const (
 	loggerKey    = contextKey("logger")
 )
 
-func LoggingMiddleware(next http.Handler) http.Handler {
+func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		/* retrieve existing or make new */
 		requestID := r.Header.Get("X-Request-ID")

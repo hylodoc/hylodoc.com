@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/resend/resend-go/v2"
+	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/auth"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
@@ -44,18 +45,17 @@ func Serve() {
 	client := httpclient.NewHttpClient(clientTimeout)
 	store := model.NewStore(db)
 	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
-
-	/* init middleware */
-	subdomainMiddleware := subdomain.NewSubdomainMiddleware(store)
-	sessionMiddleware := session.NewSessionMiddleware(store)
-	blogMiddleware := blog.NewBlogMiddleware(store)
-	billingService := billing.NewBillingService(store)
+	mixpanelClient := analytics.NewMixpanelClient(config.Config.Mixpanel.Token)
 
 	/* init services */
 	authService := auth.NewAuthService(client, resendClient, store, &config.Config.Github)
+	sessionService := session.NewSessionService(store)
+	analyticsService := analytics.NewAnalyticsService(mixpanelClient)
+	subdomainService := subdomain.NewSubdomainService(store)
+	installationService := installation.NewInstallationService(client, resendClient, store, &config.Config)
 	userService := user.NewUserService(store)
-	installService := installation.NewInstallationService(client, resendClient, store, &config.Config)
 	blogService := blog.NewBlogService(client, store, resendClient)
+	billingService := billing.NewBillingService(store)
 
 	/* init metrics */
 	metrics.Initialize()
@@ -64,13 +64,15 @@ func Serve() {
 	r := mux.NewRouter()
 
 	/* NOTE: userWebsite middleware currently runs before main application */
-	r.Use(logging.LoggingMiddleware)
+	r.Use(sessionService.Middleware)
 
-	r.Use(subdomainMiddleware.RouteToSubdomains)
+	r.Use(logging.Middleware)
 
-	r.Use(metrics.MetricsMiddleware)
+	r.Use(subdomainService.Middleware)
 
-	r.Use(sessionMiddleware.SessionMiddleware)
+	r.Use(metrics.Middleware)
+
+	r.Use(analyticsService.Middleware)
 
 	/* public routes */
 	r.HandleFunc("/", index())
@@ -84,7 +86,7 @@ func Serve() {
 	r.HandleFunc("/magic/registercallback", authService.MagicRegisterCallback())
 	r.HandleFunc("/magic/login", authService.MagicLogin())
 	r.HandleFunc("/magic/logincallback", authService.MagicLoginCallback())
-	r.HandleFunc("/gh/installcallback", installService.InstallationCallback())
+	r.HandleFunc("/gh/installcallback", installationService.InstallationCallback())
 	r.HandleFunc("/stripe/webhook", billingService.StripeWebhook())
 
 	/* XXX: should operate on subdomain since we route with that, then we can get the associated blog info */
@@ -113,7 +115,7 @@ func Serve() {
 	authR.HandleFunc("/stripe/billing-portal", billingService.BillingPortal())
 
 	blogR := authR.PathPrefix("/blogs/{blogID}").Subrouter()
-	blogR.Use(blogMiddleware.AuthoriseBlog)
+	blogR.Use(blogService.Middleware)
 	blogR.HandleFunc("/config", blogService.Config())
 	blogR.HandleFunc("/set-subdomain", blogService.SubdomainSubmit())
 	blogR.HandleFunc("/set-theme", blogService.ThemeSubmit())
