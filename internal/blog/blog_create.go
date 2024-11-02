@@ -148,10 +148,6 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		return "", fmt.Errorf("error pulling latest changes on live branch: %w", err)
 	}
 
-	/* take blog live  */
-	if _, err := SetBlogToLive(&blog, b.store); err != nil {
-		return "", fmt.Errorf("error setting blog to live: %w", err)
-	}
 	return buildDomainUrl(blog.Subdomain), nil
 }
 
@@ -228,6 +224,11 @@ func UpdateRepositoryOnDisk(c *httpclient.Client, s *model.Store, ghRepositoryId
 	tmpDst := buildRepositoryPath(repo.FullName)
 	if err = extractTarball(tmpFile, tmpDst); err != nil {
 		return fmt.Errorf("error extracting tarball to destination for `%s': %w", repo.FullName, err)
+	}
+
+	/* take blog live  */
+	if _, err := setBlogToLive(&blog, s); err != nil {
+		return fmt.Errorf("error setting blog to live: %w", err)
 	}
 	return nil
 }
@@ -311,7 +312,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	}
 
 	/* take blog live  */
-	if _, err := SetBlogToLive(&blog, b.store); err != nil {
+	if _, err := setBlogToLive(&blog, b.store); err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
 	return buildDomainUrl(blog.Subdomain), nil

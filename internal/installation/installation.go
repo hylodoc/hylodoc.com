@@ -440,10 +440,6 @@ func handlePush(c *httpclient.Client, resendClient *resend.Client, s *model.Stor
 		return fmt.Errorf("error pulling latest changes: %w", err)
 	}
 
-	/* take blog live  */
-	if _, err = blog.SetBlogToLive(&b, s); err != nil {
-		return fmt.Errorf("error setting blog to live: %w", err)
-	}
 	return nil
 }
 

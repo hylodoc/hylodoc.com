@@ -189,7 +189,7 @@ func (b *BlogService) subdomainSubmit(w http.ResponseWriter, r *http.Request) er
 	}
 
 	/* bring blog online */
-	if _, err := SetBlogToLive(&blog, b.store); err != nil {
+	if _, err := setBlogToLive(&blog, b.store); err != nil {
 		return fmt.Errorf(
 			"error bringing subdomain `%s' online: %w",
 			blog.Subdomain, err,

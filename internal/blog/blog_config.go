@@ -370,7 +370,7 @@ func (b *BlogService) folderSubmit(w http.ResponseWriter, r *http.Request) error
 	}
 
 	/* take blog live  */
-	_, err = SetBlogToLive(&blog, b.store)
+	_, err = setBlogToLive(&blog, b.store)
 	if err != nil {
 		return fmt.Errorf("error setting blog to live: %w", err)
 	}
@@ -529,7 +529,7 @@ func handleStatusChange(
 		return nil, fmt.Errorf("invalid status change: %w", err)
 	}
 	if islive {
-		return SetBlogToLive(&blog, s)
+		return setBlogToLive(&blog, s)
 	} else {
 		return setBlogToOffline(blog, s)
 	}
@@ -549,7 +549,7 @@ func validateStatusChange(blogID int32, islive bool, s *model.Store) error {
 	return nil
 }
 
-func SetBlogToLive(b *model.Blog, s *model.Store) (*statusChangeResponse, error) {
+func setBlogToLive(b *model.Blog, s *model.Store) (*statusChangeResponse, error) {
 	log.Printf("repo disk path: %s\n", b.RepositoryPath)
 	if err := launchUserBlog(s, b); err != nil {
 		return nil, fmt.Errorf("error launching blog `%d': %w", b.ID, err)
