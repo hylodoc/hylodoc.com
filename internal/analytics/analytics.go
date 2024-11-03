@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"time"
@@ -21,6 +22,7 @@ type AnalyticsService struct {
 }
 
 func NewMixpanelClient(token string) *mixpanel.ApiClient {
+	log.Printf("token: %s\n", token)
 	return mixpanel.NewApiClient(token)
 }
 
@@ -33,26 +35,19 @@ func NewAnalyticsService(c *mixpanel.ApiClient) *AnalyticsService {
 func (m *AnalyticsService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
-
-		ip := r.Header.Get("X-Forwarded-For")
-		if ip == "" {
-			next.ServeHTTP(w, r)
-		}
-		hashedIp, err := hashIp(ip)
-		if err != nil {
-			logger.Println("Could not hash ip", err)
-			http.Error(w, "", http.StatusInternalServerError)
-		}
+		logger.Printf("Analyitics middleware...")
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			logger.Println("No session")
 			http.Error(w, "", http.StatusInternalServerError)
+			return
 		}
 
+		ip := r.Header.Get("X-Forwarded-For")
 		identifiers := getIndentifiers(sesh)
 		base_props := map[string]interface{}{
-			"ip":          hashedIp,
+			"ip":          ip,
 			"time":        time.Now().Unix(),
 			"distinct_id": identifiers.distinctId,
 			"status":      identifiers.status,
@@ -63,13 +58,12 @@ func (m *AnalyticsService) Middleware(next http.Handler) http.Handler {
 			context.TODO(),
 			[]*mixpanel.Event{m.client.NewEvent(
 				r.URL.String(),
-				uuid.New().String(),
+				identifiers.distinctId,
 				base_props,
 			)},
 		); err != nil {
-			logger.Printf("Error calling mixpanel: %v", err)
-			/* XXX: should not fail requests on failing to write
-			* metrics */
+			logger.Printf("Error calling mixpanel: %v\n", err)
+			/* XXX: shouldn't fail on analytics */
 		}
 
 		next.ServeHTTP(w, r)

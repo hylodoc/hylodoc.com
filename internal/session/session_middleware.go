@@ -52,7 +52,7 @@ func (s *SessionService) Middleware(next http.Handler) http.Handler {
 		}
 
 		/* cookie exists retrieve session */
-		session, err := GetSession(s.store, w, cookie.Value)
+		session, err := GetSession(s.store, w, cookie.Value, logger)
 		if err != nil {
 			logger.Printf("Error getting session: %v", err)
 			/* expire cookie if error */
