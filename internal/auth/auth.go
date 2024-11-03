@@ -10,9 +10,11 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"text/template"
 	"time"
 
 	"github.com/resend/resend-go/v2"
+	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/httpclient"
@@ -38,24 +40,29 @@ type AuthService struct {
 	store        *model.Store
 	client       *httpclient.Client
 	resendClient *resend.Client
-	config       *config.GithubParams
+	mixpanel     *analytics.MixpanelClientWrapper
 }
 
-func NewAuthService(c *httpclient.Client, resendClient *resend.Client, s *model.Store, config *config.GithubParams) AuthService {
+func NewAuthService(
+	c *httpclient.Client, resendClient *resend.Client, s *model.Store,
+	mixpanel *analytics.MixpanelClientWrapper,
+) AuthService {
 	return AuthService{
 		client:       c,
 		resendClient: resendClient,
 		store:        s,
-		config:       config,
+		mixpanel:     mixpanel,
 	}
 }
 
 /* Github Auth */
 
-func (o *AuthService) GithubLogin() http.HandlerFunc {
+func (a *AuthService) GithubLogin() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("GithubLogin handler...")
+
+		a.mixpanel.Track("GithubLogin", r)
 
 		authUrl, err := buildGithubOAuthUrl()
 		if err != nil {
@@ -64,6 +71,8 @@ func (o *AuthService) GithubLogin() http.HandlerFunc {
 			return
 		}
 		/* redirect user to GitHub for OAuth authorization */
+
+		logger.Println("Redirecting to github for Oauth...")
 		http.Redirect(w, r, authUrl, http.StatusFound)
 	}
 }
@@ -80,51 +89,59 @@ func buildGithubOAuthUrl() (string, error) {
 	return u.String(), nil
 }
 
-func (o *AuthService) GithubOAuthCallback() http.HandlerFunc {
+func (a *AuthService) GithubOAuthCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("GithubOAuthCallback handler...")
 
+		a.mixpanel.Track("GithubOAuthCallback", r)
+
 		/* create user or login user */
-		err := o.githubOAuthCallback(w, r)
+		err := a.githubOAuthCallback(w, r)
 		if err != nil {
 			logger.Printf("Error in OAuthCallback: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
+
+		logger.Println("Redirecting user home...")
 		http.Redirect(w, r, "/user/", http.StatusTemporaryRedirect)
 	}
 }
 
-func (o *AuthService) githubOAuthCallback(
+func (a *AuthService) githubOAuthCallback(
 	w http.ResponseWriter, r *http.Request,
 ) error {
 	logger := logging.Logger(r)
-	logger.Println("GithubOAuthCallback...")
 
 	/* get code */
 	queryParams := r.URL.Query()
 	code := queryParams.Get("code")
 
 	/* get accessToken */
-	accessToken, err := getOauthAccessToken(o.client, code, o.config.ClientID, o.config.ClientSecret)
+	accessToken, err := getOauthAccessToken(
+		a.client,
+		code,
+		config.Config.Github.ClientID,
+		config.Config.Github.ClientSecret,
+	)
 	if err != nil {
 		return err
 	}
 	/* get user info using token */
-	ghUser, err := getGithubUserInfo(o.client, accessToken)
+	ghUser, err := getGithubUserInfo(a.client, accessToken)
 	if err != nil {
 		return err
 	}
 
-	u, err := o.store.GetUserByGhUserID(context.TODO(), ghUser.ID)
+	u, err := a.store.GetUserByGhUserID(context.TODO(), ghUser.ID)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return fmt.Errorf("error checking for user existence: %w", err)
 		}
 		/* new user signing in with github, create with github account */
 		logger.Println("Creating user and linking to github account in db...")
-		err = o.store.CreateUserWithGithubAccountTx(context.TODO(), model.CreateGithubAccountParams{
+		err = a.store.CreateUserWithGithubAccountTx(context.TODO(), model.CreateGithubAccountParams{
 			GhUserID:   ghUser.ID,
 			GhEmail:    ghUser.Email,
 			GhUsername: ghUser.Username,
@@ -134,7 +151,7 @@ func (o *AuthService) githubOAuthCallback(
 			return fmt.Errorf("error creating user in db: %w", err)
 		}
 		/* fetch newly created userID, needed to create Auth session */
-		u, err = o.store.GetUserByGhUserID(context.TODO(), ghUser.ID)
+		u, err = a.store.GetUserByGhUserID(context.TODO(), ghUser.ID)
 		if err != nil {
 			return fmt.Errorf("error fetching")
 		}
@@ -143,7 +160,7 @@ func (o *AuthService) githubOAuthCallback(
 
 	/* create Auth Session */
 	_, err = session.CreateAuthSession(
-		o.store, w, u.ID, authSessionDuration, logger,
+		a.store, w, u.ID, authSessionDuration, logger,
 	)
 	if err != nil {
 		logger.Printf("Error creating auth session: %v", err)
@@ -191,10 +208,12 @@ func getOauthAccessToken(
 
 /* Github account linking */
 
-func (o *AuthService) LinkGithubAccount() http.HandlerFunc {
+func (a *AuthService) LinkGithubAccount() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("LinkGithubAccount handler...")
+
+		a.mixpanel.Track("LinkGithubAccount", r)
 
 		session, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
@@ -212,6 +231,7 @@ func (o *AuthService) LinkGithubAccount() http.HandlerFunc {
 		logger.Printf("linkUrl: %s\n", linkUrl)
 
 		/* redirect user to GitHub for OAuth linking accounts */
+		logger.Println("Redirecting to Githbub for OAuth linking...")
 		http.Redirect(w, r, linkUrl, http.StatusFound)
 	}
 }
@@ -229,12 +249,14 @@ func buildGithubLinkUrl(userID int32) (string, error) {
 	return u.String(), nil
 }
 
-func (o *AuthService) GithubLinkCallback() http.HandlerFunc {
+func (a *AuthService) GithubLinkCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("GithubLinkCallback handler...")
 
-		err := o.githubLinkCallback(w, r)
+		a.mixpanel.Track("GithubLinkCallback", r)
+
+		err := a.githubLinkCallback(w, r)
 		if err != nil {
 			logger.Printf("error in githubOAuthLinkGithubAccountCallback: %v", err)
 			/* XXX: shouldn't render link option (should show unlink option) but should also
@@ -243,23 +265,29 @@ func (o *AuthService) GithubLinkCallback() http.HandlerFunc {
 			return
 		}
 
+		logger.Println("Redirecting user home...")
 		http.Redirect(w, r, "/user/", http.StatusTemporaryRedirect)
 	}
 }
 
-func (o *AuthService) githubLinkCallback(w http.ResponseWriter, r *http.Request) error {
+func (a *AuthService) githubLinkCallback(w http.ResponseWriter, r *http.Request) error {
 	/* get code */
 	queryParams := r.URL.Query()
 	code := queryParams.Get("code")
 	state := queryParams.Get("state") /* XXX: currently just userID, should make signed to protect against CSRF */
 
 	/* get accessToken */
-	accessToken, err := getOauthAccessToken(o.client, code, o.config.ClientID, o.config.ClientSecret)
+	accessToken, err := getOauthAccessToken(
+		a.client,
+		code,
+		config.Config.Github.ClientID,
+		config.Config.Github.ClientSecret,
+	)
 	if err != nil {
 		return err
 	}
 	/* get user info using token */
-	ghUser, err := getGithubUserInfo(o.client, accessToken)
+	ghUser, err := getGithubUserInfo(a.client, accessToken)
 	if err != nil {
 		return err
 	}
@@ -270,12 +298,12 @@ func (o *AuthService) githubLinkCallback(w http.ResponseWriter, r *http.Request)
 	}
 	/* Validate that user exists */
 	userID := int32(uID)
-	_, err = o.store.GetUserByID(context.TODO(), userID)
+	_, err = a.store.GetUserByID(context.TODO(), userID)
 	if err != nil {
 		return fmt.Errorf("could not get get user: %w", err)
 	}
 	/* Link github account to user */
-	_, err = o.store.CreateGithubAccount(context.TODO(), model.CreateGithubAccountParams{
+	_, err = a.store.CreateGithubAccount(context.TODO(), model.CreateGithubAccountParams{
 		UserID:     userID,
 		GhUserID:   ghUser.ID,
 		GhEmail:    ghUser.Email,
@@ -344,13 +372,78 @@ func getGithubUserInfo(
 	return user, nil
 }
 
+func (a *AuthService) Register() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.Logger(r)
+		logger.Println("Register handler...")
+
+		a.mixpanel.Track("Register", r)
+
+		/* get email/username from context */
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+		if !ok {
+			logger.Printf("No Session")
+			http.Redirect(w, r, "/user/", http.StatusSeeOther)
+			return
+		}
+
+		util.ExecTemplate(w, []string{"register.html"},
+			util.PageInfo{
+				Data: struct {
+					Title    string
+					UserInfo *session.UserInfo
+				}{
+					Title:    "Progstack - blogging for devs",
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
+				},
+			},
+			template.FuncMap{},
+			logger,
+		)
+	}
+}
+
+/* Login */
+
+func (a *AuthService) Login() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.Logger(r)
+		logger.Println("Login handler...")
+
+		a.mixpanel.Track("Login", r)
+
+		/* get email/username from context */
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+		if !ok {
+			logger.Println("No auth session")
+			http.Redirect(w, r, "/user/", http.StatusSeeOther)
+			return
+		}
+
+		util.ExecTemplate(w, []string{"login.html"},
+			util.PageInfo{
+				Data: struct {
+					Title    string
+					UserInfo *session.UserInfo
+				}{
+					Title:    "Progstack - blogging for devs",
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
+				},
+			},
+			template.FuncMap{},
+			logger,
+		)
+	}
+}
+
 /* Logout */
 
-func (o *AuthService) Logout() http.HandlerFunc {
+func (a *AuthService) Logout() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("Logout handler...")
-		/* XXX: metrics */
+
+		a.mixpanel.Track("Logout", r)
 
 		_, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
@@ -358,7 +451,7 @@ func (o *AuthService) Logout() http.HandlerFunc {
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
-		err := o.logout(w, r)
+		err := a.logout(w, r)
 		if err != nil {
 			logger.Printf("Error logging out user: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
@@ -367,7 +460,7 @@ func (o *AuthService) Logout() http.HandlerFunc {
 	}
 }
 
-func (o *AuthService) logout(w http.ResponseWriter, r *http.Request) error {
+func (a *AuthService) logout(w http.ResponseWriter, r *http.Request) error {
 	logger := logging.Logger(r)
 
 	cookie, err := r.Cookie(session.CookieName)
@@ -375,18 +468,19 @@ func (o *AuthService) logout(w http.ResponseWriter, r *http.Request) error {
 	if err != nil || authSessionId == "" {
 		return fmt.Errorf("error reading auth cookie")
 	}
-	return session.EndAuthSession(o.store, w, authSessionId, logger)
+	return session.EndAuthSession(a.store, w, authSessionId, logger)
 }
 
 /* Magic Link Auth */
 
-func (o *AuthService) MagicRegister() http.HandlerFunc {
+func (a *AuthService) MagicRegister() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("MagicRegister handler...")
-		/* XXX: hardcoding to test linking accounts */
 
-		if err := o.magicRegister(w, r); err != nil {
+		a.mixpanel.Track("MagicRegister", r)
+
+		if err := a.magicRegister(w, r); err != nil {
 			logger.Printf("error sending register link: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
@@ -396,7 +490,7 @@ func (o *AuthService) MagicRegister() http.HandlerFunc {
 	}
 }
 
-func (o *AuthService) magicRegister(w http.ResponseWriter, r *http.Request) error {
+func (a *AuthService) magicRegister(w http.ResponseWriter, r *http.Request) error {
 	logger := logging.Logger(r)
 
 	/* read email parsed through form */
@@ -414,7 +508,7 @@ func (o *AuthService) magicRegister(w http.ResponseWriter, r *http.Request) erro
 		return fmt.Errorf("error generating token: %w", err)
 	}
 	/* write token to db with email */
-	_, err = o.store.CreateMagicRegister(context.TODO(), model.CreateMagicRegisterParams{
+	_, err = a.store.CreateMagicRegister(context.TODO(), model.CreateMagicRegisterParams{
 		Token: token,
 		Email: emailAddress,
 	})
@@ -423,7 +517,7 @@ func (o *AuthService) magicRegister(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	/* send email */
-	err = email.SendRegisterLink(o.resendClient, email.MagicLinkParams{
+	err = email.SendRegisterLink(a.resendClient, email.MagicLinkParams{
 		To:    emailAddress,
 		Token: token,
 	})
@@ -433,12 +527,14 @@ func (o *AuthService) magicRegister(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
-func (o *AuthService) MagicRegisterCallback() http.HandlerFunc {
+func (a *AuthService) MagicRegisterCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("MagicRegisterCallback handler...")
 
-		if err := o.magicRegisterCallback(w, r); err != nil {
+		a.mixpanel.Track("MagicRegisterCallback", r)
+
+		if err := a.magicRegisterCallback(w, r); err != nil {
 			logger.Printf("Error registering with magic link: %v\n", err)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -449,22 +545,21 @@ func (o *AuthService) MagicRegisterCallback() http.HandlerFunc {
 	}
 }
 
-func (o *AuthService) magicRegisterCallback(w http.ResponseWriter, r *http.Request) error {
+func (a *AuthService) magicRegisterCallback(w http.ResponseWriter, r *http.Request) error {
 	logger := logging.Logger(r)
-	logger.Println("MagicRegisterCallback handler...")
 
 	/* get token from url */
 	token := r.URL.Query().Get("token")
 	logger.Printf("register token `%s'\n", token)
 
 	/* look for magic in db */
-	magic, err := o.store.GetMagicRegisterByToken(context.TODO(), token)
+	magic, err := a.store.GetMagicRegisterByToken(context.TODO(), token)
 	if err != nil {
 		return fmt.Errorf("error getting magic by token: %w", err)
 	}
 
 	/* create user */
-	u, err := o.store.CreateUser(context.TODO(), model.CreateUserParams{
+	u, err := a.store.CreateUser(context.TODO(), model.CreateUserParams{
 		Email:    magic.Email,
 		Username: GenerateUsername(),
 	})
@@ -475,7 +570,7 @@ func (o *AuthService) magicRegisterCallback(w http.ResponseWriter, r *http.Reque
 
 	/* create Auth Session */
 	_, err = session.CreateAuthSession(
-		o.store, w, u.ID, authSessionDuration, logger,
+		a.store, w, u.ID, authSessionDuration, logger,
 	)
 	if err != nil {
 		return fmt.Errorf("error creating auth session: %w", err)
@@ -483,12 +578,14 @@ func (o *AuthService) magicRegisterCallback(w http.ResponseWriter, r *http.Reque
 	return nil
 }
 
-func (o *AuthService) MagicLogin() http.HandlerFunc {
+func (a *AuthService) MagicLogin() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("MagicLogin handler...")
 
-		if err := o.magicLogin(w, r); err != nil {
+		a.mixpanel.Track("MagicLogin", r)
+
+		if err := a.magicLogin(w, r); err != nil {
 			logger.Printf("Error sending login link: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
@@ -498,7 +595,7 @@ func (o *AuthService) MagicLogin() http.HandlerFunc {
 	}
 }
 
-func (o *AuthService) magicLogin(w http.ResponseWriter, r *http.Request) error {
+func (a *AuthService) magicLogin(w http.ResponseWriter, r *http.Request) error {
 	/* read email parsed through form */
 	if err := r.ParseForm(); err != nil {
 		/* StatusBadRequest */
@@ -513,7 +610,7 @@ func (o *AuthService) magicLogin(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("error generating token: %w", err)
 	}
 	/* write token to db with email */
-	_, err = o.store.CreateMagicLogin(context.TODO(), model.CreateMagicLoginParams{
+	_, err = a.store.CreateMagicLogin(context.TODO(), model.CreateMagicLoginParams{
 		Token: token,
 		Email: emailAddress,
 	})
@@ -521,7 +618,7 @@ func (o *AuthService) magicLogin(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("error writing magic login to db: %w", err)
 	}
 	/* send email */
-	err = email.SendLoginLink(o.resendClient, email.MagicLinkParams{
+	err = email.SendLoginLink(a.resendClient, email.MagicLinkParams{
 		To:    emailAddress,
 		Token: token,
 	})
@@ -532,12 +629,14 @@ func (o *AuthService) magicLogin(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (o *AuthService) MagicLoginCallback() http.HandlerFunc {
+func (a *AuthService) MagicLoginCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("MagicLoginCallback...")
 
-		if err := o.magicLoginCallback(w, r); err != nil {
+		a.mixpanel.Track("MagicLoginCallback", r)
+
+		if err := a.magicLoginCallback(w, r); err != nil {
 			logger.Printf(
 				"error logging in with magic link: %v\n", err,
 			)
@@ -550,25 +649,25 @@ func (o *AuthService) MagicLoginCallback() http.HandlerFunc {
 	}
 }
 
-func (o *AuthService) magicLoginCallback(w http.ResponseWriter, r *http.Request) error {
+func (a *AuthService) magicLoginCallback(w http.ResponseWriter, r *http.Request) error {
 	logger := logging.Logger(r)
 
 	/* get token from url */
 	token := r.URL.Query().Get("token")
 	logger.Printf("register token `%s'\n", token)
 	/* look for magic in db */
-	magic, err := o.store.GetMagicLoginByToken(context.TODO(), token)
+	magic, err := a.store.GetMagicLoginByToken(context.TODO(), token)
 	if err != nil {
 		return fmt.Errorf("error getting magic by token: %w", err)
 	}
 	/* create user */
-	u, err := o.store.GetUserByEmail(context.TODO(), magic.Email)
+	u, err := a.store.GetUserByEmail(context.TODO(), magic.Email)
 	if err != nil {
 		return fmt.Errorf("error creating user: %w", err)
 	}
 	/* create Auth Session */
 	_, err = session.CreateAuthSession(
-		o.store, w, u.ID, authSessionDuration, logger,
+		a.store, w, u.ID, authSessionDuration, logger,
 	)
 	if err != nil {
 		return fmt.Errorf("error creating auth session: %w", err)

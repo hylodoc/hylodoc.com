@@ -51,7 +51,7 @@ func Serve() {
 
 	/* init services */
 	authService := auth.NewAuthService(
-		client, resendClient, store, &config.Config.Github,
+		client, resendClient, store, mixpanelClient,
 	)
 	sessionService := session.NewSessionService(store)
 	subdomainService := subdomain.NewSubdomainService(store)
@@ -62,7 +62,7 @@ func Serve() {
 	blogService := blog.NewBlogService(
 		client, store, resendClient, mixpanelClient,
 	)
-	billingService := billing.NewBillingService(store)
+	billingService := billing.NewBillingService(store, mixpanelClient)
 
 	/* init metrics */
 	metrics.Initialize()
@@ -82,8 +82,8 @@ func Serve() {
 	/* public routes */
 	r.HandleFunc("/", index())
 	r.Handle("/metrics", metrics.Handler())
-	r.HandleFunc("/register", register())
-	r.HandleFunc("/login", login())
+	r.HandleFunc("/register", authService.Register())
+	r.HandleFunc("/login", authService.Login())
 	r.HandleFunc("/gh/login", authService.GithubLogin())
 	r.HandleFunc("/gh/oauthcallback", authService.GithubOAuthCallback())
 	r.HandleFunc("/gh/linkcallback", authService.GithubLinkCallback())
@@ -170,66 +170,6 @@ func index() http.HandlerFunc {
 		/* get repositories for unauth session */
 
 		util.ExecTemplate(w, []string{"index.html"},
-			util.PageInfo{
-				Data: struct {
-					Title    string
-					UserInfo *session.UserInfo
-				}{
-					Title:    "Progstack - blogging for devs",
-					UserInfo: session.ConvertSessionToUserInfo(sesh),
-				},
-			},
-			template.FuncMap{},
-			logger,
-		)
-	}
-}
-
-func register() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("Register handler...")
-		/* XXX: add metrics */
-
-		/* get email/username from context */
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Printf("No Session")
-			http.Redirect(w, r, "/user/", http.StatusSeeOther)
-			return
-		}
-
-		util.ExecTemplate(w, []string{"register.html"},
-			util.PageInfo{
-				Data: struct {
-					Title    string
-					UserInfo *session.UserInfo
-				}{
-					Title:    "Progstack - blogging for devs",
-					UserInfo: session.ConvertSessionToUserInfo(sesh),
-				},
-			},
-			template.FuncMap{},
-			logger,
-		)
-	}
-}
-
-func login() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("Login handler...")
-		/* XXX: add metrics */
-
-		/* get email/username from context */
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Println("No auth session")
-			http.Redirect(w, r, "/user/", http.StatusSeeOther)
-			return
-		}
-
-		util.ExecTemplate(w, []string{"login.html"},
 			util.PageInfo{
 				Data: struct {
 					Title    string
