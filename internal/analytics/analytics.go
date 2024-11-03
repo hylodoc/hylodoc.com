@@ -2,11 +2,7 @@ package analytics
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"log"
-	"net"
 	"net/http"
 	"time"
 
@@ -17,57 +13,54 @@ import (
 	"github.com/xr0-org/progstack/internal/session"
 )
 
-type AnalyticsService struct {
+type MixpanelClientWrapper struct {
 	client *mixpanel.ApiClient
 }
 
-func NewMixpanelClient(token string) *mixpanel.ApiClient {
-	log.Printf("token: %s\n", token)
-	return mixpanel.NewApiClient(token)
-}
-
-func NewAnalyticsService(c *mixpanel.ApiClient) *AnalyticsService {
-	return &AnalyticsService{
-		client: c,
+func NewMixpanelClientWrapper(token string) *MixpanelClientWrapper {
+	return &MixpanelClientWrapper{
+		client: mixpanel.NewApiClient(token),
 	}
 }
 
-func (m *AnalyticsService) Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Printf("Analyitics middleware...")
-
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Println("No session")
-			http.Error(w, "", http.StatusInternalServerError)
-			return
+func (m *MixpanelClientWrapper) Track(event string, r *http.Request) error {
+	logger := logging.Logger(r)
+	go func() {
+		if err := m.track(r, event); err != nil {
+			logger.Printf("Error emitting analytics: %v", err)
 		}
+	}()
+	return nil
+}
 
-		ip := r.Header.Get("X-Forwarded-For")
-		identifiers := getIndentifiers(sesh)
-		base_props := map[string]interface{}{
-			"ip":          ip,
-			"time":        time.Now().Unix(),
-			"distinct_id": identifiers.distinctId,
-			"status":      identifiers.status,
-			"$insert_id":  uuid.New().String(),
-		}
+func (m *MixpanelClientWrapper) track(r *http.Request, event string) error {
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	if !ok {
+		return fmt.Errorf("No session for tracking")
+	}
 
-		if err := m.client.Track(
-			context.TODO(),
-			[]*mixpanel.Event{m.client.NewEvent(
-				r.URL.String(),
-				identifiers.distinctId,
-				base_props,
-			)},
-		); err != nil {
-			logger.Printf("Error calling mixpanel: %v\n", err)
-			/* XXX: shouldn't fail on analytics */
-		}
+	ip := r.Header.Get("X-Forwarded-For")
+	identifiers := getIndentifiers(sesh)
+	props := map[string]interface{}{
+		"distinct_id": identifiers.distinctId,
+		"ip":          ip,
+		"url":         r.URL.String(),
+		"time":        time.Now().Unix(),
+		"status":      identifiers.status,
+		"$insert_id":  uuid.New().String(),
+	}
 
-		next.ServeHTTP(w, r)
-	})
+	if err := m.client.Track(
+		context.TODO(),
+		[]*mixpanel.Event{m.client.NewEvent(
+			event,
+			identifiers.distinctId,
+			props,
+		)},
+	); err != nil {
+		return fmt.Errorf("Error calling mixpanel: %w", err)
+	}
+	return nil
 }
 
 type identifiers struct {
@@ -87,23 +80,4 @@ func getIndentifiers(sesh *session.Session) identifiers {
 			status:     "unauth",
 		}
 	}
-}
-
-func hashIp(ip string) (string, error) {
-	parsedIp := net.ParseIP(ip)
-	if parsedIp == nil {
-		return "", fmt.Errorf("invalid IP address: %s", ip)
-	}
-
-	hasher := sha256.New()
-
-	_, err := hasher.Write(parsedIp)
-	if err != nil {
-		return "", err
-	}
-
-	hashBytes := hasher.Sum(nil)
-	hashString := hex.EncodeToString(hashBytes)
-
-	return hashString, nil
 }

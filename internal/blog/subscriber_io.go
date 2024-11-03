@@ -26,6 +26,8 @@ func (b *BlogService) SubscribeToBlog() http.HandlerFunc {
 		logger := logging.Logger(r)
 		logger.Println("SubscribeToBlog handler...")
 
+		b.mixpanel.Track("SubscribeToBlog", r)
+
 		if err := b.subscribeToBlog(w, r); err != nil {
 			logger.Printf("Error subscribing to blog: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
@@ -92,8 +94,10 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 func (b *BlogService) UnsubscribeFromBlog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
+		logger.Println("UnsubscribeFromBlog handler...")
 
-		logger.Println("unsubscribe from blog handler...")
+		b.mixpanel.Track("UnsubscribeFromBlog", r)
+
 		if err := b.unsubscribeFromBlog(w, r); err != nil {
 			logger.Printf("error in unsubscribeFromBlog handler: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
@@ -191,8 +195,10 @@ func buildRemoveSubscriberUrl(blogID int32, email string) string {
 func (b *BlogService) DeleteSubscriber() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
-
 		logger.Println("DeleteSubscriber handler...")
+
+		b.mixpanel.Track("DeleteSubscriber", r)
+
 		url, err := b.deleteSubscriber(w, r)
 		if err != nil {
 			logger.Printf("Error deleting subscriber: %v\n", err)
@@ -228,6 +234,8 @@ func (b *BlogService) ExportSubscribers() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("ExportSubscribers handler...")
+
+		b.mixpanel.Track("ExportSubscribers", r)
 
 		csvData, err := b.exportSubscribers(w, r)
 		if err != nil {

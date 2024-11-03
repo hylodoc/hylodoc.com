@@ -37,6 +37,8 @@ func (b *BlogService) CreateRepositoryBlog() http.HandlerFunc {
 		logger := logging.Logger(r)
 		logger.Println("CreateRepositoryBlog handler...")
 
+		b.mixpanel.Track("CreateRepositoryBlog", r)
+
 		message := "Successfully created repository-based blog!"
 		url, err := b.createRepositoryBlog(w, r)
 		if err != nil {

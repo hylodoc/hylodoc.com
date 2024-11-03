@@ -39,6 +39,8 @@ func (b *BlogService) SubscriberMetrics() http.HandlerFunc {
 		logger := logging.Logger(r)
 		logger.Println("SubscriberMetrics handler...")
 
+		b.mixpanel.Track("SubscriberMetrics", r)
+
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
 			logger.Println("No auth session")

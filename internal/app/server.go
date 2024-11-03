@@ -43,18 +43,25 @@ func Serve() {
 		log.Fatal("could not connect to db: %w", err)
 	}
 	client := httpclient.NewHttpClient(clientTimeout)
+	mixpanelClient := analytics.NewMixpanelClientWrapper(
+		config.Config.Mixpanel.Token,
+	)
 	store := model.NewStore(db)
 	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
-	mixpanelClient := analytics.NewMixpanelClient(config.Config.Mixpanel.Token)
 
 	/* init services */
-	authService := auth.NewAuthService(client, resendClient, store, &config.Config.Github)
+	authService := auth.NewAuthService(
+		client, resendClient, store, &config.Config.Github,
+	)
 	sessionService := session.NewSessionService(store)
-	analyticsService := analytics.NewAnalyticsService(mixpanelClient)
 	subdomainService := subdomain.NewSubdomainService(store)
-	installationService := installation.NewInstallationService(client, resendClient, store, &config.Config)
-	userService := user.NewUserService(store)
-	blogService := blog.NewBlogService(client, store, resendClient)
+	installationService := installation.NewInstallationService(
+		client, resendClient, store, &config.Config,
+	)
+	userService := user.NewUserService(store, mixpanelClient)
+	blogService := blog.NewBlogService(
+		client, store, resendClient, mixpanelClient,
+	)
 	billingService := billing.NewBillingService(store)
 
 	/* init metrics */
@@ -71,8 +78,6 @@ func Serve() {
 	r.Use(subdomainService.Middleware)
 
 	r.Use(metrics.Middleware)
-
-	r.Use(analyticsService.Middleware)
 
 	/* public routes */
 	r.HandleFunc("/", index())
