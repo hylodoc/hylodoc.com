@@ -39,6 +39,10 @@ docker:
   container_name: "progstack_container"
   postgres_image: "postgres:12-alpine"
 
+# Mixpanel config
+mixpanel:
+  token: "<MixpanelProjectToken>"
+
 # Postgres config
 postgres:
   host: "postgres"

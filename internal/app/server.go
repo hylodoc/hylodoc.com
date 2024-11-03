@@ -42,7 +42,7 @@ func Serve() {
 	if err != nil {
 		log.Fatal("could not connect to db: %w", err)
 	}
-	client := httpclient.NewHttpClient(clientTimeout)
+	httpClient := httpclient.NewHttpClient(clientTimeout)
 	mixpanelClient := analytics.NewMixpanelClientWrapper(
 		config.Config.Mixpanel.Token,
 	)
@@ -50,19 +50,19 @@ func Serve() {
 	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
 
 	/* init services */
-	authService := auth.NewAuthService(
-		client, resendClient, store, mixpanelClient,
-	)
 	sessionService := session.NewSessionService(store)
 	subdomainService := subdomain.NewSubdomainService(store)
-	installationService := installation.NewInstallationService(
-		client, resendClient, store, &config.Config,
+	authService := auth.NewAuthService(
+		httpClient, resendClient, store, mixpanelClient,
 	)
 	userService := user.NewUserService(store, mixpanelClient)
-	blogService := blog.NewBlogService(
-		client, store, resendClient, mixpanelClient,
-	)
 	billingService := billing.NewBillingService(store, mixpanelClient)
+	installationService := installation.NewInstallationService(
+		httpClient, resendClient, store,
+	)
+	blogService := blog.NewBlogService(
+		httpClient, store, resendClient, mixpanelClient,
+	)
 
 	/* init metrics */
 	metrics.Initialize()
@@ -70,18 +70,15 @@ func Serve() {
 	/* routes */
 	r := mux.NewRouter()
 
-	/* NOTE: userWebsite middleware currently runs before main application */
 	r.Use(sessionService.Middleware)
-
 	r.Use(logging.Middleware)
-
 	r.Use(subdomainService.Middleware)
-
 	r.Use(metrics.Middleware)
 
 	/* public routes */
-	r.HandleFunc("/", index())
 	r.Handle("/metrics", metrics.Handler())
+
+	r.HandleFunc("/", index(mixpanelClient))
 	r.HandleFunc("/register", authService.Register())
 	r.HandleFunc("/login", authService.Login())
 	r.HandleFunc("/gh/login", authService.GithubLogin())
@@ -94,7 +91,6 @@ func Serve() {
 	r.HandleFunc("/gh/installcallback", installationService.InstallationCallback())
 	r.HandleFunc("/stripe/webhook", billingService.StripeWebhook())
 
-	/* XXX: should operate on subdomain since we route with that, then we can get the associated blog info */
 	r.HandleFunc("/blogs/{blogID}/subscribe", blogService.SubscribeToBlog()).Methods("POST")
 	r.HandleFunc("/blogs/{blogID}/unsubscribe", blogService.UnsubscribeFromBlog())
 
@@ -148,11 +144,12 @@ func Serve() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", listeningPort), r))
 }
 
-func index() http.HandlerFunc {
+func index(mixpanel *analytics.MixpanelClientWrapper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("Index handler...")
-		/* XXX: add metrics */
+
+		mixpanel.Track("Index", r)
 
 		/* get email/username from context */
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
