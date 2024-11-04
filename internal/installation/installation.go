@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/resend/resend-go/v2"
-	"github.com/xr0-org/progstack/internal/auth"
+	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
@@ -156,7 +156,7 @@ func handleInstallationCreated(
 ) error {
 	logger.Println("handling installation created event...")
 	/* get access token */
-	accessToken, err := auth.GetInstallationAccessToken(
+	accessToken, err := authn.GetInstallationAccessToken(
 		c,
 		config.Config.Github.AppID,
 		ghInstallationID,

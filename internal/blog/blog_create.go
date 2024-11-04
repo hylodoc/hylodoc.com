@@ -16,7 +16,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/xr0-org/progstack/internal/auth"
+	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/logging"
@@ -211,7 +211,7 @@ func UpdateRepositoryOnDisk(
 		return nil
 	}
 
-	accessToken, err := auth.GetInstallationAccessToken(
+	accessToken, err := authn.GetInstallationAccessToken(
 		c,
 		config.Config.Github.AppID,
 		repo.InstallationID,

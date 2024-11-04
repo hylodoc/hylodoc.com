@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/analytics"
-	"github.com/xr0-org/progstack/internal/auth"
+	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
@@ -52,7 +52,7 @@ func Serve() {
 	/* init services */
 	sessionService := session.NewSessionService(store)
 	subdomainService := subdomain.NewSubdomainService(store)
-	authService := auth.NewAuthService(
+	authService := authn.NewAuthService(
 		httpClient, resendClient, store, mixpanelClient,
 	)
 	userService := user.NewUserService(store, mixpanelClient)
@@ -67,9 +67,9 @@ func Serve() {
 	/* init metrics */
 	metrics.Initialize()
 
-	/* routes */
 	r := mux.NewRouter()
 
+	/* middeware */
 	r.Use(sessionService.Middleware)
 	r.Use(logging.Middleware)
 	r.Use(subdomainService.Middleware)
@@ -96,7 +96,7 @@ func Serve() {
 
 	/* authenticated routes */
 	authR := r.PathPrefix("/user").Subrouter()
-	authR.Use(auth.AuthMiddleware)
+	authR.Use(authn.Middleware)
 	authR.HandleFunc("/", userService.Home())
 	authR.HandleFunc("/auth/logout", authService.Logout())
 	authR.HandleFunc("/gh/linkgithub", authService.LinkGithubAccount())

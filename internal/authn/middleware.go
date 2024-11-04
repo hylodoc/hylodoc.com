@@ -1,4 +1,4 @@
-package auth
+package authn
 
 import (
 	"net/http"
@@ -7,7 +7,7 @@ import (
 	"github.com/xr0-org/progstack/internal/session"
 )
 
-func AuthMiddleware(next http.Handler) http.Handler {
+func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 
