@@ -120,10 +120,13 @@ func (b *BillingService) createCheckoutSession(w http.ResponseWriter, r *http.Re
 	}
 
 	/* write the stripeCheckoutSessionID to db */
-	_, err = b.store.CreateStripeCheckoutSession(context.TODO(), model.CreateStripeCheckoutSessionParams{
-		StripeSessionID: checkoutSession.ID,
-		UserID:          userSession.GetUserID(),
-	})
+	_, err = b.store.CreateStripeCheckoutSession(
+		context.TODO(),
+		model.CreateStripeCheckoutSessionParams{
+			StripeSessionID: checkoutSession.ID,
+			UserID:          userSession.GetUserID(),
+		},
+	)
 	if err != nil {
 		return "", fmt.Errorf("error writing stripe checkout session to db: %w", err)
 	}
@@ -248,9 +251,12 @@ func (b *BillingService) billingPortal(w http.ResponseWriter, r *http.Request) (
 	if err != nil {
 		return "", fmt.Errorf("could not get subcription for user: %w", err)
 	}
+	if !sub.StripeCustomerID.Valid {
+		return "", fmt.Errorf("No existing paid subscription")
+	}
 
 	params := &stripe.BillingPortalSessionParams{
-		Customer:  stripe.String(sub.StripeCustomerID),
+		Customer:  stripe.String(sub.StripeCustomerID.String),
 		ReturnURL: stripe.String(fmt.Sprintf("%s://%s/user/account", config.Config.Progstack.Protocol, config.Config.Progstack.ServiceName)),
 	}
 

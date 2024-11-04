@@ -22,6 +22,12 @@ FROM users u
 JOIN installations i ON u.id = i.user_id
 WHERE i.gh_installation_id = $1 AND i.active = true;
 
+-- name: GetUserSubscriptionByID :one
+SELECT s.sub_name
+FROM users u
+JOIN stripe_subscriptions s ON s.user_id = u.id
+WHERE u.id = $1;
+
 -- name: IsAwaitingGithubUpdate :one
 SELECT gh_awaiting_update
 FROM users

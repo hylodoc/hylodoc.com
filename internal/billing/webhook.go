@@ -12,6 +12,7 @@ import (
 
 	"github.com/stripe/stripe-go/v72"
 	"github.com/stripe/stripe-go/v72/checkout/session"
+	"github.com/stripe/stripe-go/v72/sub"
 	"github.com/stripe/stripe-go/v72/webhook"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/logging"
@@ -44,7 +45,11 @@ func (b *BillingService) stripeWebhook(w http.ResponseWriter, r *http.Request) e
 	}
 
 	logger.Println("verifying stripe event signature...")
-	_, err = webhook.ConstructEvent(payload, r.Header.Get("Stripe-Signature"), config.Config.Stripe.WebhookSigningSecret)
+	_, err = webhook.ConstructEvent(
+		payload,
+		r.Header.Get("Stripe-Signature"),
+		config.Config.Stripe.WebhookSigningSecret,
+	)
 	if err != nil {
 		fmt.Errorf("error verifying webhook signature: %w", err)
 	}
@@ -114,19 +119,42 @@ func handleCheckoutSessionCompleted(
 		return fmt.Errorf("no subscription: %w", err)
 	}
 	sub := expandedSession.Subscription
+	expSub, err := fetchExpandedSubscription(sub.ID)
+	if err != nil {
+		return fmt.Errorf("error fetching expanded subscription: %w", err)
+	}
+
+	logger.Printf("Sub: %v\n", expSub)
+	logger.Printf("Plan: %v\n", expSub.Plan)
+	logger.Printf("Product: %v\n", expSub.Plan.Product)
 
 	/* create subscription */
-	_, err = s.CreateStripeSubscription(context.TODO(), model.CreateStripeSubscriptionParams{
-		UserID:               pending.UserID,
-		StripeSubscriptionID: sub.ID,
-		StripeCustomerID:     sub.Customer.ID,
-		StripePriceID:        sub.Plan.ID,
-		Amount:               sub.Plan.Amount,
-		Status:               string(sub.Status),
-		CurrentPeriodStart:   time.Unix(sub.CurrentPeriodStart, 0),
-		CurrentPeriodEnd:     time.Unix(sub.CurrentPeriodEnd, 0),
-	})
-	if err != nil {
+	if err := s.CreateStripeSubscriptionTx(context.TODO(), model.CreateStripeSubscriptionParams{
+		UserID:  pending.UserID,
+		SubName: model.SubName(expSub.Plan.Product.Name),
+		StripeSubscriptionID: sql.NullString{
+			Valid:  true,
+			String: expSub.ID,
+		},
+		StripeCustomerID: sql.NullString{
+			Valid:  true,
+			String: expSub.Customer.ID,
+		},
+		StripePriceID: sql.NullString{
+			Valid:  true,
+			String: expSub.Plan.ID,
+		},
+		Amount: sql.NullInt64{
+			Valid: true,
+			Int64: expSub.Plan.Amount,
+		},
+		Status: sql.NullString{
+			Valid:  true,
+			String: string(expSub.Status),
+		},
+		CurrentPeriodStart: time.Unix(expSub.CurrentPeriodStart, 0),
+		CurrentPeriodEnd:   time.Unix(expSub.CurrentPeriodEnd, 0),
+	}); err != nil {
 		return fmt.Errorf("error writing stripe subscription to db: %w", err)
 	}
 
@@ -188,21 +216,19 @@ func handleCustomerSubscriptionUpdated(
 	}
 	logger.Printf("customer.subscription.updated event: %v", sub)
 
-	_, err := s.UpdateStripeSubscription(context.TODO(), model.UpdateStripeSubscriptionParams{
-		StripeSubscriptionID: sub.ID,
-		StripePriceID:        sub.Plan.ID,
-		Status:               string(sub.Status),
-		Amount:               sub.Plan.Amount,
-		CurrentPeriodStart:   time.Unix(sub.CurrentPeriodStart, 0),
-		CurrentPeriodEnd:     time.Unix(sub.CurrentPeriodEnd, 0),
-	})
-	if err != nil {
-		if err != sql.ErrNoRows {
-			return fmt.Errorf("error writing stripe subscription update: %w", err)
-		}
-		/* can have no rows on initial subscribe */
-	}
 	return nil
+}
+
+func fetchExpandedSubscription(subID string) (*stripe.Subscription, error) {
+	params := &stripe.SubscriptionParams{}
+	params.AddExpand("plan.product")
+	params.AddExpand("customer")
+
+	expandedSub, err := sub.Get(subID, params)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching expanded subscription: %w", err)
+	}
+	return expandedSub, nil
 }
 
 func eventString(e *stripe.Event) string {

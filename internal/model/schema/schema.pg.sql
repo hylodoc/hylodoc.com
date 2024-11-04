@@ -238,16 +238,31 @@ CREATE TABLE stripe_checkout_sessions (
 		ON DELETE CASCADE -- delete checkout sessions when user deleted
 );
 
+CREATE TYPE sub_name AS ENUM ('Scout', 'Wayfarer', 'Voyager', 'Pathfinder');
+
 CREATE TABLE stripe_subscriptions (
-	id			SERIAL						PRIMARY KEY,
-	user_id			INTEGER				NOT NULL,
-	stripe_subscription_id	VARCHAR(255)			NOT NULL	UNIQUE,
-	stripe_customer_id	VARCHAR(255)			NOT NULL,
-	stripe_price_id		VARCHAR(255)			NOT NULL,
-	status			VARCHAR(255)			NOT NULL,
-	amount			BIGINT				NOT NULL,
-	current_period_start	TIMESTAMPTZ			NOT NULL,
-	current_period_end	TIMESTAMPTZ			NOT NULL,
-	created_at		TIMESTAMPTZ			NOT NULL	DEFAULT(now()),
-	updated_at		TIMESTAMPTZ			NOT NULL	DEFAULT(now())
+	id			SERIAL					PRIMARY KEY,
+	user_id			INTEGER			NOT NULL,
+	sub_name		sub_name		NOT NULL,
+	stripe_subscription_id	VARCHAR(255),
+	stripe_customer_id	VARCHAR(255),
+	stripe_price_id		VARCHAR(255),
+	status			VARCHAR(255),
+	amount			BIGINT,
+	current_period_start	TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
+	current_period_end	TIMESTAMPTZ		NOT NULL	DEFAULT(now() + '100 years'),
+	active			BOOLEAN			NOT NULL	DEFAULT(true),
+	created_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
+	updated_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
+
+	CONSTRAINT subscription_type CHECK (
+		(sub_name <> 'Scout'
+			AND stripe_subscription_id IS NOT NULL
+			AND stripe_price_id IS NOT NULL
+			AND status IS NOT NULL
+			AND amount IS NOT NULL
+		) OR (
+			sub_name = 'Scout'
+		)
+	)
 );

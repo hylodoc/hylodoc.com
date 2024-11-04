@@ -74,6 +74,11 @@ INNER JOIN repositories r
 ON b.gh_repository_id = r.id
 WHERE r.installation_id = $1;
 
+-- name: CountBlogsByUserID :one
+SELECT COUNT(*) AS blog_count
+FROM blogs
+WHERE user_id = $1;
+
 -- name: SetBlogThemeByID :exec
 UPDATE blogs
 SET

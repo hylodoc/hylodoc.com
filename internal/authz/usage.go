@@ -1,4 +1,4 @@
-package user
+package authz
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/xr0-org/progstack/internal/model"
 )
 
-func userBytes(s *model.Store, userID int32) (int64, error) {
+func UserStorageUsed(s *model.Store, userID int32) (int64, error) {
 	paths, err := s.ListBlogRepoPathsByUserID(context.TODO(), userID)
 	if err != nil {
 		if err != sql.ErrNoRows {

@@ -36,18 +36,18 @@ var (
 	authSessionDuration = time.Now().Add(7 * 24 * time.Hour)
 )
 
-type AuthService struct {
+type AuthNService struct {
 	store        *model.Store
 	client       *httpclient.Client
 	resendClient *resend.Client
 	mixpanel     *analytics.MixpanelClientWrapper
 }
 
-func NewAuthService(
+func NewAuthNService(
 	c *httpclient.Client, resendClient *resend.Client, s *model.Store,
 	mixpanel *analytics.MixpanelClientWrapper,
-) AuthService {
-	return AuthService{
+) AuthNService {
+	return AuthNService{
 		client:       c,
 		resendClient: resendClient,
 		store:        s,
@@ -57,7 +57,7 @@ func NewAuthService(
 
 /* Github Auth */
 
-func (a *AuthService) GithubLogin() http.HandlerFunc {
+func (a *AuthNService) GithubLogin() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("GithubLogin handler...")
@@ -89,7 +89,7 @@ func buildGithubOAuthUrl() (string, error) {
 	return u.String(), nil
 }
 
-func (a *AuthService) GithubOAuthCallback() http.HandlerFunc {
+func (a *AuthNService) GithubOAuthCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("GithubOAuthCallback handler...")
@@ -109,7 +109,7 @@ func (a *AuthService) GithubOAuthCallback() http.HandlerFunc {
 	}
 }
 
-func (a *AuthService) githubOAuthCallback(
+func (a *AuthNService) githubOAuthCallback(
 	w http.ResponseWriter, r *http.Request,
 ) error {
 	logger := logging.Logger(r)
@@ -208,7 +208,7 @@ func getOauthAccessToken(
 
 /* Github account linking */
 
-func (a *AuthService) LinkGithubAccount() http.HandlerFunc {
+func (a *AuthNService) LinkGithubAccount() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("LinkGithubAccount handler...")
@@ -249,7 +249,7 @@ func buildGithubLinkUrl(userID int32) (string, error) {
 	return u.String(), nil
 }
 
-func (a *AuthService) GithubLinkCallback() http.HandlerFunc {
+func (a *AuthNService) GithubLinkCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("GithubLinkCallback handler...")
@@ -270,7 +270,7 @@ func (a *AuthService) GithubLinkCallback() http.HandlerFunc {
 	}
 }
 
-func (a *AuthService) githubLinkCallback(w http.ResponseWriter, r *http.Request) error {
+func (a *AuthNService) githubLinkCallback(w http.ResponseWriter, r *http.Request) error {
 	/* get code */
 	queryParams := r.URL.Query()
 	code := queryParams.Get("code")
@@ -372,7 +372,7 @@ func getGithubUserInfo(
 	return user, nil
 }
 
-func (a *AuthService) Register() http.HandlerFunc {
+func (a *AuthNService) Register() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("Register handler...")
@@ -405,7 +405,7 @@ func (a *AuthService) Register() http.HandlerFunc {
 
 /* Login */
 
-func (a *AuthService) Login() http.HandlerFunc {
+func (a *AuthNService) Login() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("Login handler...")
@@ -438,7 +438,7 @@ func (a *AuthService) Login() http.HandlerFunc {
 
 /* Logout */
 
-func (a *AuthService) Logout() http.HandlerFunc {
+func (a *AuthNService) Logout() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("Logout handler...")
@@ -460,7 +460,7 @@ func (a *AuthService) Logout() http.HandlerFunc {
 	}
 }
 
-func (a *AuthService) logout(w http.ResponseWriter, r *http.Request) error {
+func (a *AuthNService) logout(w http.ResponseWriter, r *http.Request) error {
 	logger := logging.Logger(r)
 
 	cookie, err := r.Cookie(session.CookieName)
@@ -473,7 +473,7 @@ func (a *AuthService) logout(w http.ResponseWriter, r *http.Request) error {
 
 /* Magic Link Auth */
 
-func (a *AuthService) MagicRegister() http.HandlerFunc {
+func (a *AuthNService) MagicRegister() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("MagicRegister handler...")
@@ -490,7 +490,7 @@ func (a *AuthService) MagicRegister() http.HandlerFunc {
 	}
 }
 
-func (a *AuthService) magicRegister(w http.ResponseWriter, r *http.Request) error {
+func (a *AuthNService) magicRegister(w http.ResponseWriter, r *http.Request) error {
 	logger := logging.Logger(r)
 
 	/* read email parsed through form */
@@ -527,7 +527,7 @@ func (a *AuthService) magicRegister(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
-func (a *AuthService) MagicRegisterCallback() http.HandlerFunc {
+func (a *AuthNService) MagicRegisterCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("MagicRegisterCallback handler...")
@@ -545,7 +545,7 @@ func (a *AuthService) MagicRegisterCallback() http.HandlerFunc {
 	}
 }
 
-func (a *AuthService) magicRegisterCallback(w http.ResponseWriter, r *http.Request) error {
+func (a *AuthNService) magicRegisterCallback(w http.ResponseWriter, r *http.Request) error {
 	logger := logging.Logger(r)
 
 	/* get token from url */
@@ -559,7 +559,7 @@ func (a *AuthService) magicRegisterCallback(w http.ResponseWriter, r *http.Reque
 	}
 
 	/* create user */
-	u, err := a.store.CreateUser(context.TODO(), model.CreateUserParams{
+	u, err := a.store.CreateUserTx(context.TODO(), model.CreateUserParams{
 		Email:    magic.Email,
 		Username: GenerateUsername(),
 	})
@@ -578,7 +578,7 @@ func (a *AuthService) magicRegisterCallback(w http.ResponseWriter, r *http.Reque
 	return nil
 }
 
-func (a *AuthService) MagicLogin() http.HandlerFunc {
+func (a *AuthNService) MagicLogin() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("MagicLogin handler...")
@@ -595,7 +595,7 @@ func (a *AuthService) MagicLogin() http.HandlerFunc {
 	}
 }
 
-func (a *AuthService) magicLogin(w http.ResponseWriter, r *http.Request) error {
+func (a *AuthNService) magicLogin(w http.ResponseWriter, r *http.Request) error {
 	/* read email parsed through form */
 	if err := r.ParseForm(); err != nil {
 		/* StatusBadRequest */
@@ -629,7 +629,7 @@ func (a *AuthService) magicLogin(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (a *AuthService) MagicLoginCallback() http.HandlerFunc {
+func (a *AuthNService) MagicLoginCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("MagicLoginCallback...")
@@ -649,7 +649,7 @@ func (a *AuthService) MagicLoginCallback() http.HandlerFunc {
 	}
 }
 
-func (a *AuthService) magicLoginCallback(w http.ResponseWriter, r *http.Request) error {
+func (a *AuthNService) magicLoginCallback(w http.ResponseWriter, r *http.Request) error {
 	logger := logging.Logger(r)
 
 	/* get token from url */

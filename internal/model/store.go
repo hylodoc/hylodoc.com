@@ -36,10 +36,37 @@ func (s *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 	return tx.Commit()
 }
 
+func (s *Store) CreateUserTx(ctx context.Context, arg CreateUserParams) (*User, error) {
+	var res User
+	if err := s.execTx(ctx, func(q *Queries) error {
+		/* create user */
+		u, err := s.CreateUser(ctx, CreateUserParams{
+			Email:    arg.Email,
+			Username: arg.Username,
+		})
+		if err != nil {
+			return fmt.Errorf("error creating user: %w", err)
+		}
+		/* create free subscription */
+		_, err = s.CreateStripeSubscription(ctx, CreateStripeSubscriptionParams{
+			UserID:  u.ID,
+			SubName: SubNameScout,
+		})
+		if err != nil {
+			return fmt.Errorf("error creating subscription: %w", err)
+		}
+		res = u
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("error in creating user tx: %w", err)
+	}
+	return &res, nil
+}
+
 func (s *Store) CreateUserWithGithubAccountTx(ctx context.Context, arg CreateGithubAccountParams) error {
 	return s.execTx(ctx, func(q *Queries) error {
 		/* for ghAccount we can just use github username */
-		user, err := s.CreateUser(ctx, CreateUserParams{
+		u, err := s.CreateUser(ctx, CreateUserParams{
 			Email:    arg.GhEmail,
 			Username: arg.GhUsername,
 		})
@@ -47,12 +74,20 @@ func (s *Store) CreateUserWithGithubAccountTx(ctx context.Context, arg CreateGit
 			return err
 		}
 		_, err = s.CreateGithubAccount(ctx, CreateGithubAccountParams{
-			UserID:     user.ID,
+			UserID:     u.ID,
 			GhUserID:   arg.GhUserID,
 			GhEmail:    arg.GhEmail,
 			GhUsername: arg.GhUsername,
 		})
-		return err
+		/* create free subscription */
+		_, err = s.CreateStripeSubscription(ctx, CreateStripeSubscriptionParams{
+			UserID:  u.ID,
+			SubName: SubNameScout,
+		})
+		if err != nil {
+			return fmt.Errorf("error creating subscription: %w", err)
+		}
+		return nil
 	})
 }
 
@@ -155,4 +190,25 @@ func (s *Store) UpdateSubdomainTx(ctx context.Context, arg UpdateSubdomainTxPara
 		}
 		return nil
 	})
+}
+
+func (s *Store) CreateStripeSubscriptionTx(ctx context.Context, arg CreateStripeSubscriptionParams) error {
+	return s.execTx(ctx, func(q *Queries) error {
+		if err := s.DeactivateStripeSubscriptionByUserID(
+			ctx, arg.UserID,
+		); err != nil {
+			return fmt.Errorf(
+				"error deactivating existing subscriptions: %w",
+				err,
+			)
+		}
+		_, err := s.CreateStripeSubscription(ctx, arg)
+		if err != nil {
+			return fmt.Errorf(
+				"error updating stripe subscription: %w", err,
+			)
+		}
+		return nil
+	})
+
 }

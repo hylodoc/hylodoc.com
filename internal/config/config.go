@@ -73,6 +73,15 @@ type StripeParams struct {
 	Plans                []Plan `mapstructure:"plans"`
 }
 
+func (sp StripeParams) PlanNameByProductID(productID string) (string, error) {
+	for _, plan := range sp.Plans {
+		if plan.ProductID == productID {
+			return plan.Name, nil
+		}
+	}
+	return "", fmt.Errorf("Invalid productID `%s'", productID)
+}
+
 type MixpanelParams struct {
 	Token string `mapstructure:"token"`
 }

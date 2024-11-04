@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/xr0-org/progstack/internal/analytics"
+	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
@@ -88,6 +90,18 @@ func (u *UserService) CreateNewBlog() http.HandlerFunc {
 		if !ok {
 			logger.Println("No auth session")
 			http.Error(w, "", http.StatusNotFound)
+			return
+		}
+
+		can, err := authz.CanCreateSite(u.store, sesh)
+		if err != nil {
+			logger.Printf("Error performing action: %v", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+		if !can {
+			logger.Printf("User not authorized")
+			http.Error(w, "", http.StatusForbidden)
 			return
 		}
 
@@ -347,7 +361,7 @@ type StorageDetails struct {
 }
 
 type Subscription struct {
-	IsSubscribed       bool
+	IsPaid             bool
 	Plan               string
 	CurrentPeriodStart string
 	CurrentPeriodEnd   string
@@ -404,7 +418,7 @@ func (u *UserService) Account() http.HandlerFunc {
 
 func getStorageDetails(s *model.Store, session *session.Session) (StorageDetails, error) {
 	/* calculate storage */
-	userBytes, err := userBytes(s, session.GetUserID())
+	userBytes, err := authz.UserStorageUsed(s, session.GetUserID())
 	if err != nil {
 		return StorageDetails{}, err
 	}
@@ -457,34 +471,30 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 
 	/* get stripe subscription */
 	subscription := Subscription{
-		IsSubscribed: false,
+		IsPaid: false,
 	}
-	subscribed := true
 	sub, err := s.GetStripeSubscriptionByUserID(
 		context.TODO(), session.GetUserID(),
 	)
 	if err != nil {
-		if err != sql.ErrNoRows {
-			return AccountDetails{}, fmt.Errorf(
-				"error getting stripe subscription details: %w",
-				err,
-			)
-		}
-		/* no sub */
-		subscribed = false
+		return AccountDetails{}, fmt.Errorf(
+			"error getting stripe subscription details: %w",
+			err,
+		)
 	}
+	log.Printf("subName: %s modelName: %s", sub.SubName, model.SubNameScout)
 
 	/* get price info from stripe */
-	if subscribed {
-		subscription.IsSubscribed = true
-		subscription.Plan = "basic" /* XXX: fix */
+	if sub.SubName != model.SubNameScout {
+		subscription.IsPaid = true
+		subscription.Plan = string(sub.SubName) /* XXX: fix */
 		subscription.CurrentPeriodStart = sub.CurrentPeriodStart.Format(
 			"Jan 02 2006 03:04PM",
 		)
 		subscription.CurrentPeriodEnd = sub.CurrentPeriodEnd.Format(
 			"Jan 02 2006 03:04PM",
 		)
-		subscription.Amount = billing.ConvertCentsToDollars(sub.Amount)
+		subscription.Amount = billing.ConvertCentsToDollars(sub.Amount.Int64)
 	}
 	accountDetails.Subscription = subscription
 	return accountDetails, nil
