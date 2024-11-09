@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
@@ -33,7 +31,6 @@ func (b *BlogService) SubscribeToBlog() http.HandlerFunc {
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusOK)
 	}
 }
 
@@ -52,42 +49,44 @@ func (sr *SubscribeRequest) validate() error {
 func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) error {
 	logger := logging.Logger(r)
 
-	/* extract BlogID from path */
-	vars := mux.Vars(r)
-	blogID := vars["blogID"]
+	if r.Method != http.MethodPost {
+		return fmt.Errorf("must be POST")
+	}
+	if err := r.ParseForm(); err != nil {
+		return fmt.Errorf("cannot parse form: %w", err)
+	}
+	/* TODO: validate email format */
+	email := r.FormValue("email")
 
-	/* parse the request body to get subscriber email */
-	body, err := ioutil.ReadAll(r.Body)
+	blogIDi64, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
 	if err != nil {
-		return fmt.Errorf("error reading request body: %w", err)
+		return fmt.Errorf("cannot parse blogID: %w", err)
 	}
-	defer r.Body.Close()
+	blogID := int32(blogIDi64)
 
-	var req SubscribeRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		return fmt.Errorf("error unmarshaling request: %w", err)
+	logger.Printf("subscribing email `%s' to blog %d\n", email, blogID)
+	if err := b.store.CreateSubscriberTx(
+		context.TODO(),
+		model.CreateSubscriberTxParams{
+			BlogID: blogID,
+			Email:  email,
+		},
+	); err != nil {
+		return fmt.Errorf("error writing subscriber to db: %w", err)
 	}
-	if err = req.validate(); err != nil {
-		return fmt.Errorf("error invalid request body: %w", err)
-	}
 
-	/* XXX: validate email format */
-
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	blog, err := b.store.GetBlogByID(context.TODO(), blogID)
 	if err != nil {
-		return fmt.Errorf("error converting string path var to blogID: %w", err)
+		return fmt.Errorf("cannot get blog: %w", err)
 	}
-
-	logger.Printf("subscribing email `%s' to blog with id: `%d'", req.Email, intBlogID)
-	/* first check if exists */
-
-	err = b.store.CreateSubscriberTx(context.TODO(), model.CreateSubscriberTxParams{
-		BlogID: int32(intBlogID),
-		Email:  req.Email,
-	})
-	if err != nil {
-		return fmt.Errorf("error writing subscriber for blog to db: %w", err)
-	}
+	http.Redirect(
+		w, r,
+		fmt.Sprintf(
+			"http://%s.%s/subscribed",
+			blog.Subdomain, baseurl,
+		),
+		http.StatusTemporaryRedirect,
+	)
 	return nil
 }
 

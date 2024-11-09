@@ -130,6 +130,20 @@ func launchUserBlog(s *model.Store, b *model.Blog) error {
 		),
 		config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
 		"algol_nu",
+		"",
+		"Subscribe via <a href=\"/subscribe\">email</a>.",
+		map[string]ssg.CustomPage{
+			"/subscribe": ssg.NewSubscriberPage(
+				fmt.Sprintf(
+					"http://%s/blogs/%d/subscribe",
+					baseurl, b.ID,
+				),
+			),
+			"/subscribed": ssg.NewMessagePage(
+				"Subscribed",
+				"You have been subscribed. Please check your email.",
+			),
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("error generating site: %w", err)
