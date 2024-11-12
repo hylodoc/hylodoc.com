@@ -5,17 +5,20 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strings"
 
 	"github.com/xr0-org/progstack/internal/analytics"
+	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 
-	"github.com/stripe/stripe-go/v72"
-	bSession "github.com/stripe/stripe-go/v72/billingportal/session"
-	cSession "github.com/stripe/stripe-go/v72/checkout/session"
+	"github.com/stripe/stripe-go/v78"
+	bSession "github.com/stripe/stripe-go/v78/billingportal/session"
+	"github.com/stripe/stripe-go/v78/customer"
+	"github.com/stripe/stripe-go/v78/subscription"
 )
 
 type BillingService struct {
@@ -26,18 +29,21 @@ type BillingService struct {
 func NewBillingService(
 	s *model.Store, m *analytics.MixpanelClientWrapper,
 ) *BillingService {
+	/* set private key for stripe client */
+	stripe.Key = config.Config.Stripe.SecretKey
+
 	return &BillingService{
 		store:    s,
 		mixpanel: m,
 	}
 }
 
-func (b *BillingService) Subscriptions() http.HandlerFunc {
+func (b *BillingService) Pricing() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
-		logger.Println("Subscriptions handler...")
+		logger.Println("Pricing handler...")
 
-		b.mixpanel.Track("Subscriptions", r)
+		b.mixpanel.Track("Pricing", r)
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
@@ -46,180 +52,116 @@ func (b *BillingService) Subscriptions() http.HandlerFunc {
 			return
 		}
 
-		util.ExecTemplate(w, []string{"subscriptions.html", "subscription_product.html"},
+		util.ExecTemplate(w, []string{"pricing.html"},
 			util.PageInfo{
 				Data: struct {
-					Title    string
-					UserInfo *session.UserInfo
-					Plans    []config.Plan
+					Title             string
+					UserInfo          *session.UserInfo
+					TierNames         []string
+					Features          []string
+					SubscriptionTiers []authz.SubscriptionFeatures
 				}{
-					Title:    "Subscriptions",
+					Title:    "Pricing",
 					UserInfo: session.ConvertSessionToUserInfo(sesh),
-					Plans:    config.Config.Stripe.Plans,
+					TierNames: []string{
+						"Scout",
+						"Wayfarer",
+						"Voyager",
+						"Pathfinder",
+					},
+					Features: []string{
+						"projects",
+						"storage",
+						"visitorsPerMonth",
+						"customDomain",
+						"themes",
+						"codeStyle",
+						"images",
+						"emailSubscribers",
+						"analytics",
+						"rss",
+						"likes",
+						"comments",
+						"teamMembers",
+						"passwordProtectedPages",
+						"downloadablePdfPages",
+						"paidSubscribers",
+					},
+					SubscriptionTiers: authz.OrderedSubscriptionTiers(),
 				},
 			},
 			template.FuncMap{
-				"centsToDollars": ConvertCentsToDollars,
+				"join": strings.Join,
 			},
 			logger,
 		)
 	}
 }
 
-func ConvertCentsToDollars(cents int64) string {
-	dollars := float64(cents) / 100.0
-	return fmt.Sprintf("$%.2f", dollars)
-}
-
-func (b *BillingService) CreateCheckoutSession() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("CreateCheckoutSession handler...")
-
-		b.mixpanel.Track("CreateCheckoutSession", r)
-
-		url, err := b.createCheckoutSession(w, r)
-		if err != nil {
-			logger.Printf("Error creating checkout session: %v", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-		logger.Println("Redirecting to stripe for payment...")
-		http.Redirect(w, r, url, http.StatusSeeOther)
-	}
-}
-
-func (b *BillingService) createCheckoutSession(w http.ResponseWriter, r *http.Request) (string, error) {
+func AutoSubscribeToFreePlan(
+	s *model.Store, r *http.Request, user model.User,
+) error {
 	logger := logging.Logger(r)
+	logger.Println("AutoSubscribeToFreePlan...")
 
-	userSession, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-	if !ok {
-		return "", fmt.Errorf("error getting session")
-	}
-
-	priceID := r.FormValue("plan")
-	logger.Printf("PriceID: %s\n", priceID)
-
-	params := &stripe.CheckoutSessionParams{
-		LineItems: []*stripe.CheckoutSessionLineItemParams{
-			&stripe.CheckoutSessionLineItemParams{
-				Price:    stripe.String(priceID),
-				Quantity: stripe.Int64(1),
-			},
-		},
-		Mode:       stripe.String(string(stripe.CheckoutSessionModeSubscription)),
-		SuccessURL: stripe.String(buildSuccessUrl()),
-		CancelURL:  stripe.String(buildCancelUrl()),
-	}
-
-	/* set private key for stripe client */
-	stripe.Key = config.Config.Stripe.SecretKey
-	checkoutSession, err := cSession.New(params)
+	/* create customer in stripe */
+	cust, err := createCustomer(user.Email)
 	if err != nil {
-		return "", fmt.Errorf("error creating stripe checkout session: %w", err)
+		return fmt.Errorf("error creating stripe customer: %w", err)
 	}
+	logger.Printf("StripeCustomer: %v\n", cust)
 
-	/* write the stripeCheckoutSessionID to db */
-	_, err = b.store.CreateStripeCheckoutSession(
+	/* create subscription for customer */
+	sub, err := createSubscription(
+		cust.ID, config.Config.Stripe.FreePlanPriceID,
+	)
+	if err != nil {
+		return fmt.Errorf("error creating subscription: %w", err)
+	}
+	logger.Printf("StripeSubscription: %v\n", sub)
+
+	/* write to db */
+	dbsub, err := s.CreateStripeSubscription(
 		context.TODO(),
-		model.CreateStripeCheckoutSessionParams{
-			StripeSessionID: checkoutSession.ID,
-			UserID:          userSession.GetUserID(),
+		model.CreateStripeSubscriptionParams{
+			UserID:               user.ID,
+			SubName:              model.SubNameScout,
+			StripeCustomerID:     cust.ID,
+			StripeSubscriptionID: sub.ID,
+			StripeStatus:         string(sub.Status),
 		},
 	)
+	logger.Printf("Db sub: %v\n", dbsub)
+	return nil
+}
+
+func createCustomer(email string) (*stripe.Customer, error) {
+	params := &stripe.CustomerParams{
+		Email: stripe.String(email),
+	}
+	cust, err := customer.New(params)
 	if err != nil {
-		return "", fmt.Errorf("error writing stripe checkout session to db: %w", err)
+		return nil, err
 	}
-	return checkoutSession.URL, nil
+	return cust, nil
 }
 
-func buildSuccessUrl() string {
-	return fmt.Sprintf(
-		"%s://%s/user/stripe/success",
-		config.Config.Progstack.Protocol,
-		config.Config.Progstack.ServiceName,
-	)
-}
-
-func buildCancelUrl() string {
-	return fmt.Sprintf(
-		"%s://%s/user/stripe/cancel",
-		config.Config.Progstack.Protocol,
-		config.Config.Progstack.ServiceName,
-	)
-}
-
-type SuccessParams struct {
-	ServiceName  string
-	ContactEmail string
-}
-
-func (b *BillingService) Success() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("Payment success!")
-
-		b.mixpanel.Track("PaymentSuccess", r)
-
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Println("No auth session")
-			http.Error(w, "", http.StatusNotFound)
-			return
-		}
-
-		/* XXX: need to get success params from db */
-		params := SuccessParams{
-			ServiceName:  config.Config.Progstack.ServiceName,
-			ContactEmail: config.Config.Progstack.AccountsEmail,
-		}
-
-		util.ExecTemplate(w, []string{"subscription_success.html"},
-			util.PageInfo{
-				Data: struct {
-					Title    string
-					UserInfo *session.UserInfo
-					Success  SuccessParams
-				}{
-					Title:    "Payment Success",
-					UserInfo: session.ConvertSessionToUserInfo(sesh),
-					Success:  params,
-				},
+func createSubscription(customerID, priceID string) (*stripe.Subscription, error) {
+	params := &stripe.SubscriptionParams{
+		Customer: stripe.String(customerID),
+		Items: []*stripe.SubscriptionItemsParams{
+			{
+				Price: stripe.String(priceID),
 			},
-			template.FuncMap{},
-			logger,
-		)
+		},
+		PaymentBehavior: stripe.String("default_incomplete"),
 	}
-}
 
-func (b *BillingService) Cancel() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Printf("Payment Cancel handler...")
-
-		b.mixpanel.Track("PaymentCancel", r)
-
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Println("No auth session")
-			http.Error(w, "User not found", http.StatusUnauthorized)
-			return
-		}
-
-		util.ExecTemplate(w, []string{"subscription_cancel.html"},
-			util.PageInfo{
-				Data: struct {
-					Title    string
-					UserInfo *session.UserInfo
-				}{
-					Title:    "Payment Cancel",
-					UserInfo: session.ConvertSessionToUserInfo(sesh),
-				},
-			},
-			template.FuncMap{},
-			logger,
-		)
+	subscription, err := subscription.New(params)
+	if err != nil {
+		return nil, err
 	}
+	return subscription, nil
 }
 
 func (b *BillingService) BillingPortal() http.HandlerFunc {
@@ -251,12 +193,9 @@ func (b *BillingService) billingPortal(w http.ResponseWriter, r *http.Request) (
 	if err != nil {
 		return "", fmt.Errorf("could not get subcription for user: %w", err)
 	}
-	if !sub.StripeCustomerID.Valid {
-		return "", fmt.Errorf("No existing paid subscription")
-	}
 
 	params := &stripe.BillingPortalSessionParams{
-		Customer:  stripe.String(sub.StripeCustomerID.String),
+		Customer:  stripe.String(sub.StripeCustomerID),
 		ReturnURL: stripe.String(fmt.Sprintf("%s://%s/user/account", config.Config.Progstack.Protocol, config.Config.Progstack.ServiceName)),
 	}
 

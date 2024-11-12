@@ -47,14 +47,6 @@ func (s *Store) CreateUserTx(ctx context.Context, arg CreateUserParams) (*User, 
 		if err != nil {
 			return fmt.Errorf("error creating user: %w", err)
 		}
-		/* create free subscription */
-		_, err = s.CreateStripeSubscription(ctx, CreateStripeSubscriptionParams{
-			UserID:  u.ID,
-			SubName: SubNameScout,
-		})
-		if err != nil {
-			return fmt.Errorf("error creating subscription: %w", err)
-		}
 		res = u
 		return nil
 	}); err != nil {
@@ -63,15 +55,16 @@ func (s *Store) CreateUserTx(ctx context.Context, arg CreateUserParams) (*User, 
 	return &res, nil
 }
 
-func (s *Store) CreateUserWithGithubAccountTx(ctx context.Context, arg CreateGithubAccountParams) error {
-	return s.execTx(ctx, func(q *Queries) error {
+func (s *Store) CreateUserWithGithubAccountTx(ctx context.Context, arg CreateGithubAccountParams) (User, error) {
+	var res User
+	if err := s.execTx(ctx, func(q *Queries) error {
 		/* for ghAccount we can just use github username */
 		u, err := s.CreateUser(ctx, CreateUserParams{
 			Email:    arg.GhEmail,
 			Username: arg.GhUsername,
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("Error creating user: %w", err)
 		}
 		_, err = s.CreateGithubAccount(ctx, CreateGithubAccountParams{
 			UserID:     u.ID,
@@ -79,16 +72,15 @@ func (s *Store) CreateUserWithGithubAccountTx(ctx context.Context, arg CreateGit
 			GhEmail:    arg.GhEmail,
 			GhUsername: arg.GhUsername,
 		})
-		/* create free subscription */
-		_, err = s.CreateStripeSubscription(ctx, CreateStripeSubscriptionParams{
-			UserID:  u.ID,
-			SubName: SubNameScout,
-		})
 		if err != nil {
-			return fmt.Errorf("error creating subscription: %w", err)
+			return fmt.Errorf("Error creating githubAccount: %w", err)
 		}
+		res = u
 		return nil
-	})
+	}); err != nil {
+		return User{}, fmt.Errorf("error creating user with github account: %w", err)
+	}
+	return res, nil
 }
 
 type RepositoryTxParams struct {
@@ -190,25 +182,4 @@ func (s *Store) UpdateSubdomainTx(ctx context.Context, arg UpdateSubdomainTxPara
 		}
 		return nil
 	})
-}
-
-func (s *Store) CreateStripeSubscriptionTx(ctx context.Context, arg CreateStripeSubscriptionParams) error {
-	return s.execTx(ctx, func(q *Queries) error {
-		if err := s.DeactivateStripeSubscriptionByUserID(
-			ctx, arg.UserID,
-		); err != nil {
-			return fmt.Errorf(
-				"error deactivating existing subscriptions: %w",
-				err,
-			)
-		}
-		_, err := s.CreateStripeSubscription(ctx, arg)
-		if err != nil {
-			return fmt.Errorf(
-				"error updating stripe subscription: %w", err,
-			)
-		}
-		return nil
-	})
-
 }

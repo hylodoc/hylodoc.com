@@ -15,6 +15,7 @@ import (
 
 	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/analytics"
+	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/httpclient"
@@ -141,31 +142,34 @@ func (a *AuthNService) githubOAuthCallback(
 		}
 		/* new user signing in with github, create with github account */
 		logger.Println("Creating user and linking to github account in db...")
-		err = a.store.CreateUserWithGithubAccountTx(context.TODO(), model.CreateGithubAccountParams{
-			GhUserID:   ghUser.ID,
-			GhEmail:    ghUser.Email,
-			GhUsername: ghUser.Username,
-		})
+		u, err = a.store.CreateUserWithGithubAccountTx(
+			context.TODO(),
+			model.CreateGithubAccountParams{
+				GhUserID:   ghUser.ID,
+				GhEmail:    ghUser.Email,
+				GhUsername: ghUser.Username,
+			},
+		)
 		if err != nil {
 			logger.Printf("Error creating user in db: %v", err)
 			return fmt.Errorf("error creating user in db: %w", err)
 		}
-		/* fetch newly created userID, needed to create Auth session */
-		u, err = a.store.GetUserByGhUserID(context.TODO(), ghUser.ID)
-		if err != nil {
-			return fmt.Errorf("error fetching")
-		}
 	}
-	logger.Println("Got user: ", u)
+	logger.Printf("Got user: %v\n", u)
 
 	/* create Auth Session */
 	_, err = session.CreateAuthSession(
 		a.store, w, u.ID, authSessionDuration, logger,
 	)
 	if err != nil {
-		logger.Printf("Error creating auth session: %v", err)
 		return fmt.Errorf("error creating auth session: %w", err)
 	}
+
+	/* autosubscribe user to stripe */
+	if err = billing.AutoSubscribeToFreePlan(a.store, r, u); err != nil {
+		return fmt.Errorf("error subscribing user to free plan: %w", err)
+	}
+
 	return nil
 }
 

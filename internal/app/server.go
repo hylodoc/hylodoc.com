@@ -90,6 +90,7 @@ func Serve() {
 	r.HandleFunc("/magic/logincallback", authNService.MagicLoginCallback())
 	r.HandleFunc("/gh/installcallback", installationService.InstallationCallback())
 	r.HandleFunc("/stripe/webhook", billingService.StripeWebhook())
+	r.HandleFunc("/pricing", billingService.Pricing())
 
 	r.HandleFunc("/blogs/{blogID}/subscribe", blogService.SubscribeToBlog()).Methods("POST")
 	r.HandleFunc("/blogs/{blogID}/unsubscribe", blogService.UnsubscribeFromBlog())
@@ -109,10 +110,8 @@ func Serve() {
 	authR.HandleFunc("/folder-flow", userService.FolderFlow())
 	authR.HandleFunc("/create-repository-blog", blogService.CreateRepositoryBlog())
 	authR.HandleFunc("/create-folder-blog", blogService.CreateFolderBlog())
-	authR.HandleFunc("/stripe/subscriptions", billingService.Subscriptions())
-	authR.HandleFunc("/stripe/create-checkout-session", billingService.CreateCheckoutSession())
-	authR.HandleFunc("/stripe/success", billingService.Success())
-	authR.HandleFunc("/stripe/cancel", billingService.Cancel())
+
+	/* billing */
 	authR.HandleFunc("/stripe/billing-portal", billingService.BillingPortal())
 
 	blogR := authR.PathPrefix("/blogs/{blogID}").Subrouter()

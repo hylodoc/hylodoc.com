@@ -103,7 +103,7 @@ func handleInstallation(
 		return fmt.Errorf("error handling installation action: %w", err)
 	}
 
-	user, err := s.GetUserByGhUserID(context.TODO(), event.Sender.ID)
+	account, err := s.GetGithubAccountByGhUserID(context.TODO(), event.Sender.ID)
 	if err != nil {
 		return fmt.Errorf(
 			"error getting user with ghUserID `%d': %w",
@@ -113,7 +113,7 @@ func handleInstallation(
 	if err := s.UpdateAwaitingGithubUpdate(
 		context.TODO(),
 		model.UpdateAwaitingGithubUpdateParams{
-			ID:               user.ID,
+			ID:               account.UserID,
 			GhAwaitingUpdate: false,
 		},
 	); err != nil {
@@ -127,7 +127,7 @@ func handleInstallationAction(
 	c *httpclient.Client, s *model.Store, event InstallationEvent,
 	logger *log.Logger,
 ) error {
-	user, err := s.GetUserByGhUserID(context.TODO(), event.Sender.ID)
+	account, err := s.GetGithubAccountByGhUserID(context.TODO(), event.Sender.ID)
 	if err != nil {
 		return fmt.Errorf(
 			"error getting user with ghUserID `%d': %w",
@@ -137,12 +137,12 @@ func handleInstallationAction(
 	switch event.Action {
 	case "created":
 		return handleInstallationCreated(
-			c, s, event.Installation.ID, user.ID, user.GhEmail,
+			c, s, event.Installation.ID, account.UserID, account.GhEmail,
 			logger,
 		)
 	case "deleted":
 		return handleInstallationDeleted(
-			c, s, event.Installation.ID, user.ID, logger,
+			c, s, event.Installation.ID, account.UserID, logger,
 		)
 	default:
 		logger.Printf("unhandled event action: %s\n", event.Action)
@@ -329,7 +329,7 @@ func handleInstallationRepositoriesAction(
 	c *httpclient.Client, s *model.Store, event InstallationRepositoriesEvent,
 	logger *log.Logger,
 ) error {
-	user, err := s.GetUserByGhUserID(context.TODO(), event.Sender.ID)
+	account, err := s.GetGithubAccountByGhUserID(context.TODO(), event.Sender.ID)
 	if err != nil {
 		return fmt.Errorf(
 			"error getting user with ghUserID `%d': %w",
@@ -343,8 +343,8 @@ func handleInstallationRepositoriesAction(
 			s,
 			event.Installation.ID,
 			event.RepositoriesAdded,
-			user.ID,
-			user.GhEmail,
+			account.UserID,
+			account.GhEmail,
 			logger,
 		)
 	case "removed":

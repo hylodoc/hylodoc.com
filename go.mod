@@ -18,7 +18,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
-	github.com/stripe/stripe-go/v72 v72.122.0
+	github.com/stripe/stripe-go/v78 v78.12.0
 	github.com/xr0-org/progstack-ssg v0.0.0-00010101000000-000000000000
 )
 

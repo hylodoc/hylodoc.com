@@ -26,16 +26,9 @@
 <section>
 	<div class="container">
 		<h3>Subscription</h3>
-		{{ if .Data.AccountDetails.Subscription.IsPaid }}
-			<p>Plan: {{ .Data.AccountDetails.Subscription.Plan }}
-			<p>Billing Started On: {{ .Data.AccountDetails.Subscription.CurrentPeriodStart }}</p>
-			<p>Next Billing Date: {{ .Data.AccountDetails.Subscription.CurrentPeriodEnd }}</p>
-			<p>Billing Amount: {{ .Data.AccountDetails.Subscription.Amount }}
-			<p>To manage your subscription, <a href="/user/stripe/billing-portal">click here</a></p>
-			<br>
-		{{ else }}
-			<p>To subscribe, <a href="/user/stripe/subscriptions">click here</a></p>
-		{{ end }}
+		<p>Plan: {{ .Data.AccountDetails.Subscription.Plan }}
+		<p>To manage your subscription, <a href="/user/stripe/billing-portal">click here</a></p>
+		<br>
 	</div>
 </section>
 

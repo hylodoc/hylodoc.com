@@ -222,47 +222,15 @@ CREATE UNIQUE INDEX unique_active_subscriber_per_blog
 	WHERE status = 'active';
 
 -- stripe integration
-
-CREATE TYPE checkout_session_status AS ENUM ('pending', 'completed');
-
-CREATE TABLE stripe_checkout_sessions (
-	stripe_session_id	VARCHAR(255)		NOT NULL	PRIMARY KEY,
-	user_id			INTEGER			NOT NULL,
-	status			checkout_session_status	NOT NULL	DEFAULT('pending'),
-	created_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
-	updated_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
-
-	CONSTRAINT fk_user_id
-		FOREIGN KEY (user_id)
-		REFERENCES users(id)
-		ON DELETE CASCADE -- delete checkout sessions when user deleted
-);
-
 CREATE TYPE sub_name AS ENUM ('Scout', 'Wayfarer', 'Voyager', 'Pathfinder');
 
 CREATE TABLE stripe_subscriptions (
 	id			SERIAL					PRIMARY KEY,
 	user_id			INTEGER			NOT NULL,
 	sub_name		sub_name		NOT NULL,
-	stripe_subscription_id	VARCHAR(255),
-	stripe_customer_id	VARCHAR(255),
-	stripe_price_id		VARCHAR(255),
-	status			VARCHAR(255),
-	amount			BIGINT,
-	current_period_start	TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
-	current_period_end	TIMESTAMPTZ		NOT NULL	DEFAULT(now() + '100 years'),
-	active			BOOLEAN			NOT NULL	DEFAULT(true),
+	stripe_subscription_id	VARCHAR(255)		NOT NULL,
+	stripe_customer_id	VARCHAR(255)		NOT NULL,
+	stripe_status		VARCHAR(255)		NOT NULL,
 	created_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
-	updated_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
-
-	CONSTRAINT subscription_type CHECK (
-		(sub_name <> 'Scout'
-			AND stripe_subscription_id IS NOT NULL
-			AND stripe_price_id IS NOT NULL
-			AND status IS NOT NULL
-			AND amount IS NOT NULL
-		) OR (
-			sub_name = 'Scout'
-		)
-	)
+	updated_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now())
 );

@@ -4,25 +4,25 @@ INSERT INTO stripe_subscriptions (
 	sub_name,
 	stripe_subscription_id,
 	stripe_customer_id,
-	stripe_price_id,
-	amount,
-	status,
-	current_period_start,
-	current_period_end
+	stripe_status
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9
+	$1, $2, $3, $4, $5
 )
 RETURNING *;
 
--- name: DeactivateStripeSubscriptionByUserID :exec
+-- name: UpdateStripeSubscription :exec
 UPDATE stripe_subscriptions
-SET active = false
-WHERE user_id = $1;
+SET
+	stripe_subscription_id = $1,
+	sub_name = $2,
+	stripe_status = $3,
+	updated_at = now()
+WHERE stripe_customer_id = $4;
 
 -- name: GetStripeSubscriptionByUserID :one
 SELECT *
 FROM stripe_subscriptions
-WHERE user_id = $1 and active = true;
+WHERE user_id = $1;
 
 -- name: StripeSubscriptionExists :one
 SELECT EXISTS (

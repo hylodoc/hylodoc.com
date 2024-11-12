@@ -12,7 +12,6 @@ import (
 
 	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/authz"
-	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/installation"
@@ -361,7 +360,6 @@ type StorageDetails struct {
 }
 
 type Subscription struct {
-	IsPaid             bool
 	Plan               string
 	CurrentPeriodStart string
 	CurrentPeriodEnd   string
@@ -424,6 +422,7 @@ func getStorageDetails(s *model.Store, session *session.Session) (StorageDetails
 	}
 	userMegaBytes := float64(userBytes) / (1024 * 1024)
 
+	/* XXX: plan limits details */
 	return StorageDetails{
 		Used:  fmt.Sprintf("%.2f", userMegaBytes),
 		Limit: "10",
@@ -470,9 +469,6 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 	}
 
 	/* get stripe subscription */
-	subscription := Subscription{
-		IsPaid: false,
-	}
 	sub, err := s.GetStripeSubscriptionByUserID(
 		context.TODO(), session.GetUserID(),
 	)
@@ -484,19 +480,9 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 	}
 	log.Printf("subName: %s modelName: %s", sub.SubName, model.SubNameScout)
 
-	/* get price info from stripe */
-	if sub.SubName != model.SubNameScout {
-		subscription.IsPaid = true
-		subscription.Plan = string(sub.SubName) /* XXX: fix */
-		subscription.CurrentPeriodStart = sub.CurrentPeriodStart.Format(
-			"Jan 02 2006 03:04PM",
-		)
-		subscription.CurrentPeriodEnd = sub.CurrentPeriodEnd.Format(
-			"Jan 02 2006 03:04PM",
-		)
-		subscription.Amount = billing.ConvertCentsToDollars(sub.Amount.Int64)
+	accountDetails.Subscription = Subscription{
+		Plan: string(sub.SubName),
 	}
-	accountDetails.Subscription = subscription
 	return accountDetails, nil
 }
 

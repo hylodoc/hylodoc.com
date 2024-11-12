@@ -24,7 +24,7 @@ func CanCreateSite(s *model.Store, sesh *session.Session) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
-	tier := subscriptionTiers[string(plan)]
+	tier := SubscriptionTiers[string(plan)]
 	return tier.canCreateProject(storageUsed, int(blogCount))
 }
 
@@ -34,8 +34,8 @@ func CanViewAnalytics(s *model.Store, sesh *session.Session) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
-	tier := subscriptionTiers[string(plan)]
-	return tier.analytics, nil
+	tier := SubscriptionTiers[string(plan)]
+	return tier.Analytics, nil
 }
 
 func CanUploadImages(s *model.Store, sesh *session.Session) (bool, error) {
@@ -43,8 +43,8 @@ func CanUploadImages(s *model.Store, sesh *session.Session) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
-	tier := subscriptionTiers[string(plan)]
-	return tier.images, nil
+	tier := SubscriptionTiers[string(plan)]
+	return tier.Images, nil
 }
 
 func CanUseTheme(s *model.Store, theme string, sesh *session.Session) (bool, error) {
@@ -52,7 +52,7 @@ func CanUseTheme(s *model.Store, theme string, sesh *session.Session) (bool, err
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
-	tier := subscriptionTiers[string(plan)]
+	tier := SubscriptionTiers[string(plan)]
 	return tier.canUseTheme(theme), nil
 }
 
@@ -61,8 +61,8 @@ func CanHaveEmailSubscribers(s *model.Store, sesh *session.Session) (bool, error
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
-	tier := subscriptionTiers[string(plan)]
-	return tier.emailSubscribers, nil
+	tier := SubscriptionTiers[string(plan)]
+	return tier.EmailSubscribers, nil
 }
 
 func CanHaveLikes(s *model.Store, sesh *session.Session) (bool, error) {
@@ -70,8 +70,8 @@ func CanHaveLikes(s *model.Store, sesh *session.Session) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
-	tier := subscriptionTiers[string(plan)]
-	return tier.likes, nil
+	tier := SubscriptionTiers[string(plan)]
+	return tier.Likes, nil
 }
 
 func CanHaveComments(s *model.Store, sesh *session.Session) (bool, error) {
@@ -79,8 +79,8 @@ func CanHaveComments(s *model.Store, sesh *session.Session) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
-	tier := subscriptionTiers[string(plan)]
-	return tier.comments, nil
+	tier := SubscriptionTiers[string(plan)]
+	return tier.Comments, nil
 }
 
 func CanHaveTeamMembers(s *model.Store, sesh *session.Session) (bool, error) {
@@ -88,8 +88,8 @@ func CanHaveTeamMembers(s *model.Store, sesh *session.Session) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
-	tier := subscriptionTiers[string(plan)]
-	return tier.teamMembers, nil
+	tier := SubscriptionTiers[string(plan)]
+	return tier.TeamMembers, nil
 }
 
 func CanHavePasswordProtectedPages(s *model.Store, sesh *session.Session) (bool, error) {
@@ -97,8 +97,8 @@ func CanHavePasswordProtectedPages(s *model.Store, sesh *session.Session) (bool,
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
-	tier := subscriptionTiers[string(plan)]
-	return tier.passwordProtectedPages, nil
+	tier := SubscriptionTiers[string(plan)]
+	return tier.PasswordProtectedPages, nil
 }
 
 func CanHaveDownloadablePdfPages(s *model.Store, sesh *session.Session) (bool, error) {
@@ -106,8 +106,8 @@ func CanHaveDownloadablePdfPages(s *model.Store, sesh *session.Session) (bool, e
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
-	tier := subscriptionTiers[string(plan)]
-	return tier.passwordProtectedPages, nil
+	tier := SubscriptionTiers[string(plan)]
+	return tier.PasswordProtectedPages, nil
 }
 
 func CanHavePaidSubscribers(s *model.Store, sesh *session.Session) (bool, error) {
@@ -115,113 +115,113 @@ func CanHavePaidSubscribers(s *model.Store, sesh *session.Session) (bool, error)
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
-	tier := subscriptionTiers[string(plan)]
-	return tier.paidSubscribers, nil
+	tier := SubscriptionTiers[string(plan)]
+	return tier.PaidSubscribers, nil
 }
 
 type SubscriptionFeatures struct {
-	projects               int
-	storage                int
-	visitorsPerMonth       int
-	customDomain           bool
-	themes                 []string
-	codeStyle              []string
-	images                 bool
-	emailSubscribers       bool
-	analytics              bool
-	rss                    bool
-	likes                  bool
-	comments               bool
-	teamMembers            bool
-	passwordProtectedPages bool
-	downloadablePdfPages   bool
-	paidSubscribers        bool
+	Projects               int
+	Storage                int
+	VisitorsPerMonth       int
+	CustomDomain           bool
+	Themes                 []string
+	CodeStyle              []string
+	Images                 bool
+	EmailSubscribers       bool
+	Analytics              bool
+	Rss                    bool
+	Likes                  bool
+	Comments               bool
+	TeamMembers            bool
+	PasswordProtectedPages bool
+	DownloadablePdfPages   bool
+	PaidSubscribers        bool
 }
 
-var subscriptionTiers = map[string]SubscriptionFeatures{
+var SubscriptionTiers = map[string]SubscriptionFeatures{
 	"Scout": {
-		projects:               1,
-		storage:                24, /* 24MB */
-		visitorsPerMonth:       1000,
-		themes:                 []string{"lit"},
-		codeStyle:              []string{"lit"},
-		customDomain:           false,
-		images:                 false,
-		emailSubscribers:       false,
-		analytics:              false,
-		rss:                    false,
-		likes:                  false,
-		comments:               false,
-		teamMembers:            false,
-		passwordProtectedPages: false,
-		downloadablePdfPages:   false,
-		paidSubscribers:        false,
+		Projects:               1,
+		Storage:                24, /* 24MB */
+		VisitorsPerMonth:       1000,
+		Themes:                 []string{"lit"},
+		CodeStyle:              []string{"lit"},
+		CustomDomain:           false,
+		Images:                 false,
+		EmailSubscribers:       false,
+		Analytics:              false,
+		Rss:                    false,
+		Likes:                  false,
+		Comments:               false,
+		TeamMembers:            false,
+		PasswordProtectedPages: false,
+		DownloadablePdfPages:   false,
+		PaidSubscribers:        false,
 	},
 	"Wayfarer": {
-		projects:               1,
-		storage:                256, /* 256MB */
-		visitorsPerMonth:       5000,
-		themes:                 []string{"lit", "latex"},
-		codeStyle:              []string{"lit", "latex"},
-		customDomain:           true,
-		images:                 true,
-		emailSubscribers:       true,
-		analytics:              true,
-		rss:                    true,
-		likes:                  true,
-		comments:               true,
-		teamMembers:            false,
-		passwordProtectedPages: false,
-		downloadablePdfPages:   false,
-		paidSubscribers:        false,
+		Projects:               1,
+		Storage:                256, /* 256MB */
+		VisitorsPerMonth:       5000,
+		Themes:                 []string{"lit", "latex"},
+		CodeStyle:              []string{"lit", "latex"},
+		CustomDomain:           true,
+		Images:                 true,
+		EmailSubscribers:       true,
+		Analytics:              true,
+		Rss:                    true,
+		Likes:                  true,
+		Comments:               true,
+		TeamMembers:            false,
+		PasswordProtectedPages: false,
+		DownloadablePdfPages:   false,
+		PaidSubscribers:        false,
 	},
 	"Voyager": {
-		projects:               3,
-		storage:                1024, /* 1GB */
-		visitorsPerMonth:       10000,
-		themes:                 []string{"lit", "latex"},
-		codeStyle:              []string{"lit", "latex"},
-		customDomain:           true,
-		images:                 true,
-		emailSubscribers:       true,
-		analytics:              true,
-		rss:                    true,
-		likes:                  true,
-		comments:               true,
-		teamMembers:            true,
-		passwordProtectedPages: true,
-		downloadablePdfPages:   false,
-		paidSubscribers:        false,
+		Projects:               3,
+		Storage:                1024, /* 1GB */
+		VisitorsPerMonth:       10000,
+		Themes:                 []string{"lit", "latex"},
+		CodeStyle:              []string{"lit", "latex"},
+		CustomDomain:           true,
+		Images:                 true,
+		EmailSubscribers:       true,
+		Analytics:              true,
+		Rss:                    true,
+		Likes:                  true,
+		Comments:               true,
+		TeamMembers:            true,
+		PasswordProtectedPages: true,
+		DownloadablePdfPages:   false,
+		PaidSubscribers:        false,
 	},
 	"Pathfinder": {
-		projects:               10,
-		storage:                10240, /* 10GB */
-		visitorsPerMonth:       100000,
-		customDomain:           false,
-		themes:                 []string{"lit", "latex"},
-		codeStyle:              []string{"lit", "latex"},
-		images:                 true,
-		emailSubscribers:       true,
-		analytics:              true,
-		rss:                    true,
-		likes:                  true,
-		comments:               true,
-		teamMembers:            true,
-		passwordProtectedPages: true,
-		downloadablePdfPages:   true,
-		paidSubscribers:        true,
+		Projects:               10,
+		Storage:                10240, /* 10GB */
+		VisitorsPerMonth:       100000,
+		CustomDomain:           false,
+		Themes:                 []string{"lit", "latex"},
+		CodeStyle:              []string{"lit", "latex"},
+		Images:                 true,
+		EmailSubscribers:       true,
+		Analytics:              true,
+		Rss:                    true,
+		Likes:                  true,
+		Comments:               true,
+		TeamMembers:            true,
+		PasswordProtectedPages: true,
+		DownloadablePdfPages:   true,
+		PaidSubscribers:        true,
 	},
 }
 
 func (s *SubscriptionFeatures) canCreateProject(bytesUsed int64, blogCount int) (bool, error) {
-	if blogCount >= s.projects {
+	if blogCount >= s.Projects {
 		return false, fmt.Errorf(
 			"site count %d excess max %d for plan",
 			blogCount,
-			s.projects,
+			s.Projects,
 		)
 	}
-	maxBytes := megabytesToBytes(int64(s.storage))
+	maxBytes := megabytesToBytes(int64(s.Storage))
 	if bytesUsed > maxBytes {
 		return false, fmt.Errorf(
 			"used %d of %d bytes",
@@ -237,10 +237,19 @@ func megabytesToBytes(mb int64) int64 {
 }
 
 func (s *SubscriptionFeatures) canUseTheme(theme string) bool {
-	for _, t := range s.themes {
+	for _, t := range s.Themes {
 		if t == theme {
 			return true
 		}
 	}
 	return false
+}
+
+func OrderedSubscriptionTiers() []SubscriptionFeatures {
+	var tiers []SubscriptionFeatures
+	tiers = append(tiers, SubscriptionTiers["Scout"])
+	tiers = append(tiers, SubscriptionTiers["Wayfarer"])
+	tiers = append(tiers, SubscriptionTiers["Voyager"])
+	tiers = append(tiers, SubscriptionTiers["Pathfinder"])
+	return tiers
 }
