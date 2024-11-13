@@ -102,7 +102,6 @@ func Serve() {
 	authR.HandleFunc("/auth/logout", authNService.Logout())
 	authR.HandleFunc("/gh/linkgithub", authNService.LinkGithubAccount())
 	authR.HandleFunc("/account", userService.Account())
-	authR.HandleFunc("/delete", userService.Delete())
 	authR.HandleFunc("/subdomain-check", blogService.SubdomainCheck())
 	authR.HandleFunc("/create-new-blog", userService.CreateNewBlog())
 	authR.HandleFunc("/repository-flow", userService.RepositoryFlow())

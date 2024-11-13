@@ -485,28 +485,3 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 	}
 	return accountDetails, nil
 }
-
-func (u *UserService) Delete() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("User Delete handler...")
-
-		u.mixpanel.Track("Delete", r)
-
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Println("No auth session")
-			http.Error(w, "", http.StatusNotFound)
-			return
-		}
-
-		/* XXX: need to call stripe to stop billing */
-
-		if err := u.store.DeleteUserByUserID(context.TODO(), sesh.GetUserID()); err != nil {
-			logger.Printf("Error deleting user: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	}
-}
