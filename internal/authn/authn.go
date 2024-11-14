@@ -154,6 +154,10 @@ func (a *AuthNService) githubOAuthCallback(
 			logger.Printf("Error creating user in db: %v", err)
 			return fmt.Errorf("error creating user in db: %w", err)
 		}
+		/* autosubscribe user to stripe */
+		if err = billing.AutoSubscribeToFreePlan(a.store, r, u); err != nil {
+			return fmt.Errorf("error subscribing user to free plan: %w", err)
+		}
 	}
 	logger.Printf("Got user: %v\n", u)
 
@@ -163,11 +167,6 @@ func (a *AuthNService) githubOAuthCallback(
 	)
 	if err != nil {
 		return fmt.Errorf("error creating auth session: %w", err)
-	}
-
-	/* autosubscribe user to stripe */
-	if err = billing.AutoSubscribeToFreePlan(a.store, r, u); err != nil {
-		return fmt.Errorf("error subscribing user to free plan: %w", err)
 	}
 
 	return nil
@@ -571,6 +570,11 @@ func (a *AuthNService) magicRegisterCallback(w http.ResponseWriter, r *http.Requ
 		return fmt.Errorf("error creating user: %w", err)
 	}
 	logger.Printf("Successfully registered user `%v'\n", u)
+
+	/* autosubscribe user to stripe */
+	if err = billing.AutoSubscribeToFreePlan(a.store, r, *u); err != nil {
+		return fmt.Errorf("error subscribing user to free plan: %w", err)
+	}
 
 	/* create Auth Session */
 	_, err = session.CreateAuthSession(
