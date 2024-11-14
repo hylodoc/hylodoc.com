@@ -61,14 +61,4 @@ stripe:
   publishable_key: "<StripePublishableKey>"
   secret_key: "<StripeSecretKey>"
   webhook_signing_secret: "<StripeWebhookKey>"
-  plans: # configured in stripe
-    - product_id: "<StripeProductID>"
-      name: "basic"
-      currency: "usd"
-      prices: # configured in stripe
-        - price_id: "<StripeMonthlyPriceID>"
-          interval: "monthly"
-          amount: 1000 # in cents ($10)
-        - price_id: "<StripeYearlyPriceID>"
-          interval: "yearly"
-          amount: 10000 # in cents ($100)
+  free_plan_price_id: "<StripeFreePlanPriceID>"
