@@ -47,8 +47,8 @@ func (b *BillingService) Pricing() http.HandlerFunc {
 
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok {
-			logger.Println("No auth session")
-			http.Error(w, "No auth session", http.StatusUnauthorized)
+			logger.Println("No session")
+			http.Error(w, "", http.StatusNotFound)
 			return
 		}
 
