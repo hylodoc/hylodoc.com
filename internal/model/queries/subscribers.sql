@@ -4,7 +4,7 @@ INSERT INTO subscribers (
 ) VALUES (
 	$1, $2
 )
-RETURNING *;
+RETURNING unsubscribe_token;
 
 -- name: GetSubscriberForBlog :one
 SELECT *

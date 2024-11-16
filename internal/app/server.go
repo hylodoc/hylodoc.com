@@ -93,7 +93,7 @@ func Serve() {
 	r.HandleFunc("/pricing", billingService.Pricing())
 
 	r.HandleFunc("/blogs/{blogID}/subscribe", blogService.SubscribeToBlog()).Methods("POST")
-	r.HandleFunc("/blogs/{blogID}/unsubscribe", blogService.UnsubscribeFromBlog())
+	r.HandleFunc("/blogs/{blogID}/unsubscribe/{token}", blogService.UnsubscribeFromBlog())
 
 	/* authenticated routes */
 	authR := r.PathPrefix("/user").Subrouter()

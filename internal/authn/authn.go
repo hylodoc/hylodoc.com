@@ -519,13 +519,13 @@ func (a *AuthNService) magicRegister(w http.ResponseWriter, r *http.Request) err
 		return fmt.Errorf("error writing magic to db: %w", err)
 	}
 
-	/* send email */
-	err = email.SendRegisterLink(a.resendClient, email.MagicLinkParams{
-		To:    emailAddress,
-		Token: token,
-	})
-	if err != nil {
-		return fmt.Errorf("error sending register link to `%s': %w", emailAddress, err)
+	if err := email.NewSender(
+		a.resendClient, model.EmailModePlaintext,
+	).SendRegisterLink(emailAddress, token); err != nil {
+		return fmt.Errorf(
+			"error sending register link to `%s': %w",
+			emailAddress, err,
+		)
 	}
 	return nil
 }
@@ -625,15 +625,15 @@ func (a *AuthNService) magicLogin(w http.ResponseWriter, r *http.Request) error 
 	if err != nil {
 		return fmt.Errorf("error writing magic login to db: %w", err)
 	}
-	/* send email */
-	err = email.SendLoginLink(a.resendClient, email.MagicLinkParams{
-		To:    emailAddress,
-		Token: token,
-	})
-	if err != nil {
-		return fmt.Errorf("error sending login link to `%s': %w", emailAddress, err)
-	}
 
+	if err := email.NewSender(
+		a.resendClient, model.EmailModePlaintext,
+	).SendLoginLink(emailAddress, token); err != nil {
+		return fmt.Errorf(
+			"error sending login link to `%s': %w",
+			emailAddress, err,
+		)
+	}
 	return nil
 }
 

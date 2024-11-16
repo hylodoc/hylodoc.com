@@ -3,7 +3,6 @@ package model
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -118,39 +117,6 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 			if err != nil {
 				return err
 			}
-		}
-		return nil
-	})
-}
-
-type CreateSubscriberTxParams struct {
-	BlogID int32
-	Email  string
-}
-
-var ErrSubscriberAlreadyExists = errors.New("subscription already exists")
-
-func (s *Store) CreateSubscriberTx(ctx context.Context, arg CreateSubscriberTxParams) error {
-	return s.execTx(ctx, func(q *Queries) error {
-		sub, err := s.GetSubscriberForBlog(ctx, GetSubscriberForBlogParams{
-			BlogID: arg.BlogID,
-			Email:  arg.Email,
-		})
-		if err != nil {
-			if !errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("error getting subscriber for blog: %w", err)
-			}
-			/* no such subscriber */
-		} else {
-			if sub.Email == arg.Email {
-				return ErrSubscriberAlreadyExists
-			}
-		}
-		if _, err := s.CreateSubscriber(ctx, CreateSubscriberParams{
-			BlogID: arg.BlogID,
-			Email:  arg.Email,
-		}); err != nil {
-			return fmt.Errorf("error writing subscriber for blog to db: %w", err)
 		}
 		return nil
 	})

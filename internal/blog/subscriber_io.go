@@ -14,7 +14,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/lib/pq"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/util"
@@ -57,22 +59,33 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 		return fmt.Errorf("cannot parse form: %w", err)
 	}
 	/* TODO: validate email format */
-	email := r.FormValue("email")
+	e := r.FormValue("email")
 
-	blogIDi64, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
+	blogID, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
 	if err != nil {
 		return fmt.Errorf("cannot parse blogID: %w", err)
 	}
-	blogID := int32(blogIDi64)
-
-	if err := b.createsubscriber(email, blogID, logger); err != nil {
-		return fmt.Errorf("cannot create subscriber: %w", err)
-	}
-
-	blog, err := b.store.GetBlogByID(context.TODO(), blogID)
+	blog, err := b.store.GetBlogByID(context.TODO(), int32(blogID))
 	if err != nil {
 		return fmt.Errorf("cannot get blog: %w", err)
 	}
+
+	unsubtoken, err := b.createsubscriber(e, blog.ID, logger)
+	if err != nil {
+		return fmt.Errorf("cannot create subscriber: %w", err)
+	}
+	if err := email.NewSender(
+		b.resendClient, blog.EmailMode,
+	).SendNewSubscriberEmail(
+		e, sitename(&blog),
+		fmt.Sprintf(
+			"http://%s/blogs/%d/unsubscribe/%s",
+			baseurl, blog.ID, unsubtoken,
+		),
+	); err != nil {
+		return fmt.Errorf("cannot send new subscriber email: %w", err)
+	}
+
 	http.Redirect(
 		w, r,
 		fmt.Sprintf(
@@ -84,34 +97,68 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 	return nil
 }
 
+func sitename(blog *model.Blog) string {
+	if blog.Name.Valid {
+		return blog.Name.String
+	}
+	return blog.Subdomain
+}
+
 func (b *BlogService) createsubscriber(
 	email string, blog int32, logger *log.Logger,
-) error {
+) (string, error) {
 	logger.Printf("subscribing email `%s' to blog %d\n", email, blog)
-	if err := b.store.CreateSubscriberTx(
+	tk, err := b.createorgetsubscriber(email, blog, logger)
+	if err != nil {
+		return "", fmt.Errorf("cannot create or get subscriber: %w", err)
+	}
+	return tk.String(), nil
+}
+
+func (b *BlogService) createorgetsubscriber(
+	email string, blog int32, logger *log.Logger,
+) (*uuid.UUID, error) {
+	tk, err := b.store.CreateSubscriber(
 		context.TODO(),
-		model.CreateSubscriberTxParams{
+		model.CreateSubscriberParams{
 			BlogID: blog,
 			Email:  email,
 		},
-	); err != nil {
-		if errors.Is(err, model.ErrSubscriberAlreadyExists) {
+	)
+	if err != nil {
+		if isUniqueActiveSubscriberPerBlogViolation(err) {
 			logger.Println("duplicate subscription")
-			return nil
+			sub, err := b.store.GetSubscriberForBlog(
+				context.TODO(),
+				model.GetSubscriberForBlogParams{
+					BlogID: blog,
+					Email:  email,
+				},
+			)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"error getting subscriber: %w", err,
+				)
+			}
+			return &sub.UnsubscribeToken, nil
 		}
-		return fmt.Errorf("error writing subscriber to db: %w", err)
+		return nil, fmt.Errorf("error creating: %w", err)
 	}
-	return nil
+	return &tk, nil
+}
 
+func isUniqueActiveSubscriberPerBlogViolation(err error) bool {
+	var pqerr *pq.Error
+	return errors.As(err, &pqerr) &&
+		pqerr.Code.Name() == "unique_violation" &&
+		pqerr.Constraint == "unique_active_subscriber_per_blog"
 }
 
 func (b *BlogService) UnsubscribeFromBlog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 		logger.Println("UnsubscribeFromBlog handler...")
-
 		b.mixpanel.Track("UnsubscribeFromBlog", r)
-
 		if err := b.unsubscribeFromBlog(w, r); err != nil {
 			logger.Printf("error in unsubscribeFromBlog handler: %v\n", err)
 			http.Error(w, "", http.StatusInternalServerError)
@@ -121,39 +168,37 @@ func (b *BlogService) UnsubscribeFromBlog() http.HandlerFunc {
 	}
 }
 
-type UnsubscribeRequest struct {
-	Token string `json:"token"`
-}
-
-func (ur *UnsubscribeRequest) validate() error {
-	if ur.Token == "" {
-		return fmt.Errorf("token is required")
-	}
-	return nil
-}
-
 func (b *BlogService) unsubscribeFromBlog(w http.ResponseWriter, r *http.Request) error {
-	/* extract BlogID from path */
 	vars := mux.Vars(r)
-	blogID := vars["blogID"]
-
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	blogID, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
 	if err != nil {
-		return fmt.Errorf("error converting string path var to blogID: %w", err)
+		return fmt.Errorf("cannot parse blogID: %w", err)
 	}
-	token := r.URL.Query().Get("token")
-	uuid, err := uuid.Parse(token)
+	blog, err := b.store.GetBlogByID(context.TODO(), int32(blogID))
 	if err != nil {
-		log.Fatalf("Failed to parse UUID: %v", err)
+		return fmt.Errorf("cannot get blog: %w", err)
 	}
-
-	err = b.store.DeleteSubscriberForBlog(context.TODO(), model.DeleteSubscriberForBlogParams{
-		BlogID:           int32(intBlogID),
-		UnsubscribeToken: uuid,
-	})
+	uuid, err := uuid.Parse(vars["token"])
 	if err != nil {
-		return fmt.Errorf("error writing subscriber for blog to db: %w", err)
+		return fmt.Errorf("failed to parse token: %w", err)
 	}
+	if err := b.store.DeleteSubscriberForBlog(
+		context.TODO(),
+		model.DeleteSubscriberForBlogParams{
+			BlogID:           blog.ID,
+			UnsubscribeToken: uuid,
+		},
+	); err != nil {
+		return fmt.Errorf("error deleting subcriber: %w", err)
+	}
+	http.Redirect(
+		w, r,
+		fmt.Sprintf(
+			"http://%s.%s/unsubscribed",
+			blog.Subdomain, baseurl,
+		),
+		http.StatusTemporaryRedirect,
+	)
 	return nil
 }
 

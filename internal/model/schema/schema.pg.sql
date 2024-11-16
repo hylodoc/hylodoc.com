@@ -112,6 +112,7 @@ CREATE TABLE repositories (
 
 CREATE TYPE blog_type AS ENUM ('repository', 'folder');
 CREATE TYPE blog_theme AS ENUM ('lit', 'latex');
+CREATE TYPE email_mode AS ENUM ('plaintext', 'html');
 
 CREATE TABLE blogs (
 	id 			SERIAL				PRIMARY KEY,
@@ -127,6 +128,10 @@ CREATE TABLE blogs (
 	blog_type		blog_type	NOT NULL,
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
+
+	email_mode		email_mode	NOT NULL,
+
+	name			VARCHAR(1000),
 
 	CONSTRAINT fk_repository_id
 		FOREIGN KEY (gh_repository_id)

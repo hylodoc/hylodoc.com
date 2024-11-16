@@ -1,119 +1,55 @@
 package email
 
 import (
-	"context"
 	"fmt"
-	"html/template"
-	"net/url"
-	"strings"
 
-	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/email/emailtemplate"
 )
 
-const (
-	newPostUpdateTemplate = `View this post at: {{ .BlogLink }}
-
-{{ .BlogBody }}
-
-Unsubscribe {{ .UnsubscribeLink }}`
-
-	/* <protocol>://<blog_subdomain_name>.<service_name>/blogs/<blog_id>/unsubscribe
-	 *	e.g. <http>://<localhost.com:7999>/blogs/<1>/unsubscribe
-	 *	e.g. <https>://<progstack.com>/blogs/<596>/unsubscribe
-	 */
-	unsubscribeLinkTemplate = "%s://%s.%s/blogs/%d/unsubscribe"
-)
-
-type NewPostUpdateParams struct {
-	Blog       BlogParams
-	Subscriber SubscriberParams
-	Post       PostParams
-}
-
-type SubscriberParams struct {
-	To               string /* subscriber email address */
-	UnsubscribeToken string /* subscribers unsubscribe token */
-}
-
-type BlogParams struct {
-	ID        int32
-	From      string /* email sender address (configured on blog (repository) by user)*/
-	Subdomain string
-}
-
-type PostParams struct {
-	Link    string /* link to blog post on hosted website */
-	Body    string /* body of post */
-	Subject string /* title of blog post */
-}
-
-func SendNewPostUpdate(client *resend.Client, params NewPostUpdateParams) error {
-	from := params.Blog.From
-	to := params.Subscriber.To
-	subject := params.Post.Subject
-	text, err := newPostUpdateText(params)
+func (s *sender) SendNewSubscriberEmail(to, sitename, unsublink string) error {
+	text, err := emailtemplate.NewSubscriber(
+		sitename, unsublink,
+	).Render(s.emailmode)
 	if err != nil {
-		return fmt.Errorf("error building newPostUpdateText: %w", err)
+		return fmt.Errorf("cannot render template: %w", err)
 	}
-
-	_, err = client.Emails.SendWithContext(context.TODO(), &resend.SendEmailRequest{
-		From:    from,
-		To:      []string{to},
-		Subject: subject,
-		Text:    text,
-	})
-	if err != nil {
-		return fmt.Errorf("error sending email to `%s: %w", to, err)
+	if err := s.send(
+		to,
+		config.Config.Progstack.FromEmail,
+		fmt.Sprintf("Welcome to %s", sitename),
+		text,
+		unsubscribeheaders(unsublink),
+	); err != nil {
+		return fmt.Errorf("error sending email: %w", err)
 	}
 	return nil
 }
 
-func newPostUpdateText(params NewPostUpdateParams) (string, error) {
-	tmpl, err := template.New("email").Parse(newPostUpdateTemplate)
-	if err != nil {
-		return "", fmt.Errorf("error parsing newPostUpdateTemplate: %w", err)
+func unsubscribeheaders(unsublink string) map[string]string {
+	return map[string]string{
+		"List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+		"List-Unsubscribe":      fmt.Sprintf("<%s>", unsublink),
 	}
-
-	var b strings.Builder
-	unsubscribeLink, err := buildUnsubscribeLink(params.Blog.ID, params.Blog.Subdomain, params.Subscriber.UnsubscribeToken)
-	if err != nil {
-		return "", fmt.Errorf("error building unsubscribe link: %w", err)
-	}
-
-	err = tmpl.Execute(&b, struct {
-		BlogLink        string
-		BlogBody        string
-		UnsubscribeLink string
-	}{
-		BlogLink:        params.Post.Link,
-		BlogBody:        params.Post.Body,
-		UnsubscribeLink: unsubscribeLink,
-	})
-	if err != nil {
-		return "", fmt.Errorf("error executing newPostUpdateTemplate: %w", err)
-	}
-	return b.String(), nil
 }
 
-func buildUnsubscribeLink(blogID int32, blogSubdomain, unsubscribeToken string) (string, error) {
-	base := fmt.Sprintf(
-		unsubscribeLinkTemplate,
-		config.Config.Progstack.Protocol,
-		blogSubdomain,
-		config.Config.Progstack.ServiceName,
-		blogID,
-	)
-
-	/* add token as query parameter */
-	u, err := url.Parse(base)
+func (s *sender) SendNewPostUpdate(
+	to, posttitle, postlink, postbody, unsublink string,
+) error {
+	text, err := emailtemplate.NewPost(
+		postlink, postbody, unsublink,
+	).Render(s.emailmode)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("cannot render template: %w", err)
 	}
-	params := url.Values{}
-	params.Add("token", unsubscribeToken)
-	u.RawQuery = params.Encode()
-
-	link := u.String()
-	return link, nil
+	if err := s.send(
+		to,
+		config.Config.Progstack.FromEmail,
+		posttitle,
+		text,
+		unsubscribeheaders(unsublink),
+	); err != nil {
+		return fmt.Errorf("error sending email: %w", err)
+	}
+	return nil
 }

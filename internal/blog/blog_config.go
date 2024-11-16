@@ -122,7 +122,7 @@ func launchUserBlog(s *model.Store, b *model.Blog) error {
 		}
 		return err
 	}
-	bindings, err := ssg.GenerateSiteWithBindings(
+	site, err := ssg.GenerateSiteWithBindings(
 		b.RepositoryPath,
 		filepath.Join(
 			config.Config.Progstack.WebsitesPath,
@@ -131,7 +131,7 @@ func launchUserBlog(s *model.Store, b *model.Blog) error {
 		config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
 		"algol_nu",
 		"",
-		"Subscribe via <a href=\"/subscribe\">email</a>.",
+		"<p>Subscribe via <a href=\"/subscribe\">email</a>.</p>",
 		map[string]ssg.CustomPage{
 			"/subscribe": ssg.NewSubscriberPage(
 				fmt.Sprintf(
@@ -141,18 +141,40 @@ func launchUserBlog(s *model.Store, b *model.Blog) error {
 			),
 			"/subscribed": ssg.NewMessagePage(
 				"Subscribed",
-				"You have been subscribed. Please check your email.",
+				"<p>You have been subscribed. Please check your email.</p>",
+			),
+			"/unsubscribed": ssg.NewMessagePage(
+				"Unsubscribed",
+				`<p>
+					You have been unsubscribed from this site.
+					You will no longer receive email updates for posts.
+				</p>
+				<p>
+					If this was a mistake, you can resubscribe
+					<a href="/subscribe">here</a>.
+				</p>`,
 			),
 		},
 	)
 	if err != nil {
 		return fmt.Errorf("error generating site: %w", err)
 	}
+	if title := site.Title(); title != "" {
+		if err := s.UpdateBlogName(
+			context.TODO(),
+			model.UpdateBlogNameParams{
+				ID:   b.ID,
+				Name: title,
+			},
+		); err != nil {
+			return fmt.Errorf("cannot set title %q: %w", title, err)
+		}
+	}
 	gen, err := s.InsertGeneration(context.TODO(), b.ID)
 	if err != nil {
 		return fmt.Errorf("error inserting generation: %w", err)
 	}
-	for url, file := range bindings {
+	for url, file := range site.Bindings() {
 		if err := s.InsertBinding(
 			context.TODO(),
 			model.InsertBindingParams{

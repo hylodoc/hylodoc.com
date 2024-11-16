@@ -15,7 +15,6 @@ import (
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
@@ -486,19 +485,23 @@ func getEventBranchName(event PushEvent) (string, error) {
 	return "", fmt.Errorf("could not get extract branch name")
 }
 
+/*
 func sendNewPostUpdateEmailsForBlog(
 	ghRepositoryID int64, c *resend.Client, s *model.Store,
 ) error {
-	/* build parameters */
 	paramsList, err := buildNewPostUpdateParamsList(ghRepositoryID, s)
 	if err != nil {
-		return fmt.Errorf("error building newPostUpdatesParamsList: %w", err)
+		return fmt.Errorf(
+			"error building newPostUpdatesParamsList: %w", err,
+		)
 	}
-	/* send emails for all parameter */
 	for _, params := range paramsList {
-		err := email.SendNewPostUpdate(c, params)
-		if err != nil {
-			return fmt.Errorf("error sending new post update email: %w", err)
+		if err := email.NewSender(
+			c, model.EmailModePlaintext,
+		).SendNewPostUpdate(params); err != nil {
+			return fmt.Errorf(
+				"error sending new post update email: %w", err,
+			)
 		}
 	}
 	return nil
@@ -507,7 +510,6 @@ func sendNewPostUpdateEmailsForBlog(
 func buildNewPostUpdateParamsList(
 	ghRepositoryID int64, s *model.Store,
 ) ([]email.NewPostUpdateParams, error) {
-	/* get blog */
 	blog, err := s.GetBlogByGhRepositoryID(context.TODO(), sql.NullInt64{
 		Valid: true,
 		Int64: ghRepositoryID,
@@ -519,7 +521,6 @@ func buildNewPostUpdateParamsList(
 			err,
 		)
 	}
-	/* list active subscribers */
 	subscribers, err := s.ListActiveSubscribersForGhRepositoryID(
 		context.TODO(),
 		sql.NullInt64{
@@ -534,21 +535,19 @@ func buildNewPostUpdateParamsList(
 		)
 	}
 
-	/* build details */
 	var paramsList []email.NewPostUpdateParams
 	blogParams := email.BlogParams{
 		ID:        blog.ID,
 		From:      blog.FromAddress,
 		Subdomain: blog.Subdomain,
 	}
-	/* XXX: construct postParams from generated site, hardcoding for now */
+	 //XXX: construct postParams from generated site, hardcoding for now
 	postParams := email.PostParams{
 		Link:    fmt.Sprintf("https://%s.progstack.com/posts/1", blog.Subdomain),
 		Body:    "testing subscriber update emails in progstack",
 		Subject: "#1 progstack email functinality",
 	}
-	/* send each subscriber an email */
-	/* XXX: should prolly use their bulk API, does up to 100 per batch */
+	 //XXX: should prolly use their bulk API, does up to 100 per batch
 	for _, subscriber := range subscribers {
 		subscriberParams := email.SubscriberParams{
 			To:               subscriber.Email,
@@ -563,3 +562,4 @@ func buildNewPostUpdateParamsList(
 	}
 	return paramsList, nil
 }
+*/

@@ -132,17 +132,21 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		},
 		FromAddress: config.Config.Progstack.FromEmail,
 		BlogType:    model.BlogTypeRepository,
+		EmailMode:   model.EmailModePlaintext,
 	})
 	if err != nil {
 		return "", fmt.Errorf("could not create blog: %w", err)
 	}
 
-	/* add first user as subscriber */
-	if err = b.store.CreateSubscriberTx(context.TODO(), model.CreateSubscriberTxParams{
-		BlogID: blog.ID,
-		Email:  sesh.GetEmail(),
-	}); err != nil {
-		return "", fmt.Errorf("error creating first subscriber: %w", err)
+	// add owner as subscriber
+	if _, err = b.store.CreateSubscriber(
+		context.TODO(),
+		model.CreateSubscriberParams{
+			BlogID: blog.ID,
+			Email:  sesh.GetEmail(),
+		},
+	); err != nil {
+		return "", fmt.Errorf("error subscribing owner: %w", err)
 	}
 
 	if !blog.GhRepositoryID.Valid {
@@ -315,18 +319,15 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		return "", fmt.Errorf("error creating folder-based blog: %w", err)
 	}
 
-	/* add user as first subscriber */
-	if err = b.store.CreateSubscriberTx(context.TODO(), model.CreateSubscriberTxParams{
-		BlogID: blog.ID,
-		Email:  sesh.GetEmail(),
-	}); err != nil {
-		return "", fmt.Errorf(
-			"error adding email `%s' for user `%d' as subscriber to blog `%d': %w",
-			sesh.GetEmail(),
-			sesh.GetUserID(),
-			blog.ID,
-			err,
-		)
+	// subscribe owner
+	if _, err := b.store.CreateSubscriber(
+		context.TODO(),
+		model.CreateSubscriberParams{
+			BlogID: blog.ID,
+			Email:  sesh.GetEmail(),
+		},
+	); err != nil {
+		return "", fmt.Errorf("error subscribing owner: %w", err)
 	}
 
 	/* take blog live  */
