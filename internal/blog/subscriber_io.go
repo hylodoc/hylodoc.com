@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
@@ -64,15 +65,8 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 	}
 	blogID := int32(blogIDi64)
 
-	logger.Printf("subscribing email `%s' to blog %d\n", email, blogID)
-	if err := b.store.CreateSubscriberTx(
-		context.TODO(),
-		model.CreateSubscriberTxParams{
-			BlogID: blogID,
-			Email:  email,
-		},
-	); err != nil {
-		return fmt.Errorf("error writing subscriber to db: %w", err)
+	if err := b.createsubscriber(email, blogID, logger); err != nil {
+		return fmt.Errorf("cannot create subscriber: %w", err)
 	}
 
 	blog, err := b.store.GetBlogByID(context.TODO(), blogID)
@@ -88,6 +82,27 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 		http.StatusTemporaryRedirect,
 	)
 	return nil
+}
+
+func (b *BlogService) createsubscriber(
+	email string, blog int32, logger *log.Logger,
+) error {
+	logger.Printf("subscribing email `%s' to blog %d\n", email, blog)
+	if err := b.store.CreateSubscriberTx(
+		context.TODO(),
+		model.CreateSubscriberTxParams{
+			BlogID: blog,
+			Email:  email,
+		},
+	); err != nil {
+		if errors.Is(err, model.ErrSubscriberAlreadyExists) {
+			logger.Println("duplicate subscription")
+			return nil
+		}
+		return fmt.Errorf("error writing subscriber to db: %w", err)
+	}
+	return nil
+
 }
 
 func (b *BlogService) UnsubscribeFromBlog() http.HandlerFunc {
