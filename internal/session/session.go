@@ -83,7 +83,7 @@ func CreateAuthSession(
 		Path:     "/",
 		Secure:   true,
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteNoneMode,
 		Expires:  authSessionDuration, /* XXX: make configurable */
 	})
 
