@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/xr0-org/progstack/internal/blog/emaildata"
+	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
@@ -52,7 +54,11 @@ func (b *BlogService) siteMetrics(w http.ResponseWriter, r *http.Request) error 
 	if !ok {
 		return util.CreateCustomError("", http.StatusNotFound)
 	}
-	data, err := b.getSiteMetrics(r)
+	blogidint, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
+	if err != nil {
+		return fmt.Errorf("cannot parse blog id: %w", err)
+	}
+	data, err := b.getSiteMetrics(int32(blogidint))
 	if err != nil {
 		return fmt.Errorf("error getting subscriber metrics: %w", err)
 	}
@@ -76,28 +82,15 @@ func (b *BlogService) siteMetrics(w http.ResponseWriter, r *http.Request) error 
 }
 
 type postdata struct {
-	Title     string
-	Url       template.URL
-	Date      *time.Time
-	Visits    int
-	EmailData emaildata
+	Title   string
+	Url     template.URL
+	Date    *time.Time
+	NewSubs int
+	Views   int
+	Email   emaildata.EmailData
 }
 
-type emaildata struct {
-	Deliveries int
-	Opens      int
-	OpenRate   int
-}
-
-/* TODO: get from config */
-var baseurl string = "localhost:7999"
-
-func (b *BlogService) getSiteMetrics(r *http.Request) ([]postdata, error) {
-	blogidint, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("cannot parse blog id: %w", err)
-	}
-	blogid := int32(blogidint)
+func (b *BlogService) getSiteMetrics(blogid int32) ([]postdata, error) {
 	blog, err := b.store.GetBlogByID(context.TODO(), blogid)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get blog: %w", err)
@@ -109,8 +102,12 @@ func (b *BlogService) getSiteMetrics(r *http.Request) ([]postdata, error) {
 	data := make([]postdata, len(posts))
 	for i, p := range posts {
 		u, err := url.JoinPath(
-			/* XXX */
-			fmt.Sprintf("http://%s.%s", blog.Subdomain, baseurl),
+			fmt.Sprintf(
+				"%s://%s.%s",
+				config.Config.Progstack.Protocol,
+				blog.Subdomain,
+				config.Config.Progstack.ServiceName,
+			),
 			p.Url,
 		)
 		if err != nil {
@@ -126,19 +123,42 @@ func (b *BlogService) getSiteMetrics(r *http.Request) ([]postdata, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot count visits: %w", err)
 		}
-		data[i] = postdata{
-			Title:  p.Title,
-			Url:    template.URL(u),
-			Date:   unwrapsqltime(p.PublishedAt),
-			Visits: int(visits),
-			EmailData: emaildata{
-				Deliveries: 3,
-				Opens:      5,
-				OpenRate:   40,
+		emailopens, err := b.store.CountEmailClicks(
+			context.TODO(),
+			model.CountEmailClicksParams{
+				Blog: blogid,
+				Url:  p.Url,
 			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("cannot count clicks: %w", err)
+		}
+		data[i] = postdata{
+			Title: p.Title,
+			Url:   template.URL(u),
+			Date:  unwrapsqltime(p.PublishedAt),
+			Views: int(visits),
+			Email: getemaildata(&posts[i], int(emailopens)),
 		}
 	}
 	return data, nil
+}
+
+func getemaildata(post *model.Post, clicks int) emaildata.EmailData {
+	if post.EmailSent {
+		return emaildata.NewSent(clicks)
+	}
+	return emaildata.NewUnsent(
+		template.URL(
+			fmt.Sprintf(
+				"%s://%s/user/blogs/%d/email?token=%s",
+				config.Config.Progstack.Protocol,
+				config.Config.Progstack.ServiceName,
+				post.Blog,
+				post.EmailToken,
+			),
+		),
+	)
 }
 
 func unwrapsqltime(time sql.NullTime) *time.Time {

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -47,6 +48,11 @@ func Serve() {
 		config.Config.Mixpanel.Token,
 	)
 	store := model.NewStore(db)
+	bootid, err := store.Boot(context.TODO())
+	if err != nil {
+		log.Fatal("cannot boot: %w", err)
+	}
+	log.Println("bootid", bootid)
 	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
 
 	/* init services */
@@ -93,7 +99,7 @@ func Serve() {
 	r.HandleFunc("/pricing", billingService.Pricing())
 
 	r.HandleFunc("/blogs/{blogID}/subscribe", blogService.SubscribeToBlog()).Methods("POST")
-	r.HandleFunc("/blogs/{blogID}/unsubscribe/{token}", blogService.UnsubscribeFromBlog())
+	r.HandleFunc("/blogs/unsubscribe", blogService.UnsubscribeFromBlog())
 
 	/* authenticated routes */
 	authR := r.PathPrefix("/user").Subrouter()
@@ -122,12 +128,12 @@ func Serve() {
 	blogR.HandleFunc("/set-live-branch", blogService.LiveBranchSubmit())
 	blogR.HandleFunc("/set-folder", blogService.FolderSubmit())
 	blogR.HandleFunc("/set-status", blogService.SetStatusSubmit())
+	blogR.HandleFunc("/email", blogService.SendPostEmail())
 
 	blogR.HandleFunc("/metrics", blogService.SiteMetrics())
 	blogR.HandleFunc("/subscriber/metrics", blogService.SubscriberMetrics())
 	blogR.HandleFunc("/subscriber/export", blogService.ExportSubscribers())
 	blogR.HandleFunc("/subscriber/edit", blogService.EditSubscriber())
-	blogR.HandleFunc("/subscriber/delete", blogService.DeleteSubscriber())
 
 	/* serve static content */
 	r.PathPrefix("/static/css").Handler(http.StripPrefix("/static/css", http.FileServer(http.Dir("./web/static/css"))))

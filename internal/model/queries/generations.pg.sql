@@ -1,36 +1,39 @@
 -- name: InsertGeneration :one
 INSERT INTO generations (
-	blog
+	hash, boot_id
 ) VALUES (
-	$1
+	$1, (SELECT id FROM boot_id)
 )
 RETURNING id;
 
--- name: GetLastGenerationBySubdomain :one
+-- name: GetFreshGeneration :one
 SELECT g.id
 FROM generations g
 INNER JOIN blogs b
-	ON b.id = g.blog
-WHERE subdomain = $1
-ORDER BY b.id DESC
+	ON b.live_hash = g.hash
+WHERE b.id = @blog_id
+	AND g.boot_id = (SELECT id FROM boot_id)
+	AND g.stale = false
 LIMIT 1;
-
--- name: DeactivateGenerations :exec
-UPDATE generations
-SET active = false
-WHERE blog = $1;
 
 -- name: InsertBinding :exec
 INSERT INTO bindings (
-	gen, url, file
+	gen, url, path
 ) VALUES (
 	$1, $2, $3
 );
 
 -- name: GetBinding :one
-SELECT file
+SELECT path
 FROM bindings
 WHERE gen = @generation AND url = $1;
+
+-- name: InsertPostEmailBinding :exec
+INSERT INTO post_email_bindings (
+	gen, url, html, text
+) VALUES (
+	$1, $2, $3, $4
+);
 
 -- name: InsertRPost :exec
 INSERT INTO _r_posts (
@@ -67,4 +70,20 @@ ORDER BY published_at DESC;
 -- name: CountVisits :one
 SELECT COUNT(*)
 FROM visits
+WHERE url = $1 AND blog = $2;
+
+-- name: CountEmailClicks :one
+SELECT COUNT(*)
+FROM subscriber_emails
+WHERE clicked = true AND url = $1 AND blog = $2;
+
+-- name: GetPostByToken :one
+SELECT *
+FROM posts
+WHERE email_token = $1;
+
+-- name: SetPostEmailSent :exec
+UPDATE _r_posts
+SET
+	email_sent = true
 WHERE url = $1 AND blog = $2;

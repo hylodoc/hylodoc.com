@@ -5,10 +5,9 @@
 		<tr>
 			<th>Post</th>
 			<th>Date</th>
-			<th>Visits</th>
-			<th>Deliveries</th>
-			<th>Opens</th>
-			<th>Open Rate</th>
+			<th>Views</th>
+			<th>New Subs</th>
+			<th>Email</th>
 		</tr>
 	</thead>
 	<tbody>
@@ -22,10 +21,15 @@
 						N/A
 					{{ end }}
 				</td>
-				<td>{{ .Visits }}</td>
-				<td>{{ .EmailData.Deliveries }}</td>
-				<td>{{ .EmailData.Opens }}</td>
-				<td>{{ .EmailData.OpenRate }}</td>
+				<td>{{ .Views }}</td>
+				<td>{{ .NewSubs }}</td>
+				<td>
+					{{ if .Email.Sent }}
+						{{ .Email.Opens }} opens
+					{{ else }}
+						<a href="{{ .Email.SendURL }}">Send email</a>
+					{{ end }}
+				</td>
 			</tr>
 		{{end}}
 	</tbody>

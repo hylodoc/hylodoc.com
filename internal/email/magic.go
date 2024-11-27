@@ -12,7 +12,7 @@ const (
 	magicLoginLinkSubject    = "Login to Progstack"
 )
 
-func (s *sender) SendRegisterLink(to, token string) error {
+func (s *sender) SendRegisterLink(token string) error {
 	text, err := emailtemplate.NewRegisterLink(
 		fmt.Sprintf(
 			"%s://%s/%s?token=%s",
@@ -25,19 +25,13 @@ func (s *sender) SendRegisterLink(to, token string) error {
 	if err != nil {
 		return fmt.Errorf("cannot render template: %w", err)
 	}
-	if err := s.send(
-		to,
-		config.Config.Progstack.FromEmail,
-		magicRegisterLinkSubject,
-		text,
-		nil,
-	); err != nil {
+	if err := s.send(magicRegisterLinkSubject, text); err != nil {
 		return fmt.Errorf("send error: %w", err)
 	}
 	return nil
 }
 
-func (s *sender) SendLoginLink(to, token string) error {
+func (s *sender) SendLoginLink(token string) error {
 	text, err := emailtemplate.NewLoginLink(
 		fmt.Sprintf(
 			"%s://%s/%s?token=%s",
@@ -50,13 +44,7 @@ func (s *sender) SendLoginLink(to, token string) error {
 	if err != nil {
 		return fmt.Errorf("cannot render template: %w", err)
 	}
-	if err := s.send(
-		to,
-		config.Config.Progstack.FromEmail,
-		magicLoginLinkSubject,
-		text,
-		nil,
-	); err != nil {
+	if err := s.send(magicLoginLinkSubject, text); err != nil {
 		return fmt.Errorf("send error: %w", err)
 	}
 	return nil

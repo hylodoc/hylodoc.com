@@ -23,6 +23,14 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA progstack
 ALTER DEFAULT PRIVILEGES IN SCHEMA progstack
 	GRANT ALL PRIVILEGES ON SEQUENCES to progstack_user;
 
+CREATE TABLE boots (
+	id		SERIAL		PRIMARY KEY,
+	created_at	TIMESTAMPTZ	NOT NULL	DEFAULT(now())
+);
+CREATE VIEW boot_id AS
+	SELECT id FROM boots ORDER BY id DESC LIMIT 1;
+
+
 CREATE TABLE users (
 	id			SERIAL				PRIMARY KEY,
 	username		VARCHAR(255)	NOT NULL	UNIQUE,
@@ -116,61 +124,80 @@ CREATE TYPE email_mode AS ENUM ('plaintext', 'html');
 
 CREATE TABLE blogs (
 	id 			SERIAL				PRIMARY KEY,
+	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
+	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
+	name			VARCHAR(1000),
 	user_id			INTEGER		NOT NULL,
-	gh_repository_id	BIGINT				UNIQUE		DEFAULT(NULL),
-	gh_url			VARCHAR(255)			UNIQUE		DEFAULT(NULL),
-	repository_path		VARCHAR(255)	NOT NULL,			-- path on disk
 	theme			blog_theme	NOT NULL			DEFAULT('lit'),
-	test_branch		VARCHAR(255),
-	live_branch		VARCHAR(255),
 	subdomain		VARCHAR(255)	NOT NULL	UNIQUE,
 	from_address		VARCHAR(255)	NOT NULL,
 	blog_type		blog_type	NOT NULL,
-	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
-	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
-
 	email_mode		email_mode	NOT NULL,
+	repository_path		VARCHAR(255)	NOT NULL,			-- path on disk
+	live_hash		VARCHAR(1000)	NOT NULL,
 
-	name			VARCHAR(1000),
+	gh_repository_id	BIGINT				UNIQUE		DEFAULT(NULL),
+	gh_url			VARCHAR(255)			UNIQUE		DEFAULT(NULL),
+	test_branch		VARCHAR(255),
+	live_branch		VARCHAR(255),
+
+	is_live			BOOLEAN		NOT NULL			DEFAULT(false),
+
+	CONSTRAINT fk_user_id
+		FOREIGN KEY (user_id)
+		REFERENCES users
+		ON DELETE CASCADE,
 
 	CONSTRAINT fk_repository_id
 		FOREIGN KEY (gh_repository_id)
 		REFERENCES repositories(repository_id)
-		ON DELETE CASCADE, -- delete blogs when repository deleted
+		ON DELETE CASCADE,
 
 	CONSTRAINT blog_type_check CHECK (
 		(
 			blog_type = 'repository'
-			AND gh_repository_id IS NOT NULL
-			AND gh_url IS NOT NULL
-			AND test_branch IS NOT NULL
-			AND live_branch IS NOT NULL
+			AND gh_repository_id	IS NOT NULL
+			AND gh_url		IS NOT NULL
+			AND test_branch		IS NOT NULL
+			AND live_branch 	IS NOT NULL
 		) OR (
 			blog_type = 'folder'
-			AND gh_repository_id IS NULL
-			AND gh_url IS NULL
-			AND test_branch IS NULL
-			AND live_branch IS NULL
+			AND gh_repository_id	IS NULL
+			AND gh_url		IS NULL
+			AND test_branch		IS NULL
+			AND live_branch 	IS NULL
 		)
 	)
 );
 
 CREATE TABLE generations (
 	id		SERIAL		PRIMARY KEY,
-	blog		INTEGER		NOT NULL	REFERENCES blogs,
 	created_at	TIMESTAMPTZ	NOT NULL	DEFAULT(now()),
-	active		BOOLEAN		NOT NULL	DEFAULT(true)
+	hash		VARCHAR(1000)	NOT NULL,
+	boot_id		INTEGER		NOT NULL	REFERENCES boots,
+	stale		BOOLEAN		NOT NULL	DEFAULT(false),
+
+	CONSTRAINT unique_hash_boot_id
+		UNIQUE (hash, boot_id)
 );
-CREATE INDEX ON generations(blog);
-CREATE UNIQUE INDEX ON generations(blog) WHERE active = true;
-CREATE INDEX ON generations(created_at);
+CREATE INDEX ON generations(stale);
+CREATE INDEX ON generations(boot_id);
 
 CREATE TABLE bindings (
-	gen	INTEGER		NOT NULL	REFERENCES generations,
-	url	VARCHAR(1000)	NOT NULL,
-	file	VARCHAR(1000)	NOT NULL,
+	gen 	INTEGER		NOT NULL	REFERENCES generations,
+	url 	VARCHAR(1000)	NOT NULL,
+	path	VARCHAR(1000)	NOT NULL,
 
 	PRIMARY KEY (gen, url)
+);
+
+CREATE TABLE post_email_bindings (
+	gen		INTEGER		NOT NULL,
+	url		VARCHAR(1000)	NOT NULL, 	PRIMARY KEY (gen, url),
+							FOREIGN KEY (gen, url)
+							REFERENCES bindings(gen, url),
+	html		VARCHAR(1000)	NOT NULL,
+	text		VARCHAR(1000)	NOT NULL
 );
 
 CREATE TABLE _r_posts (
@@ -179,17 +206,33 @@ CREATE TABLE _r_posts (
 	published_at	TIMESTAMPTZ,
 	title		VARCHAR(1000)	NOT NULL,
 
+	email_token	UUID		NOT NULL	UNIQUE	DEFAULT uuid_generate_v4(),
+	email_sent	BOOLEAN		NOT NULL	DEFAULT(false),
+
 	PRIMARY KEY (url, blog)
 );
 CREATE INDEX ON _r_posts(published_at);
 CREATE VIEW posts AS
 	SELECT
-		p.url, p.blog, p.title, (bind.url IS NOT NULL) is_active,
-		p.published_at
+		p.url,
+		p.blog,
+		p.title,
+		(bind.url IS NOT NULL)::BOOLEAN is_active,
+		p.published_at,
+		p.email_token,
+		p.email_sent,
+		peb.html html_email_path,
+		peb.text text_email_path
 	FROM _r_posts p
-	INNER JOIN generations g ON g.blog = p.blog
-	LEFT JOIN bindings bind ON (bind.gen = g.id AND bind.url = p.url)
-	WHERE g.active = true;
+	INNER JOIN blogs b ON b.id = p.blog
+	INNER JOIN generations g ON g.hash = b.live_hash
+	INNER JOIN boot_id on boot_id.id = g.boot_id
+	LEFT JOIN (
+		bindings bind
+		INNER JOIN post_email_bindings peb
+			ON (peb.gen = bind.gen AND peb.url = bind.url)
+	) ON (bind.gen = g.id AND bind.url = p.url)
+	WHERE g.stale = false;
 
 CREATE TABLE visits (
 	id	SERIAL		PRIMARY KEY,
@@ -210,7 +253,7 @@ CREATE TABLE subscribers (
 	id			SERIAL					PRIMARY KEY,
 	blog_id			INTEGER			NOT NULL,
 	email			VARCHAR(255)		NOT NULL,
-	unsubscribe_token 	UUID			NOT NULL			DEFAULT uuid_generate_v4(),
+	unsubscribe_token 	UUID			NOT NULL	UNIQUE		DEFAULT uuid_generate_v4(),
 	status			subscription_status	NOT NULL			DEFAULT('active'),
 
 	created_at		TIMESTAMPTZ		NOT NULL			DEFAULT(now()),
@@ -225,6 +268,22 @@ CREATE TABLE subscribers (
 CREATE UNIQUE INDEX unique_active_subscriber_per_blog
 	ON subscribers (email, blog_id) 
 	WHERE status = 'active';
+
+CREATE TABLE subscriber_emails (
+	token		UUID		PRIMARY KEY	DEFAULT uuid_generate_v4(),
+	subscriber	INTEGER		NOT NULL	REFERENCES subscribers,
+
+	url		VARCHAR(1000)	NOT NULL,
+	blog		INTEGER		NOT NULL, 	FOREIGN KEY (url, blog)
+							REFERENCES _r_posts (url, blog),
+	clicked 	BOOLEAN		NOT NULL	DEFAULT(false),
+
+	UNIQUE (subscriber, url, blog)
+);
+CREATE INDEX ON subscriber_emails(subscriber);
+CREATE INDEX ON subscriber_emails(clicked);
+CREATE INDEX ON subscriber_emails(url, blog);
+
 
 -- stripe integration
 CREATE TYPE sub_name AS ENUM ('Scout', 'Wayfarer', 'Voyager', 'Pathfinder');

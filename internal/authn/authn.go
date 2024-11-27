@@ -18,6 +18,7 @@ import (
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
+	"github.com/xr0-org/progstack/internal/email/emailaddr"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
@@ -501,8 +502,8 @@ func (a *AuthNService) magicRegister(w http.ResponseWriter, r *http.Request) err
 		/* StatusBadRequest */
 		return fmt.Errorf("error parsing form: %w", err)
 	}
-	emailAddress := r.FormValue("email")
-	logger.Printf("parsed email `%s' from register form\n", emailAddress)
+	toaddr := r.FormValue("email")
+	logger.Printf("parsed email `%s' from register form\n", toaddr)
 
 	/* generate token for register link */
 	token, err := GenerateToken()
@@ -510,21 +511,29 @@ func (a *AuthNService) magicRegister(w http.ResponseWriter, r *http.Request) err
 		/* StatusInternalServerError */
 		return fmt.Errorf("error generating token: %w", err)
 	}
-	/* write token to db with email */
-	_, err = a.store.CreateMagicRegister(context.TODO(), model.CreateMagicRegisterParams{
-		Token: token,
-		Email: emailAddress,
-	})
-	if err != nil {
+	if _, err := a.store.CreateMagicRegister(
+		context.TODO(),
+		model.CreateMagicRegisterParams{
+			Token: token,
+			Email: toaddr,
+		},
+	); err != nil {
 		return fmt.Errorf("error writing magic to db: %w", err)
 	}
 
 	if err := email.NewSender(
-		a.resendClient, model.EmailModePlaintext,
-	).SendRegisterLink(emailAddress, token); err != nil {
+		emailaddr.NewAddr(toaddr),
+		emailaddr.NewAddr(
+			fmt.Sprintf(
+				"magic@%s", config.Config.Progstack.EmailDomain,
+			),
+		),
+		a.resendClient,
+		model.EmailModePlaintext,
+	).SendRegisterLink(token); err != nil {
 		return fmt.Errorf(
 			"error sending register link to `%s': %w",
-			emailAddress, err,
+			toaddr, err,
 		)
 	}
 	return nil
@@ -609,7 +618,7 @@ func (a *AuthNService) magicLogin(w http.ResponseWriter, r *http.Request) error 
 		/* StatusBadRequest */
 		return fmt.Errorf("error parsing login form: %w", err)
 	}
-	emailAddress := r.FormValue("email")
+	toaddr := r.FormValue("email")
 
 	/* generate token for register link */
 	token, err := GenerateToken()
@@ -617,21 +626,29 @@ func (a *AuthNService) magicLogin(w http.ResponseWriter, r *http.Request) error 
 		/* StatusInternalServerError */
 		return fmt.Errorf("error generating token: %w", err)
 	}
-	/* write token to db with email */
-	_, err = a.store.CreateMagicLogin(context.TODO(), model.CreateMagicLoginParams{
-		Token: token,
-		Email: emailAddress,
-	})
-	if err != nil {
+	if _, err := a.store.CreateMagicLogin(
+		context.TODO(),
+		model.CreateMagicLoginParams{
+			Token: token,
+			Email: toaddr,
+		},
+	); err != nil {
 		return fmt.Errorf("error writing magic login to db: %w", err)
 	}
 
 	if err := email.NewSender(
-		a.resendClient, model.EmailModePlaintext,
-	).SendLoginLink(emailAddress, token); err != nil {
+		emailaddr.NewAddr(toaddr),
+		emailaddr.NewAddr(
+			fmt.Sprintf(
+				"magic@%s", config.Config.Progstack.EmailDomain,
+			),
+		),
+		a.resendClient,
+		model.EmailModePlaintext,
+	).SendLoginLink(token); err != nil {
 		return fmt.Errorf(
 			"error sending login link to `%s': %w",
-			emailAddress, err,
+			toaddr, err,
 		)
 	}
 	return nil

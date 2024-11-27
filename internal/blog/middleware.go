@@ -48,6 +48,14 @@ func (b *BlogService) Middleware(next http.Handler) http.Handler {
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}
+
+		if _, err := GetFreshGeneration(
+			int32(intBlogID), b.store,
+		); err != nil {
+			logger.Printf("Error getting fresh generation: %v\n", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
+	"github.com/xr0-org/progstack/internal/email/emailaddr"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/util"
@@ -74,13 +75,26 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 	if err != nil {
 		return fmt.Errorf("cannot create subscriber: %w", err)
 	}
+	sitename := getsitename(&blog)
 	if err := email.NewSender(
-		b.resendClient, blog.EmailMode,
+		emailaddr.NewAddr(e),
+		emailaddr.NewNamedAddr(
+			sitename,
+			fmt.Sprintf(
+				"%s@%s",
+				blog.Subdomain,
+				config.Config.Progstack.EmailDomain,
+			),
+		),
+		b.resendClient,
+		blog.EmailMode,
 	).SendNewSubscriberEmail(
-		e, sitename(&blog),
+		sitename,
 		fmt.Sprintf(
-			"http://%s/blogs/%d/unsubscribe/%s",
-			baseurl, blog.ID, unsubtoken,
+			"%s://%s/blogs/unsubscribe?token=%s",
+			config.Config.Progstack.Protocol,
+			config.Config.Progstack.ServiceName,
+			unsubtoken,
 		),
 	); err != nil {
 		return fmt.Errorf("cannot send new subscriber email: %w", err)
@@ -89,15 +103,17 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 	http.Redirect(
 		w, r,
 		fmt.Sprintf(
-			"http://%s.%s/subscribed",
-			blog.Subdomain, baseurl,
+			"%s://%s.%s/subscribed",
+			config.Config.Progstack.Protocol,
+			blog.Subdomain,
+			config.Config.Progstack.ServiceName,
 		),
 		http.StatusTemporaryRedirect,
 	)
 	return nil
 }
 
-func sitename(blog *model.Blog) string {
+func getsitename(blog *model.Blog) string {
 	if blog.Name.Valid {
 		return blog.Name.String
 	}
@@ -169,33 +185,28 @@ func (b *BlogService) UnsubscribeFromBlog() http.HandlerFunc {
 }
 
 func (b *BlogService) unsubscribeFromBlog(w http.ResponseWriter, r *http.Request) error {
-	vars := mux.Vars(r)
-	blogID, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
-	if err != nil {
-		return fmt.Errorf("cannot parse blogID: %w", err)
-	}
-	blog, err := b.store.GetBlogByID(context.TODO(), int32(blogID))
-	if err != nil {
-		return fmt.Errorf("cannot get blog: %w", err)
-	}
-	uuid, err := uuid.Parse(vars["token"])
+	token, err := uuid.Parse(r.URL.Query().Get("token"))
 	if err != nil {
 		return fmt.Errorf("failed to parse token: %w", err)
 	}
-	if err := b.store.DeleteSubscriberForBlog(
-		context.TODO(),
-		model.DeleteSubscriberForBlogParams{
-			BlogID:           blog.ID,
-			UnsubscribeToken: uuid,
-		},
-	); err != nil {
+	sub, err := b.store.GetSubscriberByToken(context.TODO(), token)
+	if err != nil {
+		return fmt.Errorf("cannot get subscriber: %w", err)
+	}
+	if err := b.store.DeleteSubscriber(context.TODO(), sub.ID); err != nil {
 		return fmt.Errorf("error deleting subcriber: %w", err)
+	}
+	blog, err := b.store.GetBlogByID(context.TODO(), sub.BlogID)
+	if err != nil {
+		return fmt.Errorf("cannot get blog: %w", err)
 	}
 	http.Redirect(
 		w, r,
 		fmt.Sprintf(
-			"http://%s.%s/unsubscribed",
-			blog.Subdomain, baseurl,
+			"%s://%s.%s/unsubscribed",
+			config.Config.Progstack.Protocol,
+			blog.Subdomain,
+			config.Config.Progstack.ServiceName,
 		),
 		http.StatusTemporaryRedirect,
 	)

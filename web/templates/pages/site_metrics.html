@@ -1,60 +1,11 @@
 {{ template "header" . }}
 
-<!-- Site Chart -->
-<section>
-	<div class="container">
-		<h3>Visitors</h3>
-		<br><br>
-		<canvas id="siteVisits"></canvas>
-	</div>
-</section>
-
 <!-- Posts table -->
 <section>
 	<div class="container">
-		<h3>Posts</h3>
+		<h2>Posts</h3>
 		{{ template "posts" .Data.PostData }}
 	</div>
 </section>
-
-<script>
-	function renderChart() {
-		const ctx = document.getElementById("siteVisits");
-		const metrics = {{ .Data.SiteData.CumulativeCounts }};
-		new Chart(ctx, {
-			type: "line",
-			data: {
-				datasets: [{
-					label: "Number of visitors",
-					data: metrics.map(
-						item => ({
-							x: item.timestamp,
-							y: item.count
-						})
-					)
-				}],
-			},
-			options: {
-				scales: {
-					x: {
-						type: "time",
-						time: {
-							unit: "month"
-						},
-						title: {
-							display: true,
-							text: "Months"
-						}
-					},
-					y: {
-						beginAtZero: true
-					}
-				}
-			}
-		});
-	}
-
-	renderChart();
-</script>
 
 {{ template "footer" . }}

@@ -7,13 +7,11 @@ import (
 )
 
 const (
-	newpostPlaintext = `View this post at {{ .PostLink }}.
+	newpostPlaintext = `{{ .PostBody }}
 
 ---
 
-{{ .PostBody }}
-
----
+View this post at {{ .PostLink }}.
 
 If you would like to stop receiving these emails, click
 	{{ .UnsubscribeLink }}
@@ -23,13 +21,12 @@ to unsubscribe.`
 <!DOCTYPE HTML>
 <html>
 <body>
-<p>
-	View this post <a href="{{ .PostLink }}">here</a>.
-</p>
-
 {{ .PostBody }}
 
 <hr>
+<p>
+	View this post <a href="{{ .PostLink }}">here</a>.
+</p>
 
 <p>
 	If you would like to stop receiving these emails, click

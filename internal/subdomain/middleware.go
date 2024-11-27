@@ -42,7 +42,16 @@ func (ss *SubdomainService) middleware(
 	if err != nil {
 		return fmt.Errorf("cannot parse request: %w", err)
 	}
-	if err := req.recordvisit(ss.store); err != nil {
+	/* site visit is only recorded after checking for email token because
+	 * the redirect would cause two visits to be recorded. */
+	if req.recordemailclick(ss.store) {
+		/* TODO: make permanent redirect */
+		http.Redirect(
+			w, r, req.redirecturl(), http.StatusTemporaryRedirect,
+		)
+		return nil
+	}
+	if err := req.recordsitevisit(ss.store); err != nil {
 		return fmt.Errorf("cannot record visit: %w", err)
 	}
 	filepath, err := req.getfilepath(ss.store)

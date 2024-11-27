@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/xr0-org/progstack-ssg/pkg/ssg"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
@@ -109,6 +110,12 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		return "", err
 	}
 
+	repopath := buildRepositoryPath(repo.FullName)
+	h, err := ssg.GetSiteHash(repopath)
+	if err != nil {
+		return "", fmt.Errorf("cannot get hash: %w", err)
+	}
+
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
 		UserID: sesh.GetUserID(),
 		GhRepositoryID: sql.NullInt64{
@@ -119,7 +126,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 			Valid:  true,
 			String: buildRepositoryUrl(repo.FullName),
 		},
-		RepositoryPath: buildRepositoryPath(repo.FullName),
+		RepositoryPath: repopath,
 		Theme:          theme,
 		Subdomain:      req.Subdomain,
 		TestBranch: sql.NullString{
@@ -130,9 +137,13 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 			Valid:  true,
 			String: req.LiveBranch,
 		},
-		FromAddress: config.Config.Progstack.FromEmail,
-		BlogType:    model.BlogTypeRepository,
-		EmailMode:   model.EmailModePlaintext,
+		LiveHash:  h,
+		BlogType:  model.BlogTypeRepository,
+		EmailMode: model.EmailModePlaintext,
+		FromAddress: fmt.Sprintf(
+			"%s@%s",
+			req.Subdomain, config.Config.Progstack.EmailDomain,
+		),
 	})
 	if err != nil {
 		return "", fmt.Errorf("could not create blog: %w", err)
@@ -153,13 +164,14 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		return "", fmt.Errorf("invalid blog repositoryID")
 	}
 
-	/* pull latest changes for live branch */
 	if err := UpdateRepositoryOnDisk(
 		b.client, b.store, blog.GhRepositoryID.Int64, logger,
 	); err != nil {
 		return "", fmt.Errorf("error pulling latest changes on live branch: %w", err)
 	}
-
+	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
+		return "", fmt.Errorf("error setting blog to live: %w", err)
+	}
 	return buildDomainUrl(blog.Subdomain), nil
 }
 
@@ -192,7 +204,7 @@ func UpdateRepositoryOnDisk(
 	c *httpclient.Client, s *model.Store, ghRepositoryId int64,
 	logger *log.Logger,
 ) error {
-	logger.Printf("updating repository `%d' on disk...", ghRepositoryId)
+	logger.Printf("updating repository `%d' on disk...\n", ghRepositoryId)
 
 	/* get repository */
 	repo, err := s.GetRepositoryByGhRepositoryID(context.TODO(), ghRepositoryId)
@@ -236,11 +248,6 @@ func UpdateRepositoryOnDisk(
 		accessToken,
 	); err != nil {
 		return fmt.Errorf("clone error: %w", err)
-	}
-
-	/* take blog live  */
-	if _, err := setBlogToLive(&blog, s, logger); err != nil {
-		return fmt.Errorf("error setting blog to live: %w", err)
 	}
 	return nil
 }
@@ -303,7 +310,11 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		return "", fmt.Errorf("error extracting .zip: %w", err)
 	}
 
-	/* create blog */
+	h, err := ssg.GetSiteHash(dst)
+	if err != nil {
+		return "", fmt.Errorf("cannot get hash: %w", err)
+	}
+
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
 		UserID: sesh.GetUserID(),
 		GhRepositoryID: sql.NullInt64{
@@ -311,9 +322,13 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		},
 		RepositoryPath: dst,
 		Subdomain:      req.subdomain,
-		FromAddress:    config.Config.Progstack.FromEmail,
 		Theme:          req.theme,
 		BlogType:       model.BlogTypeFolder,
+		LiveHash:       h,
+		FromAddress: fmt.Sprintf(
+			"%s@%s",
+			req.subdomain, config.Config.Progstack.EmailDomain,
+		),
 	})
 	if err != nil {
 		return "", fmt.Errorf("error creating folder-based blog: %w", err)
@@ -329,8 +344,6 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	); err != nil {
 		return "", fmt.Errorf("error subscribing owner: %w", err)
 	}
-
-	/* take blog live  */
 	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
@@ -347,8 +360,7 @@ func parseCreateFolderBlogRequest(r *http.Request) (createFolderBlogRequest, err
 	logger := logging.Logger(r)
 
 	/* XXX: Add subscription based file size limits */
-	err := r.ParseMultipartForm(maxFileSize) /* 10MB limit */
-	if err != nil {
+	if err := r.ParseMultipartForm(maxFileSize); err != nil {
 		logger.Printf("Error File too large: %v\n", err)
 		return createFolderBlogRequest{}, util.CreateCustomError(
 			"File too large",

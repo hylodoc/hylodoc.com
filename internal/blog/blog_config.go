@@ -16,7 +16,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/resend/resend-go/v2"
-	"github.com/xr0-org/progstack-ssg/pkg/ssg"
 	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
@@ -108,135 +107,6 @@ func BuildThemes(themes map[string]config.Theme) []string {
 func ConvertCentsToDollars(cents int64) string {
 	dollars := float64(cents) / 100.0
 	return fmt.Sprintf("$%.2f", dollars)
-}
-
-/* Launch Blog */
-
-func launchUserBlog(s *model.Store, b *model.Blog) error {
-	if _, err := os.Stat(b.RepositoryPath); err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf(
-				"repository at `%s' does not exist on disk: %w",
-				b.RepositoryPath, err,
-			)
-		}
-		return err
-	}
-	site, err := ssg.GenerateSiteWithBindings(
-		b.RepositoryPath,
-		filepath.Join(
-			config.Config.Progstack.WebsitesPath,
-			b.Subdomain,
-		),
-		config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
-		"algol_nu",
-		"",
-		"<p>Subscribe via <a href=\"/subscribe\">email</a>.</p>",
-		map[string]ssg.CustomPage{
-			"/subscribe": ssg.NewSubscriberPage(
-				fmt.Sprintf(
-					"http://%s/blogs/%d/subscribe",
-					baseurl, b.ID,
-				),
-			),
-			"/subscribed": ssg.NewMessagePage(
-				"Subscribed",
-				"<p>You have been subscribed. Please check your email.</p>",
-			),
-			"/unsubscribed": ssg.NewMessagePage(
-				"Unsubscribed",
-				`<p>
-					You have been unsubscribed from this site.
-					You will no longer receive email updates for posts.
-				</p>
-				<p>
-					If this was a mistake, you can resubscribe
-					<a href="/subscribe">here</a>.
-				</p>`,
-			),
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("error generating site: %w", err)
-	}
-	if title := site.Title(); title != "" {
-		if err := s.UpdateBlogName(
-			context.TODO(),
-			model.UpdateBlogNameParams{
-				ID:   b.ID,
-				Name: title,
-			},
-		); err != nil {
-			return fmt.Errorf("cannot set title %q: %w", title, err)
-		}
-	}
-	gen, err := s.InsertGeneration(context.TODO(), b.ID)
-	if err != nil {
-		return fmt.Errorf("error inserting generation: %w", err)
-	}
-	for url, file := range site.Bindings() {
-		if err := s.InsertBinding(
-			context.TODO(),
-			model.InsertBindingParams{
-				Gen:  gen,
-				Url:  url,
-				File: file.Path(),
-			},
-		); err != nil {
-			return fmt.Errorf("error inserting binding: %w", err)
-		}
-		if file.IsPost() {
-			if err := upsertPostDetails(
-				s, url, b.ID, file,
-			); err != nil {
-				return fmt.Errorf(
-					"error ensuring post exists: %w", err,
-				)
-			}
-		}
-	}
-	return nil
-}
-
-func upsertPostDetails(
-	s *model.Store, url string, blogid int32, file ssg.File,
-) error {
-	published := publishedat(file)
-	_, err := s.GetPostExists(
-		context.TODO(),
-		model.GetPostExistsParams{
-			Url:  url,
-			Blog: blogid,
-		},
-	)
-	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("error checking if post exists: %w", err)
-		}
-		return s.InsertRPost(
-			context.TODO(),
-			model.InsertRPostParams{
-				Url:         url,
-				Blog:        blogid,
-				PublishedAt: published,
-				Title:       file.PostTitle(),
-			},
-		)
-	}
-	return s.UpdateRPost(
-		context.TODO(),
-		model.UpdateRPostParams{
-			Url:         url,
-			Blog:        blogid,
-			PublishedAt: published,
-			Title:       file.PostTitle(),
-		},
-	)
-}
-
-func publishedat(file ssg.File) sql.NullTime {
-	t, ok := file.PostTime()
-	return sql.NullTime{t, ok}
 }
 
 /* Theme */
@@ -451,9 +321,7 @@ func (b *BlogService) folderSubmit(w http.ResponseWriter, r *http.Request) error
 		return err
 	}
 
-	/* take blog live  */
-	_, err = setBlogToLive(&blog, b.store, logger)
-	if err != nil {
+	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
 		return fmt.Errorf("error setting blog to live: %w", err)
 	}
 	return nil
@@ -618,7 +486,7 @@ func handleStatusChange(
 	if islive {
 		return setBlogToLive(&blog, s, logger)
 	} else {
-		return setBlogToOffline(blog, s)
+		return setBlogToOffline(&blog, s)
 	}
 }
 
@@ -637,9 +505,8 @@ func validateStatusChange(blogID int32, islive bool, s *model.Store) error {
 }
 
 func setBlogToLive(b *model.Blog, s *model.Store, logger *log.Logger) (*statusChangeResponse, error) {
-	logger.Printf("repo disk path: %s\n", b.RepositoryPath)
-	if err := launchUserBlog(s, b); err != nil {
-		return nil, fmt.Errorf("error launching blog `%d': %w", b.ID, err)
+	if err := s.SetBlogToLive(context.TODO(), b.ID); err != nil {
+		return nil, err
 	}
 	return &statusChangeResponse{
 		Domain: b.Subdomain,
@@ -647,22 +514,23 @@ func setBlogToLive(b *model.Blog, s *model.Store, logger *log.Logger) (*statusCh
 	}, nil
 }
 
-func setBlogToOffline(blog model.Blog, s *model.Store) (*statusChangeResponse, error) {
-	site := filepath.Join(
-		config.Config.Progstack.WebsitesPath,
-		blog.Subdomain,
-	)
-	if err := os.RemoveAll(site); err != nil {
+func setBlogToOffline(b *model.Blog, s *model.Store) (*statusChangeResponse, error) {
+	if err := os.RemoveAll(
+		filepath.Join(
+			config.Config.Progstack.WebsitesPath,
+			b.Subdomain,
+		),
+	); err != nil {
 		return nil, fmt.Errorf(
 			"error deleting website `%s' from disk: %w",
-			blog.Subdomain, err,
+			b.Subdomain, err,
 		)
 	}
-	if err := s.DeactivateGenerations(context.TODO(), blog.ID); err != nil {
-		return nil, fmt.Errorf("deactivate error: %w", err)
+	if err := s.SetBlogToOffline(context.TODO(), b.ID); err != nil {
+		return nil, fmt.Errorf("cannot set offline: %w", err)
 	}
 	return &statusChangeResponse{
-		Domain: blog.Subdomain,
+		Domain: b.Subdomain,
 		IsLive: false,
 	}, nil
 }

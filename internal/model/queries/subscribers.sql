@@ -23,13 +23,30 @@ SELECT *
 FROM subscribers
 WHERE blog_id = $1 and status = 'active';
 
--- name: DeleteSubscriberForBlog :exec
+-- name: GetSubscriberByToken :one
+SELECT *
+FROM subscribers
+WHERE unsubscribe_token = $1;
+
+-- name: DeleteSubscriber :exec
 UPDATE subscribers
 SET status = 'unsubscribed'
-WHERE unsubscribe_token = $1 AND blog_id = $2;
+WHERE id = $1;
 
 -- name: DeleteSubscriberByEmail :exec
 UPDATE subscribers
 SET status = 'unsubscribed'
 WHERE email = $1 AND blog_id = $2;
 
+-- name: InsertSubscriberEmail :one
+INSERT INTO subscriber_emails (
+	subscriber, url, blog
+) VALUES (
+	$1, $2, $3
+)
+RETURNING token;
+
+-- name: SetSubscriberEmailClicked :exec
+UPDATE subscriber_emails
+SET clicked = true
+WHERE token = $1;

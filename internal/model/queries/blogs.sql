@@ -8,11 +8,12 @@ INSERT INTO blogs (
 	subdomain,
 	test_branch,
 	live_branch,
+	live_hash,
 	from_address,
 	blog_type,
 	email_mode
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
 )
 RETURNING *;
 
@@ -54,7 +55,7 @@ WHERE gh_repository_id = $1 AND blog_type = 'repository';
 -- name: GetBlogIDBySubdomain :one
 SELECT id
 FROM blogs
-WHERE subdomain = @subdomain::VARCHAR;
+WHERE subdomain = $1;
 
 -- name: ListBlogIDsByUserID :many
 SELECT id
@@ -67,11 +68,19 @@ FROM blogs b
 WHERE user_id = $1;
 
 -- name: GetBlogIsLive :one
-SELECT EXISTS (
-	SELECT 1
-	FROM generations
-	WHERE blog = $1 AND active = true
-);
+SELECT is_live
+FROM blogs
+WHERE id = $1 AND is_live = true;
+
+-- name: SetBlogToLive :exec
+UPDATE blogs
+SET is_live = true
+WHERE id = $1;
+
+-- name: SetBlogToOffline :exec
+UPDATE blogs
+SET is_live = false
+WHERE id = $1;
 
 -- name: ListBlogsForInstallationByGhInstallationID :many
 SELECT *

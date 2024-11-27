@@ -3,20 +3,18 @@ package email
 import (
 	"fmt"
 
-	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email/emailtemplate"
+	"github.com/xr0-org/progstack/internal/email/postbody"
 )
 
-func (s *sender) SendNewSubscriberEmail(to, sitename, unsublink string) error {
+func (s *sender) SendNewSubscriberEmail(sitename, unsublink string) error {
 	text, err := emailtemplate.NewSubscriber(
 		sitename, unsublink,
 	).Render(s.emailmode)
 	if err != nil {
 		return fmt.Errorf("cannot render template: %w", err)
 	}
-	if err := s.send(
-		to,
-		config.Config.Progstack.FromEmail,
+	if err := s.sendwithheaders(
 		fmt.Sprintf("Welcome to %s", sitename),
 		text,
 		unsubscribeheaders(unsublink),
@@ -34,20 +32,20 @@ func unsubscribeheaders(unsublink string) map[string]string {
 }
 
 func (s *sender) SendNewPostUpdate(
-	to, posttitle, postlink, postbody, unsublink string,
+	posttitle, postlink, unsublink string, pb postbody.PostBody,
 ) error {
+	body, err := pb.Read(s.emailmode)
+	if err != nil {
+		return fmt.Errorf("cannot read body: %w", err)
+	}
 	text, err := emailtemplate.NewPost(
-		postlink, postbody, unsublink,
+		postlink, string(body), unsublink,
 	).Render(s.emailmode)
 	if err != nil {
 		return fmt.Errorf("cannot render template: %w", err)
 	}
-	if err := s.send(
-		to,
-		config.Config.Progstack.FromEmail,
-		posttitle,
-		text,
-		unsubscribeheaders(unsublink),
+	if err := s.sendwithheaders(
+		posttitle, text, unsubscribeheaders(unsublink),
 	); err != nil {
 		return fmt.Errorf("error sending email: %w", err)
 	}

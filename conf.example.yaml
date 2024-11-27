@@ -8,8 +8,8 @@ progstack:
   repositories_path: "./repositories"
   folders_path: "./folders"
   websites_path: "./websites"
-  from_email: "no-reply@lbnz.dev"	# update email
   accounts_email: "accounts@lbnz.dev"	# billing query email
+  email_domain: "mails.lbnz.dev"
 
 # Progstack ssg config
 progstack_ssg:

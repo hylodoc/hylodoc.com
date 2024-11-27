@@ -161,50 +161,27 @@ func (b *BlogService) SubdomainSubmit() http.HandlerFunc {
 }
 
 func (b *BlogService) subdomainSubmit(w http.ResponseWriter, r *http.Request) error {
-	logger := logging.Logger(r)
-
-	blogID := mux.Vars(r)["blogID"]
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	blogID, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot parse id: %w", err)
 	}
 
 	var req SubdomainRequest
-	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return fmt.Errorf("cannot decode request: %w", err)
+	}
+
+	if err := validateSubdomain(req.Subdomain); err != nil {
+		return fmt.Errorf("cannot validate subdomain: %w", err)
+	}
+
+	if err := b.store.UpdateSubdomainTx(
+		context.TODO(), model.UpdateSubdomainTxParams{
+			BlogID:    int32(blogID),
+			Subdomain: req.Subdomain,
+		},
+	); err != nil {
 		return err
 	}
-	if err = validateSubdomain(req.Subdomain); err != nil {
-		return err
-	}
-
-	/* get existing blog */
-	blog, err := b.store.GetBlogByID(context.TODO(), int32(intBlogID))
-	if err != nil {
-		return err
-	}
-
-	/* take current blog offline */
-	if _, err := setBlogToOffline(blog, b.store); err != nil {
-		return fmt.Errorf(
-			"error taking subdomain `%s' offline: %w",
-			blog.Subdomain, err,
-		)
-	}
-
-	if err = b.store.UpdateSubdomainTx(context.TODO(), model.UpdateSubdomainTxParams{
-		BlogID:    int32(intBlogID),
-		Subdomain: req.Subdomain,
-	}); err != nil {
-		return err
-	}
-
-	/* bring blog online */
-	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
-		return fmt.Errorf(
-			"error bringing subdomain `%s' online: %w",
-			blog.Subdomain, err,
-		)
-	}
-
 	return nil
 }
