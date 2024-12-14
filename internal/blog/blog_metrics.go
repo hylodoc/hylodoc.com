@@ -58,7 +58,11 @@ func (b *BlogService) siteMetrics(w http.ResponseWriter, r *http.Request) error 
 	if err != nil {
 		return fmt.Errorf("cannot parse blog id: %w", err)
 	}
-	data, err := b.getSiteMetrics(int32(blogidint))
+	blog, err := b.store.GetBlogByID(context.TODO(), int32(blogidint))
+	if err != nil {
+		return fmt.Errorf("cannot get blog: %w", err)
+	}
+	data, err := b.getSiteMetrics(blog.ID)
 	if err != nil {
 		return fmt.Errorf("error getting subscriber metrics: %w", err)
 	}
@@ -66,11 +70,15 @@ func (b *BlogService) siteMetrics(w http.ResponseWriter, r *http.Request) error 
 		util.PageInfo{
 			Data: struct {
 				Title    string
+				SiteName string
+				IsLive   bool
 				UserInfo *session.UserInfo
 				SiteData
 				PostData []postdata
 			}{
 				Title:    "Dashboard",
+				SiteName: getsitename(&blog),
+				IsLive:   blog.IsLive,
 				UserInfo: session.ConvertSessionToUserInfo(sesh),
 				PostData: data,
 			},

@@ -11,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -508,6 +507,9 @@ func setBlogToLive(b *model.Blog, s *model.Store, logger *log.Logger) (*statusCh
 	if err := s.SetBlogToLive(context.TODO(), b.ID); err != nil {
 		return nil, err
 	}
+	if _, err := GetFreshGeneration(b.ID, s); err != nil {
+		return nil, fmt.Errorf("cannot generate: %w", err)
+	}
 	return &statusChangeResponse{
 		Domain: b.Subdomain,
 		IsLive: true,
@@ -515,17 +517,6 @@ func setBlogToLive(b *model.Blog, s *model.Store, logger *log.Logger) (*statusCh
 }
 
 func setBlogToOffline(b *model.Blog, s *model.Store) (*statusChangeResponse, error) {
-	if err := os.RemoveAll(
-		filepath.Join(
-			config.Config.Progstack.WebsitesPath,
-			b.Subdomain,
-		),
-	); err != nil {
-		return nil, fmt.Errorf(
-			"error deleting website `%s' from disk: %w",
-			b.Subdomain, err,
-		)
-	}
 	if err := s.SetBlogToOffline(context.TODO(), b.ID); err != nil {
 		return nil, fmt.Errorf("cannot set offline: %w", err)
 	}

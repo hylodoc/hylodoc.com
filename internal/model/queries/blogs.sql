@@ -52,8 +52,8 @@ SELECT *
 FROM blogs
 WHERE gh_repository_id = $1 AND blog_type = 'repository';
 
--- name: GetBlogIDBySubdomain :one
-SELECT id
+-- name: GetBlogBySubdomain :one
+SELECT *
 FROM blogs
 WHERE subdomain = $1;
 
@@ -70,7 +70,7 @@ WHERE user_id = $1;
 -- name: GetBlogIsLive :one
 SELECT is_live
 FROM blogs
-WHERE id = $1 AND is_live = true;
+WHERE id = $1;
 
 -- name: SetBlogToLive :exec
 UPDATE blogs

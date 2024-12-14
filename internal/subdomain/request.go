@@ -18,11 +18,11 @@ import (
 )
 
 type request struct {
-	_subdomain string
-	_url       url.URL
+	_b   model.Blog
+	_url url.URL
 }
 
-func parseRequest(r *http.Request) (*request, error) {
+func parseRequest(r *http.Request, s *model.Store) (*request, error) {
 	/* XXX: bit dodge but with local development we have subdomains like
 	* http://<subdomain>.localhost:7999 which should also route
 	* correctly so we split on both "." and ":" */
@@ -35,7 +35,17 @@ func parseRequest(r *http.Request) (*request, error) {
 	if len(parts) < 1 {
 		return nil, fmt.Errorf("dodge regex wrong part count")
 	}
-	return &request{parts[0], *r.URL}, nil
+	b, err := s.GetBlogBySubdomain(context.TODO(), parts[0])
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("no such subdomain %q", parts)
+		}
+		return nil, fmt.Errorf("blog get error: %w", err)
+	}
+	if !b.IsLive {
+		return nil, fmt.Errorf("blog is offline")
+	}
+	return &request{b, *r.URL}, nil
 }
 
 func gethostorxforwardedhost(r *http.Request) string {
@@ -47,28 +57,15 @@ func gethostorxforwardedhost(r *http.Request) string {
 	return host
 }
 
-var errNoSubdomain = errors.New("no such subdomain")
-
 func (r *request) recordsitevisit(s *model.Store) error {
-	b, err := s.GetBlogIDBySubdomain(context.TODO(), r._subdomain)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return errNoSubdomain
-		}
-		return fmt.Errorf("cannot get blog id: %w", err)
-	}
 	return s.RecordBlogVisit(
 		context.TODO(),
-		model.RecordBlogVisitParams{Url: r._url.Path, Blog: b},
+		model.RecordBlogVisitParams{Url: r._url.Path, Blog: r._b.ID},
 	)
 }
 
 func (r *request) getfilepath(s *model.Store) (string, error) {
-	blogid, err := s.GetBlogIDBySubdomain(context.TODO(), r._subdomain)
-	if err != nil {
-		return "", fmt.Errorf("cannot get blog id: %w", err)
-	}
-	gen, err := blog.GetFreshGeneration(blogid, s)
+	gen, err := blog.GetFreshGeneration(r._b.ID, s)
 	if err != nil {
 		return "", fmt.Errorf("cannot get generation: %w", err)
 	}

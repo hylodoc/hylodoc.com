@@ -11,9 +11,15 @@
 		</tr>
 	</thead>
 	<tbody>
-		{{ range . }}
+		{{ range .PostData }}
 			<tr>
-				<td><a href="{{ .Url }}" target="_blank">{{ .Title }}</a></td>
+				<td>
+					{{ if $.IsLive }}
+					<a href="{{ .Url }}" target="_blank">{{ .Title }}</a>
+					{{ else }}
+					{{ .Title }}
+					{{ end }}
+				</td>
 				<td>
 					{{ if .Date }}
 						{{ .Date.Format "2006-01-02" }}
@@ -27,7 +33,11 @@
 					{{ if .Email.Sent }}
 						{{ .Email.Opens }} opens
 					{{ else }}
+						{{ if $.IsLive }}
 						<a href="{{ .Email.SendURL }}">Send email</a>
+						{{ else }}
+						-
+						{{ end }}
 					{{ end }}
 				</td>
 			</tr>

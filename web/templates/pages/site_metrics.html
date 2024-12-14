@@ -3,8 +3,14 @@
 <!-- Posts table -->
 <section>
 	<div class="container">
-		<h2>Posts</h3>
-		{{ template "posts" .Data.PostData }}
+		<h2>
+			{{ .Data.SiteName }}
+			{{ if not .Data.IsLive }}
+			<span>(offline)</span>
+			{{ end }}
+		</h2>
+		<h3>Posts</h3>
+		{{ template "posts" .Data }}
 	</div>
 </section>
 
