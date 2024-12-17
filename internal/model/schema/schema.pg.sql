@@ -129,7 +129,13 @@ CREATE TABLE blogs (
 	name			VARCHAR(1000),
 	user_id			INTEGER		NOT NULL,
 	theme			blog_theme	NOT NULL			DEFAULT('lit'),
-	subdomain		VARCHAR(255)	NOT NULL	UNIQUE,
+
+	subdomain		VARCHAR(255)	NOT NULL	UNIQUE
+		CHECK (subdomain NOT IN ('', 'custom-domain-cname-target')),
+
+	domain			VARCHAR(255)			UNIQUE
+		CHECK (domain <> ''),
+
 	from_address		VARCHAR(255)	NOT NULL,
 	blog_type		blog_type	NOT NULL,
 	email_mode		email_mode	NOT NULL,

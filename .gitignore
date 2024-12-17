@@ -1,11 +1,12 @@
 bin/
-app/
 repositories/
 folders/
 websites/
+certs/
 letsencrypt/
 .DS_Store
-conf.yaml
+conf.yml
+docker-compose.yml
 *.swp
 *.swo
 *.pem

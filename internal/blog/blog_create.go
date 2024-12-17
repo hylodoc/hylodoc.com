@@ -19,6 +19,7 @@ import (
 	"github.com/xr0-org/progstack-ssg/pkg/ssg"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
@@ -111,9 +112,22 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 	}
 
 	repopath := buildRepositoryPath(repo.FullName)
+
+	if err := UpdateRepositoryOnDisk(
+		b.client, b.store, intRepoID, req.LiveBranch,
+		logger,
+	); err != nil {
+		return "", fmt.Errorf("error pulling latest changes on live branch: %w", err)
+	}
+
 	h, err := ssg.GetSiteHash(repopath)
 	if err != nil {
 		return "", fmt.Errorf("cannot get hash: %w", err)
+	}
+
+	sub, err := dns.ParseSubdomain(req.Subdomain)
+	if err != nil {
+		return "", fmt.Errorf("subdomain: %w", err)
 	}
 
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
@@ -128,7 +142,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		},
 		RepositoryPath: repopath,
 		Theme:          theme,
-		Subdomain:      req.Subdomain,
+		Subdomain:      sub,
 		TestBranch: sql.NullString{
 			Valid:  true,
 			String: req.TestBranch,
@@ -142,7 +156,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		EmailMode: model.EmailModePlaintext,
 		FromAddress: fmt.Sprintf(
 			"%s@%s",
-			req.Subdomain, config.Config.Progstack.EmailDomain,
+			sub, config.Config.Progstack.EmailDomain,
 		),
 	})
 	if err != nil {
@@ -164,15 +178,10 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		return "", fmt.Errorf("invalid blog repositoryID")
 	}
 
-	if err := UpdateRepositoryOnDisk(
-		b.client, b.store, blog.GhRepositoryID.Int64, logger,
-	); err != nil {
-		return "", fmt.Errorf("error pulling latest changes on live branch: %w", err)
-	}
 	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
-	return buildDomainUrl(blog.Subdomain), nil
+	return buildUrl(blog.Subdomain.String()), nil
 }
 
 func buildRepositoryUrl(fullName string) string {
@@ -201,30 +210,15 @@ func buildRepositoryPath(repoFullName string) string {
 }
 
 func UpdateRepositoryOnDisk(
-	c *httpclient.Client, s *model.Store, ghRepositoryId int64,
+	c *httpclient.Client, s *model.Store, ghRepoId int64, branch string,
 	logger *log.Logger,
 ) error {
-	logger.Printf("updating repository `%d' on disk...\n", ghRepositoryId)
+	logger.Printf("updating repository `%d' on disk...\n", ghRepoId)
 
 	/* get repository */
-	repo, err := s.GetRepositoryByGhRepositoryID(context.TODO(), ghRepositoryId)
+	repo, err := s.GetRepositoryByGhRepositoryID(context.TODO(), ghRepoId)
 	if err != nil {
 		return err
-	}
-
-	/* get blog */
-	blog, err := s.GetBlogByGhRepositoryID(context.TODO(), sql.NullInt64{
-		Valid: true,
-		Int64: ghRepositoryId,
-	})
-	if err != nil {
-		if err != sql.ErrNoRows {
-			return fmt.Errorf("error getting blog for repository event: %w", err)
-		}
-		/* XXX: can happen if user pushes to repo after installing
-		* application without having created an associated blog*/
-		logger.Printf("No associated blog with repositoryID `%d'\n", ghRepositoryId)
-		return nil
 	}
 
 	accessToken, err := authn.GetInstallationAccessToken(
@@ -234,17 +228,13 @@ func UpdateRepositoryOnDisk(
 		config.Config.Github.PrivateKeyPath,
 	)
 	if err != nil {
-		return fmt.Errorf("error getting installation access token: %w", err)
-	}
-
-	if !blog.LiveBranch.Valid {
-		return fmt.Errorf("no live branch configured for blog `%d'", blog.ID)
+		return fmt.Errorf("access token error: %w", err)
 	}
 
 	if err := cloneRepo(
 		buildRepositoryPath(repo.FullName),
 		repo.Url,
-		blog.LiveBranch.String,
+		branch,
 		accessToken,
 	); err != nil {
 		return fmt.Errorf("clone error: %w", err)
@@ -315,19 +305,24 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		return "", fmt.Errorf("cannot get hash: %w", err)
 	}
 
+	sub, err := dns.ParseSubdomain(req.subdomain)
+	if err != nil {
+		return "", fmt.Errorf("subdomain: %w", err)
+	}
+
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
 		UserID: sesh.GetUserID(),
 		GhRepositoryID: sql.NullInt64{
 			Valid: false,
 		},
 		RepositoryPath: dst,
-		Subdomain:      req.subdomain,
+		Subdomain:      sub,
 		Theme:          req.theme,
 		BlogType:       model.BlogTypeFolder,
 		LiveHash:       h,
 		FromAddress: fmt.Sprintf(
 			"%s@%s",
-			req.subdomain, config.Config.Progstack.EmailDomain,
+			sub, config.Config.Progstack.EmailDomain,
 		),
 	})
 	if err != nil {
@@ -347,7 +342,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
-	return buildDomainUrl(blog.Subdomain), nil
+	return buildUrl(blog.Subdomain.String()), nil
 }
 
 type createFolderBlogRequest struct {

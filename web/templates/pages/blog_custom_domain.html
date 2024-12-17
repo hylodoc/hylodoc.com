@@ -1,0 +1,26 @@
+{{ template "header" . }}
+
+<section>
+	<div class="container">
+		<h2>Configure {{ .Data.Blog.Name }}</h2>
+		<h3>Custom Domain</h2>
+
+		<form method="POST" action="{{ .Data.Blog.SetDomainUrl }}">
+			<label for="domain">Domain</label>
+			<input class="u-full-width"
+					autocomplete="off"
+					type="text"
+					id="domain"
+					name="domain"
+					value="{{ if .Data.Blog.Domain }}{{ .Data.Blog.Domain }}{{ end }}"
+					placeholder= "Enter your domain" />
+			<input class="button" type="submit" value="Save">
+		</form>
+
+
+	</div>
+</section>
+
+{{ template "footer" . }}
+
+

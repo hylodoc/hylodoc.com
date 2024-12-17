@@ -28,6 +28,16 @@ func CanCreateSite(s *model.Store, sesh *session.Session) (bool, error) {
 	return tier.canCreateProject(storageUsed, int(blogCount))
 }
 
+func CanConfigureCustomDomain(s *model.Store, sesh *session.Session) (bool, error) {
+	/* get user's tier features */
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	if err != nil {
+		return false, fmt.Errorf("error getting user subscription: %w", err)
+	}
+	tier := SubscriptionTiers[string(plan)]
+	return tier.CustomDomain, nil
+}
+
 func CanViewAnalytics(s *model.Store, sesh *session.Session) (bool, error) {
 	/* get user's tier features */
 	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
@@ -197,7 +207,7 @@ var SubscriptionTiers = map[string]SubscriptionFeatures{
 		Projects:               10,
 		Storage:                10240, /* 10GB */
 		VisitorsPerMonth:       100000,
-		CustomDomain:           false,
+		CustomDomain:           true,
 		Themes:                 []string{"lit", "latex"},
 		CodeStyle:              []string{"lit", "latex"},
 		Images:                 true,

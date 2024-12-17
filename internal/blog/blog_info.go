@@ -2,6 +2,7 @@ package blog
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -10,23 +11,25 @@ import (
 )
 
 type BlogInfo struct {
-	ID                   int32
-	Domain               string
-	Subdomain            string
-	CustomDomain         string
-	DomainUrl            string
-	RepositoryUrl        string
-	SubscriberMetricsUrl string
-	MetricsUrl           string
-	ConfigUrl            string
-	Theme                string
-	Type                 string
-	Status               string
-	TestBranch           string
-	LiveBranch           string
-	UpdatedAt            time.Time
-	IsRepository         bool
-	IsLive               bool
+	ID                       int32
+	Name                     string
+	Subdomain                string
+	Domain                   *string
+	Url                      string
+	ConfigureCustomDomainUrl string
+	SetDomainUrl             string
+	RepositoryUrl            string
+	SubscriberMetricsUrl     string
+	MetricsUrl               string
+	ConfigUrl                string
+	Theme                    string
+	Type                     string
+	Status                   string
+	TestBranch               string
+	LiveBranch               string
+	UpdatedAt                time.Time
+	IsRepository             bool
+	IsLive                   bool
 }
 
 func GetBlogsInfo(s *model.Store, userID int32) ([]BlogInfo, error) {
@@ -53,20 +56,36 @@ func ghurl(blog model.Blog) string {
 	return ""
 }
 
-func buildDomain(subdomain string) string {
-	return fmt.Sprintf(
-		"%s.%s",
-		subdomain,
-		config.Config.Progstack.ServiceName,
-	)
+func getname(blog model.Blog) string {
+	if blog.Name.Valid {
+		return blog.Name.String
+	}
+	if blog.Domain.Valid {
+		return blog.Domain.String
+	}
+	return blog.Subdomain.String()
 }
 
-func buildDomainUrl(subdomain string) string {
+func buildUrl(subdomain string) string {
 	return fmt.Sprintf(
 		"%s://%s.%s",
 		config.Config.Progstack.Protocol,
 		subdomain,
 		config.Config.Progstack.ServiceName,
+	)
+}
+
+func buildConfigureCustomDomainUrl(blogID int32) string {
+	return fmt.Sprintf(
+		"/user/blogs/%d/config-domain",
+		blogID,
+	)
+}
+
+func buildSetDomainUrl(blogID int32) string {
+	return fmt.Sprintf(
+		"/user/blogs/%d/set-domain",
+		blogID,
 	)
 }
 
@@ -101,20 +120,30 @@ func getBlogInfo(s *model.Store, blogID int32) (BlogInfo, error) {
 		return BlogInfo{}, fmt.Errorf("islive error: %w", err)
 	}
 	return BlogInfo{
-		ID:                   blog.ID,
-		Domain:               buildDomain(blog.Subdomain),
-		Subdomain:            blog.Subdomain,
-		DomainUrl:            buildDomainUrl(blog.Subdomain),
-		RepositoryUrl:        ghurl(blog),
-		SubscriberMetricsUrl: buildSubscriberMetricsUrl(blog.ID),
-		MetricsUrl:           buildMetricsUrl(blog.ID),
-		ConfigUrl:            buildConfigUrl(blog.ID),
-		TestBranch:           blog.TestBranch.String,
-		LiveBranch:           blog.LiveBranch.String,
-		Theme:                string(blog.Theme),
-		Type:                 string(blog.BlogType),
-		UpdatedAt:            blog.UpdatedAt,
-		IsRepository:         blog.BlogType == model.BlogTypeRepository,
-		IsLive:               isLive,
+		ID:                       blog.ID,
+		Name:                     getname(blog),
+		Domain:                   unwrapsqlnullstr(blog.Domain),
+		Subdomain:                blog.Subdomain.String(),
+		Url:                      buildUrl(blog.Subdomain.String()),
+		ConfigureCustomDomainUrl: buildConfigureCustomDomainUrl(blog.ID),
+		SetDomainUrl:             buildSetDomainUrl(blog.ID),
+		RepositoryUrl:            ghurl(blog),
+		SubscriberMetricsUrl:     buildSubscriberMetricsUrl(blog.ID),
+		MetricsUrl:               buildMetricsUrl(blog.ID),
+		ConfigUrl:                buildConfigUrl(blog.ID),
+		TestBranch:               blog.TestBranch.String,
+		LiveBranch:               blog.LiveBranch.String,
+		Theme:                    string(blog.Theme),
+		Type:                     string(blog.BlogType),
+		UpdatedAt:                blog.UpdatedAt,
+		IsRepository:             blog.BlogType == model.BlogTypeRepository,
+		IsLive:                   isLive,
 	}, nil
+}
+
+func unwrapsqlnullstr(s sql.NullString) *string {
+	if s.Valid {
+		return &s.String
+	}
+	return nil
 }

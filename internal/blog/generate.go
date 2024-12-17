@@ -31,7 +31,7 @@ func GetFreshGeneration(blogid int32, s *model.Store) (int32, error) {
 		b.RepositoryPath,
 		filepath.Join(
 			config.Config.Progstack.WebsitesPath,
-			b.Subdomain,
+			b.Subdomain.String(),
 		),
 		config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
 		"algol_nu",

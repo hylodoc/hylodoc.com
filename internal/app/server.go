@@ -20,20 +20,23 @@ import (
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/metrics"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/routing"
 	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/subdomain"
 	"github.com/xr0-org/progstack/internal/user"
 	"github.com/xr0-org/progstack/internal/util"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 const (
-	listeningPort = 7999 /* XXX: make configurable */
+	/* TODO: make configurable */
+	httpPort      = 80
+	httpsPort     = 443
 	clientTimeout = 30 * time.Second
 )
 
 func init() {
-	if err := config.LoadConfig("conf.yaml"); err != nil {
-		log.Fatalf("failed to laod config: %v", err)
+	if err := config.LoadConfig("conf.yml"); err != nil {
+		log.Fatalf("failed to load config: %v", err)
 	}
 }
 
@@ -43,21 +46,30 @@ func Serve() {
 	if err != nil {
 		log.Fatal("could not connect to db: %w", err)
 	}
-	httpClient := httpclient.NewHttpClient(clientTimeout)
-	mixpanelClient := analytics.NewMixpanelClientWrapper(
-		config.Config.Mixpanel.Token,
-	)
 	store := model.NewStore(db)
+
 	bootid, err := store.Boot(context.TODO())
 	if err != nil {
 		log.Fatal("cannot boot: %w", err)
 	}
 	log.Println("bootid", bootid)
-	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
+
+	r := mux.NewRouter()
+
+	/* middleware */
+	r.Use(session.NewSessionService(store).Middleware)
+	r.Use(logging.Middleware)
+	r.Use(metrics.Middleware)
+	r.Use(routing.NewRoutingService(store).Middleware)
+
+	/* public routes */
 
 	/* init services */
-	sessionService := session.NewSessionService(store)
-	subdomainService := subdomain.NewSubdomainService(store)
+	httpClient := httpclient.NewHttpClient(clientTimeout)
+	mixpanelClient := analytics.NewMixpanelClientWrapper(
+		config.Config.Mixpanel.Token,
+	)
+	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
 	authNService := authn.NewAuthNService(
 		httpClient, resendClient, store, mixpanelClient,
 	)
@@ -72,16 +84,6 @@ func Serve() {
 
 	/* init metrics */
 	metrics.Initialize()
-
-	r := mux.NewRouter()
-
-	/* middeware */
-	r.Use(sessionService.Middleware)
-	r.Use(logging.Middleware)
-	r.Use(subdomainService.Middleware)
-	r.Use(metrics.Middleware)
-
-	/* public routes */
 	r.Handle("/metrics", metrics.Handler())
 
 	r.HandleFunc("/", index(mixpanelClient))
@@ -123,6 +125,8 @@ func Serve() {
 	blogR.Use(blogService.Middleware)
 	blogR.HandleFunc("/config", blogService.Config())
 	blogR.HandleFunc("/set-subdomain", blogService.SubdomainSubmit())
+	blogR.HandleFunc("/config-domain", blogService.ConfigDomain())
+	blogR.HandleFunc("/set-domain", blogService.DomainSubmit())
 	blogR.HandleFunc("/set-theme", blogService.ThemeSubmit())
 	blogR.HandleFunc("/set-test-branch", blogService.TestBranchSubmit())
 	blogR.HandleFunc("/set-live-branch", blogService.LiveBranchSubmit())
@@ -144,9 +148,61 @@ func Serve() {
 	/* register subrouter */
 	r.PathPrefix("/").Handler(authR)
 
-	/* start server on listening port */
-	log.Printf("listening at http://localhost:%d...\n", listeningPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", listeningPort), r))
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc(
+			"/",
+			func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "")
+				http.Redirect(
+					w, r,
+					fmt.Sprintf(
+						"https://%s%s",
+						r.Host,
+						r.URL.String(),
+					),
+					http.StatusPermanentRedirect,
+				)
+			},
+		)
+		log.Printf(
+			"listening (to redirect) on http://localhost:%d...\n",
+			httpPort,
+		)
+		if err := http.ListenAndServe(
+			fmt.Sprintf(":%d", httpPort), mux,
+		); err != nil {
+			log.Fatal("fatal http error", err)
+		}
+	}()
+
+	m := &autocert.Manager{
+		Cache:  autocert.DirCache(config.Config.Progstack.CertsPath),
+		Prompt: autocert.AcceptTOS,
+		Email:  "tls@hylo.lbnz.dev",
+		HostPolicy: func(ctx context.Context, host string) error {
+			return nil
+		},
+	}
+	s := &http.Server{
+		Addr:      fmt.Sprintf(":%d", httpsPort),
+		TLSConfig: m.TLSConfig(),
+		Handler:   r,
+	}
+	switch config.Config.Progstack.Protocol {
+	case "https":
+		log.Printf("listening at https://localhost:%d...\n", httpsPort)
+		if err := s.ListenAndServeTLS("", ""); err != nil {
+			log.Fatal("fatal error", err)
+		}
+	case "http":
+		log.Printf("listening at http://localhost:%d...\n", httpsPort)
+		if err := s.ListenAndServe(); err != nil {
+			log.Fatal("fatal error", err)
+		}
+	default:
+		log.Fatal("invalid protocol")
+	}
 }
 
 func index(mixpanel *analytics.MixpanelClientWrapper) http.HandlerFunc {

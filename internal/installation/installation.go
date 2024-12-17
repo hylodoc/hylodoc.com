@@ -466,9 +466,8 @@ func handlePush(
 		return nil
 	}
 
-	/* pull latest changes if event is on live branch */
 	if err := blog.UpdateRepositoryOnDisk(
-		c, s, event.Repository.ID, logger,
+		c, s, event.Repository.ID, branchName, logger,
 	); err != nil {
 		return fmt.Errorf("error pulling latest changes: %w", err)
 	}

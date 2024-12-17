@@ -118,7 +118,7 @@ func getsitename(blog *model.Blog) string {
 	if blog.Name.Valid {
 		return blog.Name.String
 	}
-	return blog.Subdomain
+	return blog.Subdomain.String()
 }
 
 func (b *BlogService) createsubscriber(

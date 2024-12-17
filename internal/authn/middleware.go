@@ -11,7 +11,6 @@ func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 
-		logger.Println("auth middleware...")
 		/* get session from context */
 		session, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		if !ok || session == nil {

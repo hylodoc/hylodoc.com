@@ -19,6 +19,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/stripe/stripe-go/v78 v78.12.0
 	github.com/xr0-org/progstack-ssg v0.0.0-00010101000000-000000000000
+	golang.org/x/crypto v0.24.0
 )
 
 require (
@@ -68,7 +69,6 @@ require (
 	go.abhg.dev/goldmark/anchor v0.1.1 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	golang.org/x/crypto v0.24.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
