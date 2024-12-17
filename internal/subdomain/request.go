@@ -13,7 +13,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/xr0-org/progstack/internal/blog"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
@@ -21,6 +20,8 @@ type request struct {
 	_b   model.Blog
 	_url url.URL
 }
+
+var errNoSubdomain = errors.New("no such subdomain")
 
 func parseRequest(r *http.Request, s *model.Store) (*request, error) {
 	/* XXX: bit dodge but with local development we have subdomains like
@@ -38,7 +39,7 @@ func parseRequest(r *http.Request, s *model.Store) (*request, error) {
 	b, err := s.GetBlogBySubdomain(context.TODO(), parts[0])
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("no such subdomain %q", parts)
+			return nil, fmt.Errorf("%q: %w", parts, errNoSubdomain)
 		}
 		return nil, fmt.Errorf("blog get error: %w", err)
 	}
@@ -49,12 +50,10 @@ func parseRequest(r *http.Request, s *model.Store) (*request, error) {
 }
 
 func gethostorxforwardedhost(r *http.Request) string {
-	host := r.Header.Get("X-Forwarded-Host")
-	logging.Logger(r).Printf("X-Forwarded-Host: %s\n", host)
-	if host == "" {
-		return r.Host // Fallback to the Host header
+	if host := r.Header.Get("X-Forwarded-Host"); host != "" {
+		return host
 	}
-	return host
+	return r.Host // Fallback to the Host header
 }
 
 func (r *request) recordsitevisit(s *model.Store) error {

@@ -26,7 +26,6 @@ func NewSessionService(s *model.Store) *SessionService {
 func (s *SessionService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
-		logger.Println("Session middleware...")
 
 		/* ignore /metrics used by prometheus */
 		if r.URL.Path == "/metrics" {

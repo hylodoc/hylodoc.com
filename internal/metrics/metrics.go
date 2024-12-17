@@ -115,8 +115,6 @@ func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 
-		logger.Printf("metrics middleware")
-
 		start := time.Now()
 
 		/* custom responseWriter to capture code */

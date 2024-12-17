@@ -111,6 +111,14 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 	}
 
 	repopath := buildRepositoryPath(repo.FullName)
+
+	if err := UpdateRepositoryOnDisk(
+		b.client, b.store, intRepoID, req.LiveBranch,
+		logger,
+	); err != nil {
+		return "", fmt.Errorf("error pulling latest changes on live branch: %w", err)
+	}
+
 	h, err := ssg.GetSiteHash(repopath)
 	if err != nil {
 		return "", fmt.Errorf("cannot get hash: %w", err)
@@ -164,11 +172,6 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		return "", fmt.Errorf("invalid blog repositoryID")
 	}
 
-	if err := UpdateRepositoryOnDisk(
-		b.client, b.store, blog.GhRepositoryID.Int64, logger,
-	); err != nil {
-		return "", fmt.Errorf("error pulling latest changes on live branch: %w", err)
-	}
 	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
@@ -201,30 +204,15 @@ func buildRepositoryPath(repoFullName string) string {
 }
 
 func UpdateRepositoryOnDisk(
-	c *httpclient.Client, s *model.Store, ghRepositoryId int64,
+	c *httpclient.Client, s *model.Store, ghRepoId int64, branch string,
 	logger *log.Logger,
 ) error {
-	logger.Printf("updating repository `%d' on disk...\n", ghRepositoryId)
+	logger.Printf("updating repository `%d' on disk...\n", ghRepoId)
 
 	/* get repository */
-	repo, err := s.GetRepositoryByGhRepositoryID(context.TODO(), ghRepositoryId)
+	repo, err := s.GetRepositoryByGhRepositoryID(context.TODO(), ghRepoId)
 	if err != nil {
 		return err
-	}
-
-	/* get blog */
-	blog, err := s.GetBlogByGhRepositoryID(context.TODO(), sql.NullInt64{
-		Valid: true,
-		Int64: ghRepositoryId,
-	})
-	if err != nil {
-		if err != sql.ErrNoRows {
-			return fmt.Errorf("error getting blog for repository event: %w", err)
-		}
-		/* XXX: can happen if user pushes to repo after installing
-		* application without having created an associated blog*/
-		logger.Printf("No associated blog with repositoryID `%d'\n", ghRepositoryId)
-		return nil
 	}
 
 	accessToken, err := authn.GetInstallationAccessToken(
@@ -234,17 +222,13 @@ func UpdateRepositoryOnDisk(
 		config.Config.Github.PrivateKeyPath,
 	)
 	if err != nil {
-		return fmt.Errorf("error getting installation access token: %w", err)
-	}
-
-	if !blog.LiveBranch.Valid {
-		return fmt.Errorf("no live branch configured for blog `%d'", blog.ID)
+		return fmt.Errorf("access token error: %w", err)
 	}
 
 	if err := cloneRepo(
 		buildRepositoryPath(repo.FullName),
 		repo.Url,
-		blog.LiveBranch.String,
+		branch,
 		accessToken,
 	); err != nil {
 		return fmt.Errorf("clone error: %w", err)

@@ -1,6 +1,7 @@
 package subdomain
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -19,10 +20,10 @@ func NewSubdomainService(s *model.Store) *SubdomainService {
 func (ss *SubdomainService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
-		logger.Println("running subdomain middleware...")
-		logger.Println("received request for: ", r.URL)
 		if err := ss.middleware(w, r); err != nil {
-			logger.Println("no subdomain found:", err)
+			if !errors.Is(err, errNoSubdomain) {
+				logger.Println("subdomain error:", err)
+			}
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -52,7 +53,6 @@ func (ss *SubdomainService) middleware(
 	if err != nil {
 		return fmt.Errorf("cannot get filepath: %w", err)
 	}
-	logging.Logger(r).Println("filepath", filepath)
 	http.ServeFile(w, r, filepath)
 	return nil
 }
