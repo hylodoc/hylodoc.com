@@ -1,6 +1,10 @@
+{{ template "header" . }}
+
 <div class="container">
 	<h1>Edit subscription</h1>
 	<h2>Remove from email list</h2>
 	<p>{{ .Data.Email }} will no longer receive emails</p>
 	<a class="button" href="{{ .Data.RemoveSubscriberUrl }}">Remove Subscriber</a>
 </div>
+
+{{ template "footer" . }}

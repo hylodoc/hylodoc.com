@@ -20,6 +20,7 @@ import (
 	"github.com/xr0-org/progstack/internal/email/emailaddr"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -226,6 +227,13 @@ func (b *BlogService) EditSubscriber() http.HandlerFunc {
 
 		email := r.URL.Query().Get("email")
 
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+		if !ok {
+			logger.Println("No auth session")
+			http.Error(w, "", http.StatusNotFound)
+			return
+		}
+
 		blogID := mux.Vars(r)["blogID"]
 		intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 		if err != nil {
@@ -239,9 +247,15 @@ func (b *BlogService) EditSubscriber() http.HandlerFunc {
 		util.ExecTemplate(w, []string{"subscriber_edit.html"},
 			util.PageInfo{
 				Data: struct {
+					Title    string
+					UserInfo *session.UserInfo
+
 					Email               string
 					RemoveSubscriberUrl string
 				}{
+					Title:    "Edit Subscriber",
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
+
 					Email:               email,
 					RemoveSubscriberUrl: buildRemoveSubscriberUrl(int32(intBlogID), email),
 				},

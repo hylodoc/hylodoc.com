@@ -134,6 +134,7 @@ func Serve() {
 	blogR.HandleFunc("/subscriber/metrics", blogService.SubscriberMetrics())
 	blogR.HandleFunc("/subscriber/export", blogService.ExportSubscribers())
 	blogR.HandleFunc("/subscriber/edit", blogService.EditSubscriber())
+	blogR.HandleFunc("/subscriber/delete", blogService.DeleteSubscriber())
 
 	/* serve static content */
 	r.PathPrefix("/static/css").Handler(http.StripPrefix("/static/css", http.FileServer(http.Dir("./web/static/css"))))
