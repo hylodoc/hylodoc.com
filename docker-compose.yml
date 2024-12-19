@@ -5,11 +5,13 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - '7999:7999'
+      - '80:80'
+      - '443:443'
     volumes:
+      - './certs:/app/certs'
+      - './folders:/app/folders'
       - './repositories:/app/repositories'
       - './websites:/app/websites'
-      - './folders:/app/folders'
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,8 +59,10 @@ services:
       - monitor-network
 
 volumes:
-  repositories:
+  certs:
   folders:
+  repositories:
+  websites:
 
 networks:
   monitor-network:

@@ -24,10 +24,13 @@ import (
 	"github.com/xr0-org/progstack/internal/subdomain"
 	"github.com/xr0-org/progstack/internal/user"
 	"github.com/xr0-org/progstack/internal/util"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 const (
-	listeningPort = 7999 /* XXX: make configurable */
+	/* TODO: make configurable */
+	httpPort      = 80
+	httpsPort     = 443
 	clientTimeout = 30 * time.Second
 )
 
@@ -144,9 +147,71 @@ func Serve() {
 	/* register subrouter */
 	r.PathPrefix("/").Handler(authR)
 
-	/* start server on listening port */
-	log.Printf("listening at http://localhost:%d...\n", listeningPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", listeningPort), r))
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc(
+			"/",
+			func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "")
+				http.Redirect(
+					w, r,
+					fmt.Sprintf(
+						"https://%s%s",
+						r.Host,
+						r.URL.String(),
+					),
+					http.StatusPermanentRedirect,
+				)
+			},
+		)
+		log.Printf(
+			"listening (to redirect) on http://localhost:%d...\n",
+			httpPort,
+		)
+		if err := http.ListenAndServe(
+			fmt.Sprintf(":%d", httpPort), mux,
+		); err != nil {
+			log.Fatal("fatal http error", err)
+		}
+	}()
+
+	log.Printf("listening at http://localhost:%d...\n", httpsPort)
+	m := &autocert.Manager{
+		Cache:  autocert.DirCache(config.Config.Progstack.CertsPath),
+		Prompt: autocert.AcceptTOS,
+		Email:  "tls@hylo.lbnz.dev",
+		HostPolicy: func(ctx context.Context, host string) error {
+			if err := checkDomain(ctx, host, store); err != nil {
+				log.Printf(
+					"check domain error %q: %s\n", host, err,
+				)
+				return err
+			}
+			return nil
+		},
+	}
+	s := &http.Server{
+		Addr:      fmt.Sprintf(":%d", httpsPort),
+		TLSConfig: m.TLSConfig(),
+		Handler:   r,
+	}
+	if err := s.ListenAndServeTLS("", ""); err != nil {
+		log.Fatal("fatal https error", err)
+	}
+}
+
+func checkDomain(ctx context.Context, host string, s *model.Store) error {
+	if host == config.Config.Progstack.ServiceName {
+		return nil
+	}
+	exists, err := s.DomainExists(ctx, host)
+	if err != nil {
+		return fmt.Errorf("domain exists error: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("no such domain")
+	}
+	return nil
 }
 
 func index(mixpanel *analytics.MixpanelClientWrapper) http.HandlerFunc {
