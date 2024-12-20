@@ -2,15 +2,18 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"text/template"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/analytics"
+	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
@@ -204,12 +207,47 @@ func checkDomain(ctx context.Context, host string, s *model.Store) error {
 	if host == config.Config.Progstack.ServiceName {
 		return nil
 	}
-	exists, err := s.DomainExists(ctx, host)
+
+	/* check for subdomain first because it's the more common case */
+	err := checkSubdomain(ctx, host, s)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, errNoSubdomainFound) {
+		return fmt.Errorf("subdomain exists error: %w", err)
+	}
+	assert.Assert(errors.Is(err, errNoSubdomainFound))
+
+	domainexists, err := s.DomainExists(ctx, host)
 	if err != nil {
 		return fmt.Errorf("domain exists error: %w", err)
 	}
+	if domainexists {
+		return nil
+	}
+
+	return fmt.Errorf("no such domain or subdomain")
+}
+
+var errNoSubdomainFound = errors.New("no such subdomain")
+
+func checkSubdomain(ctx context.Context, host string, s *model.Store) error {
+	/* `.hylodoc.com' (dot followed by service name) must follow host */
+	subdomain, found := strings.CutSuffix(
+		host,
+		fmt.Sprintf(".%s", config.Config.Progstack.ServiceName),
+	)
+	if !found {
+		return fmt.Errorf(
+			"service name not found: %w", errNoSubdomainFound,
+		)
+	}
+	exists, err := s.SubdomainExists(ctx, subdomain)
+	if err != nil {
+		return fmt.Errorf("query error: %w", err)
+	}
 	if !exists {
-		return fmt.Errorf("no such domain")
+		return fmt.Errorf("not in db: %w", errNoSubdomainFound)
 	}
 	return nil
 }
