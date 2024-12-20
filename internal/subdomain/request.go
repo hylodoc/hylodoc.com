@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/xr0-org/progstack/internal/blog"
+	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
@@ -36,7 +37,11 @@ func parseRequest(r *http.Request, s *model.Store) (*request, error) {
 	if len(parts) < 1 {
 		return nil, fmt.Errorf("dodge regex wrong part count")
 	}
-	b, err := s.GetBlogBySubdomain(context.TODO(), parts[0])
+	sub, err := dns.ParseSubdomain(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("subdomain: %w", err)
+	}
+	b, err := s.GetBlogBySubdomain(context.TODO(), sub)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("%q: %w", parts, errNoSubdomain)

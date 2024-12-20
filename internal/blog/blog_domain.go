@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/gorilla/mux"
+	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/util"
@@ -68,7 +69,18 @@ func (b *BlogService) subdomainCheck(w http.ResponseWriter, r *http.Request) err
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return err
 	}
-	exists, err := b.store.SubdomainExists(context.TODO(), req.Subdomain)
+	sub, err := dns.ParseSubdomain(req.Subdomain)
+	if err != nil {
+		var parseErr dns.ParseUserError
+		if errors.As(err, &parseErr) {
+			return util.CreateCustomError(
+				parseErr.Error(),
+				http.StatusBadRequest,
+			)
+		}
+		return fmt.Errorf("subdomain: %w", err)
+	}
+	exists, err := b.store.SubdomainExists(context.TODO(), sub)
 	if err != nil {
 		return fmt.Errorf("error checking for subdomain in db: %w", err)
 	}
@@ -171,14 +183,22 @@ func (b *BlogService) subdomainSubmit(w http.ResponseWriter, r *http.Request) er
 		return fmt.Errorf("cannot decode request: %w", err)
 	}
 
-	if err := validateSubdomain(req.Subdomain); err != nil {
-		return fmt.Errorf("cannot validate subdomain: %w", err)
+	sub, err := dns.ParseSubdomain(req.Subdomain)
+	if err != nil {
+		var parseErr dns.ParseUserError
+		if errors.As(err, &parseErr) {
+			return util.CreateCustomError(
+				parseErr.Error(),
+				http.StatusBadRequest,
+			)
+		}
+		return fmt.Errorf("subdomain: %w", err)
 	}
 
 	if err := b.store.UpdateSubdomainTx(
 		context.TODO(), model.UpdateSubdomainTxParams{
 			BlogID:    int32(blogID),
-			Subdomain: req.Subdomain,
+			Subdomain: sub,
 		},
 	); err != nil {
 		return err

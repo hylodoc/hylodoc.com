@@ -18,6 +18,7 @@ import (
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/installation"
 	"github.com/xr0-org/progstack/internal/logging"
@@ -242,7 +243,12 @@ func checkSubdomain(ctx context.Context, host string, s *model.Store) error {
 			"service name not found: %w", errNoSubdomainFound,
 		)
 	}
-	exists, err := s.SubdomainExists(ctx, subdomain)
+	sub, err := dns.ParseSubdomain(subdomain)
+	if err != nil {
+		return fmt.Errorf("subdomain: %w", err)
+	}
+
+	exists, err := s.SubdomainExists(ctx, sub)
 	if err != nil {
 		return fmt.Errorf("query error: %w", err)
 	}

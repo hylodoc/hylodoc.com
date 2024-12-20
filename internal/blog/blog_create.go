@@ -19,6 +19,7 @@ import (
 	"github.com/xr0-org/progstack-ssg/pkg/ssg"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
@@ -124,6 +125,11 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		return "", fmt.Errorf("cannot get hash: %w", err)
 	}
 
+	sub, err := dns.ParseSubdomain(req.Subdomain)
+	if err != nil {
+		return "", fmt.Errorf("subdomain: %w", err)
+	}
+
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
 		UserID: sesh.GetUserID(),
 		GhRepositoryID: sql.NullInt64{
@@ -136,7 +142,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		},
 		RepositoryPath: repopath,
 		Theme:          theme,
-		Subdomain:      req.Subdomain,
+		Subdomain:      sub,
 		TestBranch: sql.NullString{
 			Valid:  true,
 			String: req.TestBranch,
@@ -175,7 +181,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
-	return buildDomainUrl(blog.Subdomain), nil
+	return buildDomainUrl(blog.Subdomain.String()), nil
 }
 
 func buildRepositoryUrl(fullName string) string {
@@ -299,13 +305,18 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		return "", fmt.Errorf("cannot get hash: %w", err)
 	}
 
+	sub, err := dns.ParseSubdomain(req.subdomain)
+	if err != nil {
+		return "", fmt.Errorf("subdomain: %w", err)
+	}
+
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
 		UserID: sesh.GetUserID(),
 		GhRepositoryID: sql.NullInt64{
 			Valid: false,
 		},
 		RepositoryPath: dst,
-		Subdomain:      req.subdomain,
+		Subdomain:      sub,
 		Theme:          req.theme,
 		BlogType:       model.BlogTypeFolder,
 		LiveHash:       h,
@@ -331,7 +342,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
-	return buildDomainUrl(blog.Subdomain), nil
+	return buildDomainUrl(blog.Subdomain.String()), nil
 }
 
 type createFolderBlogRequest struct {

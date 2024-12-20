@@ -102,9 +102,9 @@ func getBlogInfo(s *model.Store, blogID int32) (BlogInfo, error) {
 	}
 	return BlogInfo{
 		ID:                   blog.ID,
-		Domain:               buildDomain(blog.Subdomain),
-		Subdomain:            blog.Subdomain,
-		DomainUrl:            buildDomainUrl(blog.Subdomain),
+		Domain:               buildDomain(blog.Subdomain.String()),
+		Subdomain:            blog.Subdomain.String(),
+		DomainUrl:            buildDomainUrl(blog.Subdomain.String()),
 		RepositoryUrl:        ghurl(blog),
 		SubscriberMetricsUrl: buildSubscriberMetricsUrl(blog.ID),
 		MetricsUrl:           buildMetricsUrl(blog.ID),

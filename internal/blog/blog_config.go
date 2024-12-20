@@ -511,7 +511,7 @@ func setBlogToLive(b *model.Blog, s *model.Store, logger *log.Logger) (*statusCh
 		return nil, fmt.Errorf("cannot generate: %w", err)
 	}
 	return &statusChangeResponse{
-		Domain: b.Subdomain,
+		Domain: b.Subdomain.String(),
 		IsLive: true,
 	}, nil
 }
@@ -521,7 +521,7 @@ func setBlogToOffline(b *model.Blog, s *model.Store) (*statusChangeResponse, err
 		return nil, fmt.Errorf("cannot set offline: %w", err)
 	}
 	return &statusChangeResponse{
-		Domain: b.Subdomain,
+		Domain: b.Subdomain.String(),
 		IsLive: false,
 	}, nil
 }

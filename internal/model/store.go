@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -124,7 +125,7 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 
 type UpdateSubdomainTxParams struct {
 	BlogID    int32
-	Subdomain string
+	Subdomain dns.Subdomain
 }
 
 func (s *Store) UpdateSubdomainTx(ctx context.Context, arg UpdateSubdomainTxParams) error {

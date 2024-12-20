@@ -10,3 +10,8 @@ sql:
         output_db_file_name: "db.gen.go"
         output_models_file_name: "model.gen.go"
         output_files_suffix: ".gen"
+        overrides:
+          - column: blogs.subdomain
+            go_type:
+              import: "github.com/xr0-org/progstack/internal/dns"
+              type: "Subdomain"
