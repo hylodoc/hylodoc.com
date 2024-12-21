@@ -1,4 +1,4 @@
-package subdomain
+package usersite
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -17,21 +16,19 @@ import (
 	"github.com/xr0-org/progstack/internal/model"
 )
 
-type request struct {
-	_b   model.Blog
-	_url url.URL
+type Site struct {
+	_b model.Blog
 }
 
-var errNoSubdomain = errors.New("no such subdomain")
+var ErrIsService = errors.New("host is service name")
+var ErrUnknownSubdomain = errors.New("unknown subdomain")
 
-func parseRequest(r *http.Request, s *model.Store) (*request, error) {
+func GetSite(host string, s *model.Store) (*Site, error) {
 	/* XXX: bit dodge but with local development we have subdomains like
 	* http://<subdomain>.localhost:7999 which should also route
 	* correctly so we split on both "." and ":" */
 	parts := regexp.MustCompile(`[.:]`).Split(
-		strings.ReplaceAll(
-			gethostorxforwardedhost(r), "127.0.0.1", "localhost",
-		),
+		strings.ReplaceAll(host, "127.0.0.1", "localhost"),
 		-1,
 	)
 	if len(parts) < 1 {
@@ -44,51 +41,44 @@ func parseRequest(r *http.Request, s *model.Store) (*request, error) {
 	b, err := s.GetBlogBySubdomain(context.TODO(), sub)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("%q: %w", parts, errNoSubdomain)
+			return nil, fmt.Errorf("no such site")
 		}
 		return nil, fmt.Errorf("blog get error: %w", err)
 	}
 	if !b.IsLive {
 		return nil, fmt.Errorf("blog is offline")
 	}
-	return &request{b, *r.URL}, nil
+	return &Site{b}, nil
 }
 
-func gethostorxforwardedhost(r *http.Request) string {
-	if host := r.Header.Get("X-Forwarded-Host"); host != "" {
-		return host
-	}
-	return r.Host // Fallback to the Host header
-}
-
-func (r *request) recordsitevisit(s *model.Store) error {
-	return s.RecordBlogVisit(
+func (site *Site) RecordVisit(path string, store *model.Store) error {
+	return store.RecordBlogVisit(
 		context.TODO(),
-		model.RecordBlogVisitParams{Url: r._url.Path, Blog: r._b.ID},
+		model.RecordBlogVisitParams{Url: path, Blog: site._b.ID},
 	)
 }
 
-func (r *request) getfilepath(s *model.Store) (string, error) {
-	gen, err := blog.GetFreshGeneration(r._b.ID, s)
+func (site *Site) GetBinding(path string, store *model.Store) (string, error) {
+	gen, err := blog.GetFreshGeneration(site._b.ID, store)
 	if err != nil {
-		return "", fmt.Errorf("cannot get generation: %w", err)
+		return "", fmt.Errorf("generation: %w", err)
 	}
-	path, err := s.GetBinding(
+	binding, err := store.GetBinding(
 		context.TODO(),
-		model.GetBindingParams{Generation: gen, Url: r._url.Path},
+		model.GetBindingParams{Generation: gen, Url: path},
 	)
 	if err != nil {
-		return "", fmt.Errorf("cannot get binding: %w", err)
+		return "", fmt.Errorf("query: %w", err)
 	}
-	return path, nil
+	return binding, nil
 }
 
-func (r *request) recordemailclick(s *model.Store) bool {
-	values := r._url.Query()
+func (site *Site) RecordEmailClick(url *url.URL, store *model.Store) bool {
+	values := url.Query()
 	if !values.Has("subscriber") {
 		return false
 	}
-	if err := recordemailclick(values.Get("subscriber"), s); err != nil {
+	if err := recordemailclick(values.Get("subscriber"), store); err != nil {
 		/* TODO: emit metric */
 		log.Println("emit metric:", err)
 	}
@@ -101,10 +91,4 @@ func recordemailclick(rawtoken string, s *model.Store) error {
 		return fmt.Errorf("cannot parse token: %w", err)
 	}
 	return s.SetSubscriberEmailClicked(context.TODO(), token)
-}
-
-func (r *request) redirecturl() string {
-	u := r._url
-	u.RawQuery = ""
-	return u.String()
 }

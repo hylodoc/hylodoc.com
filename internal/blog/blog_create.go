@@ -156,7 +156,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		EmailMode: model.EmailModePlaintext,
 		FromAddress: fmt.Sprintf(
 			"%s@%s",
-			req.Subdomain, config.Config.Progstack.EmailDomain,
+			sub, config.Config.Progstack.EmailDomain,
 		),
 	})
 	if err != nil {
@@ -322,7 +322,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		LiveHash:       h,
 		FromAddress: fmt.Sprintf(
 			"%s@%s",
-			req.subdomain, config.Config.Progstack.EmailDomain,
+			sub, config.Config.Progstack.EmailDomain,
 		),
 	})
 	if err != nil {

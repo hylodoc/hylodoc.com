@@ -1,31 +1,17 @@
 package dns
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"strings"
 	"unicode"
 )
 
-type Subdomain interface {
-	subdomain() string
+type Subdomain struct{ string }
 
-	sql.Scanner
-	driver.Valuer
-	fmt.Stringer
-}
+func (s *Subdomain) String() string { return s.string }
 
-type subdomain string
-
-func (s *subdomain) subdomain() string { return string(*s) }
-func (s *subdomain) String() string    { return s.subdomain() }
-
-type ParseUserError string
-
-func (err ParseUserError) Error() string { return string(err) }
-
-func ParseSubdomain(raw string) (Subdomain, error) {
+func ParseSubdomain(raw string) (*Subdomain, error) {
 	trimlw := strings.ToLower(strings.TrimSpace(raw))
 	if len(trimlw) < 1 || len(trimlw) > 63 {
 		return nil, ParseUserError(
@@ -48,19 +34,22 @@ func ParseSubdomain(raw string) (Subdomain, error) {
 			)
 		}
 	}
-	sub := subdomain(trimlw)
-	return &sub, nil
+	return &Subdomain{trimlw}, nil
 }
 
-func (s *subdomain) Scan(src any) error {
+type ParseUserError string
+
+func (err ParseUserError) Error() string { return string(err) }
+
+func (s *Subdomain) Scan(src any) error {
 	str, ok := src.(string)
 	if !ok {
 		return fmt.Errorf("need string")
 	}
-	*s = subdomain(str)
+	*s = Subdomain{str}
 	return nil
 }
 
-func (s *subdomain) Value() (driver.Value, error) {
-	return s.subdomain(), nil
+func (s *Subdomain) Value() (driver.Value, error) {
+	return s.string, nil
 }

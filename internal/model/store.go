@@ -125,7 +125,7 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 
 type UpdateSubdomainTxParams struct {
 	BlogID    int32
-	Subdomain dns.Subdomain
+	Subdomain *dns.Subdomain
 }
 
 func (s *Store) UpdateSubdomainTx(ctx context.Context, arg UpdateSubdomainTxParams) error {

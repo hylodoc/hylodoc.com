@@ -24,8 +24,8 @@ import (
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/metrics"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/routing"
 	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/subdomain"
 	"github.com/xr0-org/progstack/internal/user"
 	"github.com/xr0-org/progstack/internal/util"
 	"golang.org/x/crypto/acme/autocert"
@@ -50,21 +50,30 @@ func Serve() {
 	if err != nil {
 		log.Fatal("could not connect to db: %w", err)
 	}
-	httpClient := httpclient.NewHttpClient(clientTimeout)
-	mixpanelClient := analytics.NewMixpanelClientWrapper(
-		config.Config.Mixpanel.Token,
-	)
 	store := model.NewStore(db)
+
 	bootid, err := store.Boot(context.TODO())
 	if err != nil {
 		log.Fatal("cannot boot: %w", err)
 	}
 	log.Println("bootid", bootid)
-	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
+
+	r := mux.NewRouter()
+
+	/* middleware */
+	r.Use(session.NewSessionService(store).Middleware)
+	r.Use(logging.Middleware)
+	r.Use(metrics.Middleware)
+	r.Use(routing.NewRoutingService(store).Middleware)
+
+	/* public routes */
 
 	/* init services */
-	sessionService := session.NewSessionService(store)
-	subdomainService := subdomain.NewSubdomainService(store)
+	httpClient := httpclient.NewHttpClient(clientTimeout)
+	mixpanelClient := analytics.NewMixpanelClientWrapper(
+		config.Config.Mixpanel.Token,
+	)
+	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
 	authNService := authn.NewAuthNService(
 		httpClient, resendClient, store, mixpanelClient,
 	)
@@ -79,16 +88,6 @@ func Serve() {
 
 	/* init metrics */
 	metrics.Initialize()
-
-	r := mux.NewRouter()
-
-	/* middeware */
-	r.Use(sessionService.Middleware)
-	r.Use(logging.Middleware)
-	r.Use(subdomainService.Middleware)
-	r.Use(metrics.Middleware)
-
-	/* public routes */
 	r.Handle("/metrics", metrics.Handler())
 
 	r.HandleFunc("/", index(mixpanelClient))
@@ -185,12 +184,6 @@ func Serve() {
 		Prompt: autocert.AcceptTOS,
 		Email:  "tls@hylo.lbnz.dev",
 		HostPolicy: func(ctx context.Context, host string) error {
-			if err := checkDomain(ctx, host, store); err != nil {
-				log.Printf(
-					"check domain error %q: %s\n", host, err,
-				)
-				return err
-			}
 			return nil
 		},
 	}
@@ -247,7 +240,6 @@ func checkSubdomain(ctx context.Context, host string, s *model.Store) error {
 	if err != nil {
 		return fmt.Errorf("subdomain: %w", err)
 	}
-
 	exists, err := s.SubdomainExists(ctx, sub)
 	if err != nil {
 		return fmt.Errorf("query error: %w", err)
