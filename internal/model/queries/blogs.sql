@@ -69,6 +69,11 @@ SELECT *
 FROM blogs
 WHERE subdomain = $1;
 
+-- name: GetBlogByDomain :one
+SELECT *
+FROM blogs
+WHERE domain = $1::VARCHAR;
+
 -- name: ListBlogIDsByUserID :many
 SELECT id
 FROM blogs b

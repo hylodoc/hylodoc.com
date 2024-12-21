@@ -3,7 +3,7 @@
 <table>
 	<thead>
 		<tr>
-			<th>Domain</th>
+			<th>Site</th>
 			<th>Repository Link</th>
 			<th>Subscribers</th>
 			<th>Metrics</th>
@@ -18,7 +18,7 @@
 			<tr>
 				<td>
 					{{ if .IsLive }}
-						<a href="{{ .DomainUrl }}" target="_blank">{{ .Domain }}</a>
+						<a href="{{ .Url }}" target="_blank">{{ .Name }}</a>
 					{{ else }}
 						{{ .Domain }}
 					{{ end }}

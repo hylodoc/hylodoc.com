@@ -2,23 +2,19 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"text/template"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/analytics"
-	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/installation"
 	"github.com/xr0-org/progstack/internal/logging"
@@ -129,6 +125,8 @@ func Serve() {
 	blogR.Use(blogService.Middleware)
 	blogR.HandleFunc("/config", blogService.Config())
 	blogR.HandleFunc("/set-subdomain", blogService.SubdomainSubmit())
+	blogR.HandleFunc("/config-domain", blogService.ConfigDomain())
+	blogR.HandleFunc("/set-domain", blogService.DomainSubmit())
 	blogR.HandleFunc("/set-theme", blogService.ThemeSubmit())
 	blogR.HandleFunc("/set-test-branch", blogService.TestBranchSubmit())
 	blogR.HandleFunc("/set-live-branch", blogService.LiveBranchSubmit())
@@ -195,59 +193,6 @@ func Serve() {
 	if err := s.ListenAndServeTLS("", ""); err != nil {
 		log.Fatal("fatal https error", err)
 	}
-}
-
-func checkDomain(ctx context.Context, host string, s *model.Store) error {
-	if host == config.Config.Progstack.ServiceName {
-		return nil
-	}
-
-	/* check for subdomain first because it's the more common case */
-	err := checkSubdomain(ctx, host, s)
-	if err == nil {
-		return nil
-	}
-	if !errors.Is(err, errNoSubdomainFound) {
-		return fmt.Errorf("subdomain exists error: %w", err)
-	}
-	assert.Assert(errors.Is(err, errNoSubdomainFound))
-
-	domainexists, err := s.DomainExists(ctx, host)
-	if err != nil {
-		return fmt.Errorf("domain exists error: %w", err)
-	}
-	if domainexists {
-		return nil
-	}
-
-	return fmt.Errorf("no such domain or subdomain")
-}
-
-var errNoSubdomainFound = errors.New("no such subdomain")
-
-func checkSubdomain(ctx context.Context, host string, s *model.Store) error {
-	/* `.hylodoc.com' (dot followed by service name) must follow host */
-	subdomain, found := strings.CutSuffix(
-		host,
-		fmt.Sprintf(".%s", config.Config.Progstack.ServiceName),
-	)
-	if !found {
-		return fmt.Errorf(
-			"service name not found: %w", errNoSubdomainFound,
-		)
-	}
-	sub, err := dns.ParseSubdomain(subdomain)
-	if err != nil {
-		return fmt.Errorf("subdomain: %w", err)
-	}
-	exists, err := s.SubdomainExists(ctx, sub)
-	if err != nil {
-		return fmt.Errorf("query error: %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("not in db: %w", errNoSubdomainFound)
-	}
-	return nil
 }
 
 func index(mixpanel *analytics.MixpanelClientWrapper) http.HandlerFunc {

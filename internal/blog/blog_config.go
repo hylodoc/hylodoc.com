@@ -496,7 +496,7 @@ func validateStatusChange(blogID int32, islive bool, s *model.Store) error {
 	}
 	if islive == blogIsLive {
 		return util.CreateCustomError(
-			fmt.Sprintf("cannot update to same state"),
+			"cannot update to same state",
 			http.StatusBadRequest,
 		)
 	}
@@ -524,4 +524,51 @@ func setBlogToOffline(b *model.Blog, s *model.Store) (*statusChangeResponse, err
 		Domain: b.Subdomain.String(),
 		IsLive: false,
 	}, nil
+}
+
+func (b *BlogService) ConfigDomain() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.Logger(r)
+		logger.Println("ConfigDomain handler...")
+
+		b.mixpanel.Track("ConfigDomain", r)
+
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+		if !ok {
+			http.Error(w, "User not found", http.StatusUnauthorized)
+			return
+		}
+		blogID := mux.Vars(r)["blogID"]
+		intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+		if err != nil {
+			logging.Logger(r).Printf("error converting string path var to blogID: %v\n", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+
+		blogInfo, err := getBlogInfo(b.store, int32(intBlogID))
+		if err != nil {
+			logging.Logger(r).Printf("error getting blog for user `%d': %v\n", sesh.GetUserID(), err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+
+		util.ExecTemplate(w, []string{"blog_custom_domain.html"},
+			util.PageInfo{
+				Data: struct {
+					Title    string
+					UserInfo *session.UserInfo
+					ID       int32
+					Blog     BlogInfo
+				}{
+					Title:    "Custom domain configuration",
+					UserInfo: session.ConvertSessionToUserInfo(sesh),
+					ID:       int32(intBlogID),
+					Blog:     blogInfo,
+				},
+			},
+			template.FuncMap{},
+			logger,
+		)
+	}
 }

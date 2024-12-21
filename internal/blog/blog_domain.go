@@ -2,14 +2,17 @@ package blog
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"unicode"
 
 	"github.com/gorilla/mux"
+	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
@@ -204,4 +207,82 @@ func (b *BlogService) subdomainSubmit(w http.ResponseWriter, r *http.Request) er
 		return err
 	}
 	return nil
+}
+
+func (b *BlogService) DomainSubmit() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.Logger(r)
+		logger.Println("DomainSubmit handler...")
+
+		b.mixpanel.Track("DomainSubmit", r)
+
+		if err := b.domainSubmit(w, r); err != nil {
+			logger.Println("Error submiting domain")
+			var customErr *util.CustomError
+			if errors.As(err, &customErr) {
+				logger.Printf("Custom error: %v\n", customErr)
+				/* user error */
+				w.WriteHeader(customErr.Code)
+				response := map[string]string{"message": customErr.Error()}
+				json.NewEncoder(w).Encode(response)
+				return
+			} else {
+				logger.Printf("Internal Server Error: %v\n", err)
+				/* generic error */
+				w.WriteHeader(http.StatusInternalServerError)
+				response := map[string]string{"message": "An unexpected error occurred"}
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
+	}
+}
+
+func (b *BlogService) domainSubmit(w http.ResponseWriter, r *http.Request) error {
+	blogID, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
+	if err != nil {
+		return fmt.Errorf("cannot parse id: %w", err)
+	}
+
+	if r.Method != http.MethodPost {
+		return util.CreateCustomError(
+			"Invalid request method", http.StatusMethodNotAllowed,
+		)
+	}
+	if err := r.ParseForm(); err != nil {
+		return util.CreateCustomError(
+			"Error parsing form", http.StatusBadRequest,
+		)
+	}
+
+	if err := b.store.UpdateDomainByID(
+		context.TODO(), model.UpdateDomainByIDParams{
+			ID: int32(blogID),
+			Domain: wrapNullString(
+				strings.TrimSpace(
+					strings.ToLower(r.FormValue("domain")),
+				),
+			),
+		},
+	); err != nil {
+		return err
+	}
+	http.Redirect(
+		w, r,
+		fmt.Sprintf(
+			"%s://%s/user/blogs/%d/config",
+			config.Config.Progstack.Protocol,
+			config.Config.Progstack.ServiceName,
+			blogID,
+		),
+		http.StatusTemporaryRedirect,
+	)
+	return nil
+}
+
+func wrapNullString(domain string) sql.NullString {
+	if domain == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{Valid: true, String: domain}
 }

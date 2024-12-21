@@ -11,6 +11,8 @@ progstack:
   certs_path: "./certs"
   accounts_email: "accounts@lbnz.dev"	# billing query email
   email_domain: "mails.lbnz.dev"
+  custom_domain_cname: "custom-domain-cname-target.hylodoc.com"
+  custom_domain_ip: "34.218.85.117"
 
 # Progstack ssg config
 progstack_ssg:

@@ -29,7 +29,17 @@ func (s *RoutingService) Middleware(next http.Handler) http.Handler {
 				logger.Println("unknown host error:", err)
 				/* TODO: unknown host pages */
 				if errors.Is(err, usersite.ErrUnknownSubdomain) {
+					http.Error(
+						w,
+						"unclaimed subdomain",
+						http.StatusNotFound,
+					)
 				} else {
+					http.Error(
+						w,
+						"unknown domain",
+						http.StatusNotFound,
+					)
 				}
 			}
 		}

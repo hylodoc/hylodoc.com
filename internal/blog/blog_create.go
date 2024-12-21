@@ -181,7 +181,7 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
-	return buildDomainUrl(blog.Subdomain.String()), nil
+	return buildUrl(blog.Subdomain.String()), nil
 }
 
 func buildRepositoryUrl(fullName string) string {
@@ -342,7 +342,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
 		return "", fmt.Errorf("error setting blog to live: %w", err)
 	}
-	return buildDomainUrl(blog.Subdomain.String()), nil
+	return buildUrl(blog.Subdomain.String()), nil
 }
 
 type createFolderBlogRequest struct {

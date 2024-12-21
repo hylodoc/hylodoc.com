@@ -5,14 +5,14 @@
 <!-- Basic info-->
 <section>
 	<div class="container">
-		<h3>Blog Configuration</h3>
+		<h2>Configure {{ .Data.Blog.Name }}</h2>
 	</div>
 </section>
 
 <!-- Configure domains and subdomain -->
 <section>
 	<div class="container">
-		<h4>Domain</h4>
+		<h3>Subdomain</h3>
 		<!-- need these as templates so that multiple blogs can be setup at once -->
 		<form id="subdomainForm" onsubmit="return false;">
 			<label for="subdomainInput">Configure subdomain</label>
@@ -32,6 +32,15 @@
 			</div>
 			<div id="availabilityMessage" class="availability-message"></div>
 		</form>
+
+		<h3>Custom Domain</h3>
+		<p>
+			{{ if .Data.Blog.Domain }}
+			<b>{{.Data.Blog.Domain}}</b>.
+			<br>
+			{{ end }}
+			<a href="{{ .Data.Blog.ConfigureCustomDomainUrl }}">Click here</a> to configure.
+		</p>
 	</div>
 </section>
 
@@ -39,7 +48,7 @@
 {{ if .Data.Blog.IsRepository }}
 <section>
 	<div class="container">
-		<h4>Git</h4>
+		<h3>Git</h3>
 
 		<!-- Submit git branch for test builds -->
 		<form id="test-branch-form" onsubmit="return false;">
@@ -103,7 +112,7 @@
 <!-- Change theme -->
 <section>
 	<div class="container">
-		<h4>Theme</h4>
+		<h3>Theme</h3>
 
 		<form id="theme-form" onsubmit="return false">
 			<label for="themesDropdown">Change theme</label>
@@ -126,7 +135,7 @@
 <!-- Toggle site between live/offline -->
 <section>
 	<div class="container">
-		<h4>Status</h4>
+		<h3>Status</h3>
 		<form id="status-form">
 			<label for="statusInput">Set status</label>
 			<div class="row">

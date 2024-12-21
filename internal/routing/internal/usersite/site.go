@@ -2,64 +2,87 @@ package usersite
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/blog"
+	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
 type Site struct {
-	_b model.Blog
+	blogID int32
 }
 
 var ErrIsService = errors.New("host is service name")
 var ErrUnknownSubdomain = errors.New("unknown subdomain")
 
 func GetSite(host string, s *model.Store) (*Site, error) {
-	/* XXX: bit dodge but with local development we have subdomains like
-	* http://<subdomain>.localhost:7999 which should also route
-	* correctly so we split on both "." and ":" */
-	parts := regexp.MustCompile(`[.:]`).Split(
-		strings.ReplaceAll(host, "127.0.0.1", "localhost"),
-		-1,
+	if host == config.Config.Progstack.ServiceName {
+		return nil, ErrIsService
+	}
+	blog, err := getBlog(host, s)
+	if err != nil {
+		return nil, fmt.Errorf("get blog: %w", err)
+	}
+	return &Site{blog}, nil
+}
+
+func getBlog(host string, s *model.Store) (int32, error) {
+	/* check for subdomain first because it's the more common case */
+	blogID, err := getBlogBySubdomain(host, s)
+	if err == nil {
+		return blogID, nil
+	}
+	if !errors.Is(err, errNotSubdomainForm) {
+		return -1, fmt.Errorf("subdomain: %w", err)
+	}
+	assert.Assert(errors.Is(err, errNotSubdomainForm))
+
+	blog, err := s.GetBlogByDomain(context.TODO(), host)
+	if err != nil {
+		return -1, fmt.Errorf("domain: %w", err)
+	}
+	return blog.ID, nil
+}
+
+var errNotSubdomainForm = errors.New("not subdomain form")
+
+func getBlogBySubdomain(host string, s *model.Store) (int32, error) {
+	/* `.hylodoc.com' (dot followed by service name) must follow host */
+	subdomain, found := strings.CutSuffix(
+		host,
+		fmt.Sprintf(".%s", config.Config.Progstack.ServiceName),
 	)
-	if len(parts) < 1 {
-		return nil, fmt.Errorf("dodge regex wrong part count")
+	if !found {
+		return -1, errNotSubdomainForm
 	}
-	sub, err := dns.ParseSubdomain(parts[0])
+	sub, err := dns.ParseSubdomain(subdomain)
 	if err != nil {
-		return nil, fmt.Errorf("subdomain: %w", err)
+		return -1, fmt.Errorf("parse: %w", err)
 	}
-	b, err := s.GetBlogBySubdomain(context.TODO(), sub)
+	blog, err := s.GetBlogBySubdomain(context.TODO(), sub)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("no such site")
-		}
-		return nil, fmt.Errorf("blog get error: %w", err)
+		return -1, fmt.Errorf("query error: %w", err)
 	}
-	if !b.IsLive {
-		return nil, fmt.Errorf("blog is offline")
-	}
-	return &Site{b}, nil
+	return blog.ID, nil
 }
 
 func (site *Site) RecordVisit(path string, store *model.Store) error {
 	return store.RecordBlogVisit(
 		context.TODO(),
-		model.RecordBlogVisitParams{Url: path, Blog: site._b.ID},
+		model.RecordBlogVisitParams{Url: path, Blog: site.blogID},
 	)
 }
 
 func (site *Site) GetBinding(path string, store *model.Store) (string, error) {
-	gen, err := blog.GetFreshGeneration(site._b.ID, store)
+	gen, err := blog.GetFreshGeneration(site.blogID, store)
 	if err != nil {
 		return "", fmt.Errorf("generation: %w", err)
 	}
