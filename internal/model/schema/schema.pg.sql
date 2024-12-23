@@ -334,8 +334,11 @@ CREATE TABLE queued_email_headers (
 	PRIMARY KEY (email, name)
 );
 
-CREATE TABLE queued_email_resend_ids (
-	email	INTEGER		NOT NULL	REFERENCES queued_emails,
-	id	VARCHAR(256)	NOT NULL
+CREATE TABLE queued_email_postmark_error (
+	id		SERIAL		PRIMARY KEY,
+	timestamp	TIMESTAMPTZ 	NOT NULL	DEFAULT(now()),
+	email		INTEGER		NOT NULL	REFERENCES queued_emails,
+	code		INTEGER		NOT NULL,
+	message		TEXT		NOT NULL
 );
-CREATE INDEX ON queued_email_resend_ids(email);
+CREATE INDEX ON queued_email_postmark_error(email);

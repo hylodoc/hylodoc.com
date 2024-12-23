@@ -25,6 +25,13 @@ UPDATE queued_emails
 SET fail_count = fail_count+1
 WHERE id = $1;
 
+-- name: InsertQueuedEmailPostmarkError :exec
+INSERT INTO queued_email_postmark_error (
+	email, code, message
+) VALUES (
+	$1, $2, $3
+);
+
 -- name: GetTopNQueuedEmails :many
 SELECT *
 FROM queued_emails

@@ -13,7 +13,13 @@ import (
 )
 
 type Email interface {
-	Send(c *httpclient.Client) error
+	payload() (*payload, error)
+}
+
+type email struct {
+	from, to, subject, body string
+	mode                    model.EmailMode
+	headers                 map[string]string
 }
 
 func NewEmail(
@@ -23,80 +29,37 @@ func NewEmail(
 	return &email{from, to, subject, body, mode, headers}
 }
 
-type email struct {
-	from, to, subject, body string
-	mode                    model.EmailMode
-	headers                 map[string]string
+type payload struct {
+	From          string
+	To            string
+	Subject       string
+	TextBody      string
+	HtmlBody      string
+	Headers       []header
+	MessageStream string
 }
 
-func (e *email) Send(c *httpclient.Client) error {
-	payload, err := e.payload()
-	if err != nil {
-		return fmt.Errorf("payload: %w", err)
-	}
-	req, err := http.NewRequest(
-		"POST",
-		"https://api.postmarkapp.com/email",
-		bytes.NewBuffer(payload),
-	)
-	if err != nil {
-		return fmt.Errorf("new request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(
-		"X-Postmark-Server-Token",
-		config.Config.Email.PostmarkApiKey,
-	)
-	resp, err := c.Do(req)
-	if err != nil {
-		return fmt.Errorf("do: %w", err)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("read: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf(
-			"status: %d, body: %s",
-			resp.StatusCode,
-			string(body),
-		)
-	}
-	return nil
-}
-
-func (e *email) payload() ([]byte, error) {
+func (e *email) payload() (*payload, error) {
 	headers := getheaders(e.headers)
-	type payload struct {
-		From          string
-		To            string
-		Subject       string
-		TextBody      string
-		HtmlBody      string
-		Headers       []header
-		MessageStream string
-	}
 	switch e.mode {
 	case model.EmailModePlaintext:
-		return json.Marshal(payload{
+		return &payload{
 			From:          e.from,
 			To:            e.to,
 			Subject:       e.subject,
 			TextBody:      e.body,
 			Headers:       headers,
 			MessageStream: "outbound", /* XXX */
-		})
+		}, nil
 	case model.EmailModeHtml:
-		return json.Marshal(payload{
+		return &payload{
 			From:          e.from,
 			To:            e.to,
 			Subject:       e.subject,
 			HtmlBody:      e.body,
 			Headers:       headers,
 			MessageStream: "outbound", /* XXX */
-		})
+		}, nil
 	default:
 		return nil, fmt.Errorf("invalid mode %q", e.mode)
 	}
@@ -112,4 +75,92 @@ func getheaders(h map[string]string) []header {
 		headers = append(headers, header{name, value})
 	}
 	return headers
+}
+
+type Response interface {
+	ErrorCode() int
+	Message() string
+}
+
+func SendBatch(emails []Email, c *httpclient.Client) ([]Response, error) {
+	batch, err := batchpayload(emails)
+	if err != nil {
+		return nil, fmt.Errorf("payload: %w", err)
+	}
+	payload, err := json.Marshal(batch)
+	if err != nil {
+		return nil, fmt.Errorf("marshal: %w", err)
+	}
+	req, err := http.NewRequest(
+		"POST",
+		"https://api.postmarkapp.com/email/batch",
+		bytes.NewBuffer(payload),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(
+		"X-Postmark-Server-Token",
+		config.Config.Email.PostmarkApiKey,
+	)
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("do: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		/* TODO: metric */
+		return nil, fmt.Errorf(
+			"status: %d, body: %s",
+			resp.StatusCode,
+			string(body),
+		)
+	}
+	emailresps, err := unmarshalbatchresponse(body)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal batch: %w", err)
+	}
+	return emailresps, nil
+}
+
+func batchpayload(batch []Email) ([]payload, error) {
+	p := make([]payload, len(batch))
+	for i := range batch {
+		payload, err := batch[i].payload()
+		if err != nil {
+			return nil, fmt.Errorf("%v: %w", batch[i], err)
+		}
+		p[i] = *payload
+	}
+	return p, nil
+}
+
+type postmarkresponse struct {
+	ErrorCode_ int    `json:"ErrorCode"`
+	Message_   string `json:"Message"`
+}
+
+func (r *postmarkresponse) ErrorCode() int  { return r.ErrorCode_ }
+func (r *postmarkresponse) Message() string { return r.Message_ }
+
+func unmarshalbatchresponse(body []byte) ([]Response, error) {
+	var resp []postmarkresponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, err
+	}
+	return convert(resp), nil
+}
+
+func convert(pmresps []postmarkresponse) []Response {
+	resps := make([]Response, len(pmresps))
+	for i := range resps {
+		resps[i] = &pmresps[i]
+	}
+	return resps
 }
