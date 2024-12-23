@@ -77,7 +77,7 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 		return fmt.Errorf("cannot create subscriber: %w", err)
 	}
 	sitename := getsitename(&blog)
-	if err := email.NewSynthesiser(
+	if err := email.NewSender(
 		emailaddr.NewAddr(e),
 		emailaddr.NewNamedAddr(
 			sitename,

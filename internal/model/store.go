@@ -22,7 +22,7 @@ func NewStore(db *sql.DB) *Store {
 	}
 }
 
-func (s *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
+func (s *Store) ExecTx(ctx context.Context, fn func(*Queries) error) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -39,7 +39,7 @@ func (s *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 
 func (s *Store) CreateUserTx(ctx context.Context, arg CreateUserParams) (*User, error) {
 	var res User
-	if err := s.execTx(ctx, func(q *Queries) error {
+	if err := s.ExecTx(ctx, func(q *Queries) error {
 		/* create user */
 		u, err := s.CreateUser(ctx, CreateUserParams{
 			Email:    arg.Email,
@@ -58,7 +58,7 @@ func (s *Store) CreateUserTx(ctx context.Context, arg CreateUserParams) (*User, 
 
 func (s *Store) CreateUserWithGithubAccountTx(ctx context.Context, arg CreateGithubAccountParams) (User, error) {
 	var res User
-	if err := s.execTx(ctx, func(q *Queries) error {
+	if err := s.ExecTx(ctx, func(q *Queries) error {
 		/* for ghAccount we can just use github username */
 		u, err := s.CreateUser(ctx, CreateUserParams{
 			Email:    arg.GhEmail,
@@ -99,7 +99,7 @@ type InstallationTxParams struct {
 }
 
 func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxParams) error {
-	return s.execTx(ctx, func(q *Queries) error {
+	return s.ExecTx(ctx, func(q *Queries) error {
 		installation, err := s.CreateInstallation(ctx, CreateInstallationParams{
 			GhInstallationID: arg.InstallationID,
 			UserID:           arg.UserID,
@@ -129,7 +129,7 @@ type UpdateSubdomainTxParams struct {
 }
 
 func (s *Store) UpdateSubdomainTx(ctx context.Context, arg UpdateSubdomainTxParams) error {
-	return s.execTx(ctx, func(q *Queries) error {
+	return s.ExecTx(ctx, func(q *Queries) error {
 		exists, err := s.SubdomainExists(ctx, arg.Subdomain)
 		if err != nil {
 			return fmt.Errorf("error checking if subdomain exists")

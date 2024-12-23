@@ -73,7 +73,7 @@ func (b *BlogService) sendPostEmail(
 		if err != nil {
 			return fmt.Errorf("url error: %w", err)
 		}
-		if err := email.NewSynthesiser(
+		if err := email.NewSender(
 			emailaddr.NewAddr(sub.Email),
 			fromaddr,
 			blog.EmailMode,

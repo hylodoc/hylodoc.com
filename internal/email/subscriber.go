@@ -7,7 +7,7 @@ import (
 	"github.com/xr0-org/progstack/internal/email/postbody"
 )
 
-func (s *synth) SendNewSubscriberEmail(sitename, unsublink string) error {
+func (s *sender) SendNewSubscriberEmail(sitename, unsublink string) error {
 	text, err := emailtemplate.NewSubscriber(
 		sitename, unsublink,
 	).Render(s.emailmode)
@@ -31,7 +31,7 @@ func unsubscribeheaders(unsublink string) map[string]string {
 	}
 }
 
-func (s *synth) SendNewPostUpdate(
+func (s *sender) SendNewPostUpdate(
 	posttitle, postlink, unsublink string, pb postbody.PostBody,
 ) error {
 	body, err := pb.Read(s.emailmode)
