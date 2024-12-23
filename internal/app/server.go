@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/billing"
@@ -56,18 +55,13 @@ func Serve(store *model.Store) error {
 	mixpanelClient := analytics.NewMixpanelClientWrapper(
 		config.Config.Mixpanel.Token,
 	)
-	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
-	authNService := authn.NewAuthNService(
-		httpClient, resendClient, store, mixpanelClient,
-	)
+	authNService := authn.NewAuthNService(httpClient, store, mixpanelClient)
 	userService := user.NewUserService(store, mixpanelClient)
 	billingService := billing.NewBillingService(store, mixpanelClient)
 	installationService := installation.NewInstallationService(
-		httpClient, resendClient, store,
+		httpClient, store,
 	)
-	blogService := blog.NewBlogService(
-		httpClient, store, resendClient, mixpanelClient,
-	)
+	blogService := blog.NewBlogService(httpClient, store, mixpanelClient)
 
 	/* init metrics */
 	metrics.Initialize()

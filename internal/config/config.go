@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
 	_ "github.com/lib/pq"
 	"github.com/spf13/viper"
@@ -22,7 +23,7 @@ type Configuration struct {
 	ProgstackSsg ProgstackSsgParams `mapstructure:"progstack_ssg"`
 	Github       GithubParams       `mapstructure:"github"`
 	Db           DbParams           `mapstructure:"postgres"`
-	Resend       ResendParams       `mapstructure:"resend"`
+	Email        EmailParams        `mapstructure:"email"`
 	Stripe       StripeParams       `mapstructure:"stripe"`
 	Mixpanel     MixpanelParams     `mapstructure:"mixpanel"`
 }
@@ -71,8 +72,12 @@ type DbParams struct {
 	Port     int    `mapstructure:"port"`
 }
 
-type ResendParams struct {
-	ApiKey string `mapstructure:"resend_api_key"`
+type EmailParams struct {
+	ResendApiKey string `mapstructure:"resend_api_key"`
+	Queue        struct {
+		MaxRetries int32         `mapstructure:"max_retries"`
+		Period     time.Duration `mapstructure:"period"`
+	} `mapstructure:"queue"`
 }
 
 type StripeParams struct {

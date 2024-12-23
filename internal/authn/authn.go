@@ -13,7 +13,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/config"
@@ -39,21 +38,19 @@ var (
 )
 
 type AuthNService struct {
-	store        *model.Store
-	client       *httpclient.Client
-	resendClient *resend.Client
-	mixpanel     *analytics.MixpanelClientWrapper
+	store    *model.Store
+	client   *httpclient.Client
+	mixpanel *analytics.MixpanelClientWrapper
 }
 
 func NewAuthNService(
-	c *httpclient.Client, resendClient *resend.Client, s *model.Store,
+	c *httpclient.Client, s *model.Store,
 	mixpanel *analytics.MixpanelClientWrapper,
 ) AuthNService {
 	return AuthNService{
-		client:       c,
-		resendClient: resendClient,
-		store:        s,
-		mixpanel:     mixpanel,
+		client:   c,
+		store:    s,
+		mixpanel: mixpanel,
 	}
 }
 

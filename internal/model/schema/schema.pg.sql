@@ -311,7 +311,7 @@ CREATE TABLE queued_emails (
 	id		SERIAL		PRIMARY KEY,
 	created_at	TIMESTAMPTZ	NOT NULL	DEFAULT(now()),
 	status		queue_status	NOT NULL	DEFAULT('pending'),
-	num_attempts	INTEGER		NOT NULL	DEFAULT(0),
+	fail_count	INTEGER		NOT NULL	DEFAULT(0),
 
 	from_addr	VARCHAR(1000)	NOT NULL,
 	to_addr		VARCHAR(1000)	NOT NULL,
@@ -321,7 +321,7 @@ CREATE TABLE queued_emails (
 );
 CREATE INDEX ON queued_emails(created_at);
 CREATE INDEX ON queued_emails(status);
-CREATE INDEX ON queued_emails(num_attempts);
+CREATE INDEX ON queued_emails(fail_count);
 
 CREATE TABLE queued_email_headers (
 	email	INTEGER		NOT NULL	REFERENCES queued_emails,

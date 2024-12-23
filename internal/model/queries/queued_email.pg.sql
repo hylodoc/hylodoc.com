@@ -16,9 +16,9 @@ UPDATE queued_emails
 SET status = 'failed'
 WHERE id = $1;
 
--- name: MarkQueuedEmailAttempt :exec
+-- name: IncrementQueuedEmailFailCount :exec
 UPDATE queued_emails
-SET status = status+1
+SET fail_count = fail_count+1
 WHERE id = $1;
 
 -- name: GetTopNQueuedEmails :many
