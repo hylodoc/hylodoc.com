@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/email/emailaddr"
 	"github.com/xr0-org/progstack/internal/email/postbody"
 	"github.com/xr0-org/progstack/internal/model"
@@ -24,14 +23,14 @@ type Synthesiser interface {
 
 type synth struct {
 	to, from  emailaddr.EmailAddr
-	client    *resend.Client
 	emailmode model.EmailMode
+	store     *model.Store
 }
 
 func NewSynthesiser(
-	to, from emailaddr.EmailAddr, c *resend.Client, mode model.EmailMode,
+	to, from emailaddr.EmailAddr, mode model.EmailMode, store *model.Store,
 ) Synthesiser {
-	return &synth{to, from, c, mode}
+	return &synth{to, from, mode, store}
 }
 
 func (s *synth) send(subject, body string) error {
@@ -41,38 +40,31 @@ func (s *synth) send(subject, body string) error {
 func (s *synth) sendwithheaders(
 	subject, body string, headers map[string]string,
 ) error {
-	switch s.emailmode {
-	case model.EmailModePlaintext:
-		_, err := s.client.Emails.SendWithContext(
-			context.TODO(),
-			&resend.SendEmailRequest{
-				From:    s.from.Addr(),
-				To:      []string{s.to.Addr()},
-				Subject: subject,
-				Text:    body,
-				Headers: headers,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("plaintext: %w", err)
-		}
-		return nil
-	case model.EmailModeHtml:
-		_, err := s.client.Emails.SendWithContext(
-			context.TODO(),
-			&resend.SendEmailRequest{
-				From:    s.from.Addr(),
-				To:      []string{s.to.Addr()},
-				Subject: subject,
-				Html:    body,
-				Headers: headers,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("html: %w", err)
-		}
-		return nil
-	default:
-		return fmt.Errorf("unknown email mode %q", s.emailmode)
+	id, err := s.store.InsertQueuedEmail(
+		context.TODO(),
+		model.InsertQueuedEmailParams{
+			FromAddr: s.from.Addr(),
+			ToAddr:   s.to.Addr(),
+			Subject:  subject,
+			Body:     body,
+			//Headers: headers,
+			Mode: s.emailmode,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("insert: %w", err)
 	}
+	for name, value := range headers {
+		if err := s.store.InsertQueuedEmailHeader(
+			context.TODO(),
+			model.InsertQueuedEmailHeaderParams{
+				Email: id,
+				Name:  name,
+				Value: value,
+			},
+		); err != nil {
+			return fmt.Errorf("header: %w", err)
+		}
+	}
+	return nil
 }

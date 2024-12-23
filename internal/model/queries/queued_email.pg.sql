@@ -1,9 +1,10 @@
--- name: InsertQueuedEmail :exec
+-- name: InsertQueuedEmail :one
 INSERT INTO queued_emails (
 	from_addr, to_addr, subject, body, mode
 ) VALUES (
 	$1, $2, $3, $4, $5
-);
+)
+RETURNING id;
 
 -- name: MarkQueuedEmailSent :exec
 UPDATE queued_emails
@@ -27,9 +28,14 @@ WHERE status = 'pending'
 ORDER BY created_at DESC
 LIMIT $1::INT;
 
+-- name: InsertQueuedEmailHeader :exec
+INSERT INTO queued_email_headers (
+	email, name, value
+) VALUES (
+	$1, $2, $3
+);
+
 -- name: GetQueuedEmailHeaders :many
-SELECT
-	name,
-	value
+SELECT name, value
 FROM queued_email_headers
 WHERE email = $1;

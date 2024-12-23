@@ -528,8 +528,8 @@ func (a *AuthNService) magicRegister(w http.ResponseWriter, r *http.Request) err
 				"magic@%s", config.Config.Progstack.EmailDomain,
 			),
 		),
-		a.resendClient,
 		model.EmailModePlaintext,
+		a.store,
 	).SendRegisterLink(token); err != nil {
 		return fmt.Errorf(
 			"error sending register link to `%s': %w",
@@ -643,8 +643,8 @@ func (a *AuthNService) magicLogin(w http.ResponseWriter, r *http.Request) error 
 				"magic@%s", config.Config.Progstack.EmailDomain,
 			),
 		),
-		a.resendClient,
 		model.EmailModePlaintext,
+		a.store,
 	).SendLoginLink(token); err != nil {
 		return fmt.Errorf(
 			"error sending login link to `%s': %w",

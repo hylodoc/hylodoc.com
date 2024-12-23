@@ -76,8 +76,8 @@ func (b *BlogService) sendPostEmail(
 		if err := email.NewSynthesiser(
 			emailaddr.NewAddr(sub.Email),
 			fromaddr,
-			b.resendClient,
 			blog.EmailMode,
+			b.store,
 		).SendNewPostUpdate(
 			post.Title,
 			fmt.Sprintf(

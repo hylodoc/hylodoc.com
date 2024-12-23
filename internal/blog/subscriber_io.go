@@ -87,8 +87,8 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 				config.Config.Progstack.EmailDomain,
 			),
 		),
-		b.resendClient,
 		blog.EmailMode,
+		b.store,
 	).SendNewSubscriberEmail(
 		sitename,
 		fmt.Sprintf(
