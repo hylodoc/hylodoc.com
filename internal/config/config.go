@@ -9,6 +9,12 @@ import (
 	"github.com/spf13/viper"
 )
 
+func init() {
+	if err := loadConfig("conf.yml"); err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+}
+
 var Config Configuration
 
 type Configuration struct {
@@ -96,7 +102,7 @@ func (params DbParams) Connect() (*sql.DB, error) {
 	return db, nil
 }
 
-func LoadConfig(path string) error {
+func loadConfig(path string) error {
 	viper.SetConfigFile(path)
 	viper.AutomaticEnv()
 

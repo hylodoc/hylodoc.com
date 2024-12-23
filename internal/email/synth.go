@@ -10,7 +10,7 @@ import (
 	"github.com/xr0-org/progstack/internal/model"
 )
 
-type Sender interface {
+type Synthesiser interface {
 	SendRegisterLink(token string) error
 	SendLoginLink(token string) error
 
@@ -22,23 +22,23 @@ type Sender interface {
 	) error
 }
 
-type sender struct {
+type synth struct {
 	to, from  emailaddr.EmailAddr
 	client    *resend.Client
 	emailmode model.EmailMode
 }
 
-func NewSender(
+func NewSynthesiser(
 	to, from emailaddr.EmailAddr, c *resend.Client, mode model.EmailMode,
-) Sender {
-	return &sender{to, from, c, mode}
+) Synthesiser {
+	return &synth{to, from, c, mode}
 }
 
-func (s *sender) send(subject, body string) error {
+func (s *synth) send(subject, body string) error {
 	return s.sendwithheaders(subject, body, nil)
 }
 
-func (s *sender) sendwithheaders(
+func (s *synth) sendwithheaders(
 	subject, body string, headers map[string]string,
 ) error {
 	switch s.emailmode {

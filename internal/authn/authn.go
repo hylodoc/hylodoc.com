@@ -521,7 +521,7 @@ func (a *AuthNService) magicRegister(w http.ResponseWriter, r *http.Request) err
 		return fmt.Errorf("error writing magic to db: %w", err)
 	}
 
-	if err := email.NewSender(
+	if err := email.NewSynthesiser(
 		emailaddr.NewAddr(toaddr),
 		emailaddr.NewAddr(
 			fmt.Sprintf(
@@ -636,7 +636,7 @@ func (a *AuthNService) magicLogin(w http.ResponseWriter, r *http.Request) error 
 		return fmt.Errorf("error writing magic login to db: %w", err)
 	}
 
-	if err := email.NewSender(
+	if err := email.NewSynthesiser(
 		emailaddr.NewAddr(toaddr),
 		emailaddr.NewAddr(
 			fmt.Sprintf(

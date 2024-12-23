@@ -3,11 +3,11 @@ package email
 import (
 	"fmt"
 
-	"github.com/xr0-org/progstack/internal/email/emailtemplate"
+	"github.com/xr0-org/progstack/internal/email/internal/emailtemplate"
 	"github.com/xr0-org/progstack/internal/email/postbody"
 )
 
-func (s *sender) SendNewSubscriberEmail(sitename, unsublink string) error {
+func (s *synth) SendNewSubscriberEmail(sitename, unsublink string) error {
 	text, err := emailtemplate.NewSubscriber(
 		sitename, unsublink,
 	).Render(s.emailmode)
@@ -31,7 +31,7 @@ func unsubscribeheaders(unsublink string) map[string]string {
 	}
 }
 
-func (s *sender) SendNewPostUpdate(
+func (s *synth) SendNewPostUpdate(
 	posttitle, postlink, unsublink string, pb postbody.PostBody,
 ) error {
 	body, err := pb.Read(s.emailmode)

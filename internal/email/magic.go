@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/email/emailtemplate"
+	"github.com/xr0-org/progstack/internal/email/internal/emailtemplate"
 )
 
 const (
@@ -12,7 +12,7 @@ const (
 	magicLoginLinkSubject    = "Login to Progstack"
 )
 
-func (s *sender) SendRegisterLink(token string) error {
+func (s *synth) SendRegisterLink(token string) error {
 	text, err := emailtemplate.NewRegisterLink(
 		fmt.Sprintf(
 			"%s://%s/%s?token=%s",
@@ -31,7 +31,7 @@ func (s *sender) SendRegisterLink(token string) error {
 	return nil
 }
 
-func (s *sender) SendLoginLink(token string) error {
+func (s *synth) SendLoginLink(token string) error {
 	text, err := emailtemplate.NewLoginLink(
 		fmt.Sprintf(
 			"%s://%s/%s?token=%s",

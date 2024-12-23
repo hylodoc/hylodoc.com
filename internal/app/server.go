@@ -34,23 +34,10 @@ const (
 	clientTimeout = 30 * time.Second
 )
 
-func init() {
-	if err := config.LoadConfig("conf.yml"); err != nil {
-		log.Fatalf("failed to load config: %v", err)
-	}
-}
-
-func Serve() {
-	/* init dependencies */
-	db, err := config.Config.Db.Connect()
-	if err != nil {
-		log.Fatal("could not connect to db: %w", err)
-	}
-	store := model.NewStore(db)
-
+func Serve(store *model.Store) error {
 	bootid, err := store.Boot(context.TODO())
 	if err != nil {
-		log.Fatal("cannot boot: %w", err)
+		return fmt.Errorf("cannot boot: %w", err)
 	}
 	log.Println("bootid", bootid)
 
@@ -192,16 +179,12 @@ func Serve() {
 	switch config.Config.Progstack.Protocol {
 	case "https":
 		log.Printf("listening at https://localhost:%d...\n", httpsPort)
-		if err := s.ListenAndServeTLS("", ""); err != nil {
-			log.Fatal("fatal error", err)
-		}
+		return s.ListenAndServeTLS("", "")
 	case "http":
 		log.Printf("listening at http://localhost:%d...\n", httpsPort)
-		if err := s.ListenAndServe(); err != nil {
-			log.Fatal("fatal error", err)
-		}
+		return s.ListenAndServe()
 	default:
-		log.Fatal("invalid protocol")
+		return fmt.Errorf("invalid protocol")
 	}
 }
 
