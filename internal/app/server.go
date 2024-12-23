@@ -35,8 +35,8 @@ const (
 )
 
 func init() {
-	if err := config.LoadConfig("conf.yaml"); err != nil {
-		log.Fatalf("failed to laod config: %v", err)
+	if err := config.LoadConfig("conf.yml"); err != nil {
+		log.Fatalf("failed to load config: %v", err)
 	}
 }
 
@@ -176,7 +176,6 @@ func Serve() {
 		}
 	}()
 
-	log.Printf("listening at http://localhost:%d...\n", httpsPort)
 	m := &autocert.Manager{
 		Cache:  autocert.DirCache(config.Config.Progstack.CertsPath),
 		Prompt: autocert.AcceptTOS,
@@ -190,8 +189,19 @@ func Serve() {
 		TLSConfig: m.TLSConfig(),
 		Handler:   r,
 	}
-	if err := s.ListenAndServeTLS("", ""); err != nil {
-		log.Fatal("fatal https error", err)
+	switch config.Config.Progstack.Protocol {
+	case "https":
+		log.Printf("listening at https://localhost:%d...\n", httpsPort)
+		if err := s.ListenAndServeTLS("", ""); err != nil {
+			log.Fatal("fatal error", err)
+		}
+	case "http":
+		log.Printf("listening at http://localhost:%d...\n", httpsPort)
+		if err := s.ListenAndServe(); err != nil {
+			log.Fatal("fatal error", err)
+		}
+	default:
+		log.Fatal("invalid protocol")
 	}
 }
 

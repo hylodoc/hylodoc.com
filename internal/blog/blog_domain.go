@@ -12,10 +12,12 @@ import (
 	"unicode"
 
 	"github.com/gorilla/mux"
+	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -215,6 +217,25 @@ func (b *BlogService) DomainSubmit() http.HandlerFunc {
 		logger.Println("DomainSubmit handler...")
 
 		b.mixpanel.Track("DomainSubmit", r)
+
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+		if !ok {
+			logger.Println("No auth session")
+			http.Error(w, "", http.StatusNotFound)
+			return
+		}
+
+		can, err := authz.CanConfigureCustomDomain(b.store, sesh)
+		if err != nil {
+			logger.Printf("Error performing action: %v", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+		if !can {
+			logger.Printf("User not authorized")
+			http.Error(w, "", http.StatusForbidden)
+			return
+		}
 
 		if err := b.domainSubmit(w, r); err != nil {
 			logger.Println("Error submiting domain")
