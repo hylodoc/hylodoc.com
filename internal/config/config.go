@@ -4,10 +4,17 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
 	_ "github.com/lib/pq"
 	"github.com/spf13/viper"
 )
+
+func init() {
+	if err := loadConfig("conf.yml"); err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+}
 
 var Config Configuration
 
@@ -16,7 +23,7 @@ type Configuration struct {
 	ProgstackSsg ProgstackSsgParams `mapstructure:"progstack_ssg"`
 	Github       GithubParams       `mapstructure:"github"`
 	Db           DbParams           `mapstructure:"postgres"`
-	Resend       ResendParams       `mapstructure:"resend"`
+	Email        EmailParams        `mapstructure:"email"`
 	Stripe       StripeParams       `mapstructure:"stripe"`
 	Mixpanel     MixpanelParams     `mapstructure:"mixpanel"`
 }
@@ -65,8 +72,12 @@ type DbParams struct {
 	Port     int    `mapstructure:"port"`
 }
 
-type ResendParams struct {
-	ApiKey string `mapstructure:"resend_api_key"`
+type EmailParams struct {
+	PostmarkApiKey string `mapstructure:"postmark_api_key"`
+	Queue          struct {
+		MaxRetries int32         `mapstructure:"max_retries"`
+		Period     time.Duration `mapstructure:"period"`
+	} `mapstructure:"queue"`
 }
 
 type StripeParams struct {
@@ -96,7 +107,7 @@ func (params DbParams) Connect() (*sql.DB, error) {
 	return db, nil
 }
 
-func LoadConfig(path string) error {
+func loadConfig(path string) error {
 	viper.SetConfigFile(path)
 	viper.AutomaticEnv()
 

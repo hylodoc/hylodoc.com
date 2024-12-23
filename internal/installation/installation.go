@@ -11,7 +11,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
@@ -30,18 +29,16 @@ const (
 )
 
 type InstallationService struct {
-	client       *httpclient.Client
-	resendClient *resend.Client
-	store        *model.Store
+	client *httpclient.Client
+	store  *model.Store
 }
 
 func NewInstallationService(
-	c *httpclient.Client, r *resend.Client, s *model.Store,
+	c *httpclient.Client, s *model.Store,
 ) *InstallationService {
 	return &InstallationService{
-		client:       c,
-		resendClient: r,
-		store:        s,
+		client: c,
+		store:  s,
 	}
 }
 
@@ -79,7 +76,7 @@ func (i *InstallationService) installationCallback(w http.ResponseWriter, r *htt
 	case "installation_repositories":
 		return handleInstallationRepositories(i.client, i.store, body, logger)
 	case "push":
-		return handlePush(i.client, i.resendClient, i.store, body, logger)
+		return handlePush(i.client, i.store, body, logger)
 	default:
 		logging.Logger(r).Printf("unhandled event type: %s\n", eventType)
 	}
@@ -415,7 +412,7 @@ func handleInstallationRepositoriesRemoved(
 }
 
 func handlePush(
-	c *httpclient.Client, resendClient *resend.Client, s *model.Store,
+	c *httpclient.Client, s *model.Store,
 	body []byte, logger *log.Logger,
 ) error {
 	logger.Println("handling push event...")

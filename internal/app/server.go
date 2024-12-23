@@ -6,10 +6,8 @@ import (
 	"log"
 	"net/http"
 	"text/template"
-	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/billing"
@@ -29,28 +27,15 @@ import (
 
 const (
 	/* TODO: make configurable */
-	httpPort      = 80
-	httpsPort     = 443
-	clientTimeout = 30 * time.Second
+	httpPort        = 80
+	httpsPort       = 443
+	metricsHttpPort = 8000
 )
 
-func init() {
-	if err := config.LoadConfig("conf.yml"); err != nil {
-		log.Fatalf("failed to load config: %v", err)
-	}
-}
-
-func Serve() {
-	/* init dependencies */
-	db, err := config.Config.Db.Connect()
-	if err != nil {
-		log.Fatal("could not connect to db: %w", err)
-	}
-	store := model.NewStore(db)
-
+func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	bootid, err := store.Boot(context.TODO())
 	if err != nil {
-		log.Fatal("cannot boot: %w", err)
+		return fmt.Errorf("cannot boot: %w", err)
 	}
 	log.Println("bootid", bootid)
 
@@ -65,26 +50,19 @@ func Serve() {
 	/* public routes */
 
 	/* init services */
-	httpClient := httpclient.NewHttpClient(clientTimeout)
 	mixpanelClient := analytics.NewMixpanelClientWrapper(
 		config.Config.Mixpanel.Token,
 	)
-	resendClient := resend.NewClient(config.Config.Resend.ApiKey)
-	authNService := authn.NewAuthNService(
-		httpClient, resendClient, store, mixpanelClient,
-	)
+	authNService := authn.NewAuthNService(httpClient, store, mixpanelClient)
 	userService := user.NewUserService(store, mixpanelClient)
 	billingService := billing.NewBillingService(store, mixpanelClient)
 	installationService := installation.NewInstallationService(
-		httpClient, resendClient, store,
+		httpClient, store,
 	)
-	blogService := blog.NewBlogService(
-		httpClient, store, resendClient, mixpanelClient,
-	)
+	blogService := blog.NewBlogService(httpClient, store, mixpanelClient)
 
 	/* init metrics */
 	metrics.Initialize()
-	r.Handle("/metrics", metrics.Handler())
 
 	r.HandleFunc("/", index(mixpanelClient))
 	r.HandleFunc("/register", authNService.Register())
@@ -150,6 +128,20 @@ func Serve() {
 
 	go func() {
 		mux := http.NewServeMux()
+		mux.Handle("/metrics", metrics.Handler())
+		log.Printf(
+			"listening (metrics) on http://localhost:%d...\n",
+			metricsHttpPort,
+		)
+		if err := http.ListenAndServe(
+			fmt.Sprintf(":%d", metricsHttpPort), mux,
+		); err != nil {
+			log.Fatal("fatal metrics error", err)
+		}
+	}()
+
+	go func() {
+		mux := http.NewServeMux()
 		mux.HandleFunc(
 			"/",
 			func(w http.ResponseWriter, r *http.Request) {
@@ -192,16 +184,12 @@ func Serve() {
 	switch config.Config.Progstack.Protocol {
 	case "https":
 		log.Printf("listening at https://localhost:%d...\n", httpsPort)
-		if err := s.ListenAndServeTLS("", ""); err != nil {
-			log.Fatal("fatal error", err)
-		}
+		return s.ListenAndServeTLS("", "")
 	case "http":
 		log.Printf("listening at http://localhost:%d...\n", httpsPort)
-		if err := s.ListenAndServe(); err != nil {
-			log.Fatal("fatal error", err)
-		}
+		return s.ListenAndServe()
 	default:
-		log.Fatal("invalid protocol")
+		return fmt.Errorf("invalid protocol")
 	}
 }
 

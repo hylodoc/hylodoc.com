@@ -14,7 +14,6 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
@@ -25,21 +24,19 @@ import (
 )
 
 type BlogService struct {
-	client       *httpclient.Client
-	store        *model.Store
-	resendClient *resend.Client
-	mixpanel     *analytics.MixpanelClientWrapper
+	client   *httpclient.Client
+	store    *model.Store
+	mixpanel *analytics.MixpanelClientWrapper
 }
 
 func NewBlogService(
 	client *httpclient.Client, store *model.Store,
-	resendClient *resend.Client, mixpanel *analytics.MixpanelClientWrapper,
+	mixpanel *analytics.MixpanelClientWrapper,
 ) *BlogService {
 	return &BlogService{
-		client:       client,
-		store:        store,
-		resendClient: resendClient,
-		mixpanel:     mixpanel,
+		client:   client,
+		store:    store,
+		mixpanel: mixpanel,
 	}
 }
 
