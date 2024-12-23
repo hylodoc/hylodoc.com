@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"text/template"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/xr0-org/progstack/internal/analytics"
@@ -28,12 +27,11 @@ import (
 
 const (
 	/* TODO: make configurable */
-	httpPort      = 80
-	httpsPort     = 443
-	clientTimeout = 30 * time.Second
+	httpPort  = 80
+	httpsPort = 443
 )
 
-func Serve(store *model.Store) error {
+func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	bootid, err := store.Boot(context.TODO())
 	if err != nil {
 		return fmt.Errorf("cannot boot: %w", err)
@@ -51,7 +49,6 @@ func Serve(store *model.Store) error {
 	/* public routes */
 
 	/* init services */
-	httpClient := httpclient.NewHttpClient(clientTimeout)
 	mixpanelClient := analytics.NewMixpanelClientWrapper(
 		config.Config.Mixpanel.Token,
 	)

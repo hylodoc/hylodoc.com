@@ -8,12 +8,16 @@ RETURNING id;
 
 -- name: MarkQueuedEmailSent :exec
 UPDATE queued_emails
-SET status = 'sent'
+SET
+	status = 'sent',
+	ended_at = now()
 WHERE id = $1;
 
 -- name: MarkQueuedEmailFailed :exec
 UPDATE queued_emails
-SET status = 'failed'
+SET
+	status = 'failed',
+	ended_at = now()
 WHERE id = $1;
 
 -- name: IncrementQueuedEmailFailCount :exec

@@ -11,8 +11,11 @@ import (
 	server "github.com/xr0-org/progstack/internal/app"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email/emailqueue"
+	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
 )
+
+const clientTimeout = 30 * time.Second
 
 var rootCmd = &cobra.Command{
 	Use:   "progstack.com",
@@ -23,13 +26,14 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("could not connect to db: %w", err)
 		}
+		c := httpclient.NewHttpClient(clientTimeout)
 		store := model.NewStore(db)
 		go func() {
-			if err := emailqueue.Run(store); err != nil {
+			if err := emailqueue.Run(c, store); err != nil {
 				log.Fatal("email queue error", err)
 			}
 		}()
-		return server.Serve(store)
+		return server.Serve(c, store)
 	},
 }
 

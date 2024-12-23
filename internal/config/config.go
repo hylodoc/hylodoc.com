@@ -73,8 +73,8 @@ type DbParams struct {
 }
 
 type EmailParams struct {
-	ResendApiKey string `mapstructure:"resend_api_key"`
-	Queue        struct {
+	PostmarkApiKey string `mapstructure:"postmark_api_key"`
+	Queue          struct {
 		MaxRetries int32         `mapstructure:"max_retries"`
 		Period     time.Duration `mapstructure:"period"`
 	} `mapstructure:"queue"`

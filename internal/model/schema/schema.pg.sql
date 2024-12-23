@@ -317,7 +317,10 @@ CREATE TABLE queued_emails (
 	to_addr		VARCHAR(1000)	NOT NULL,
 	subject		VARCHAR(1000)	NOT NULL,
 	body		TEXT		NOT NULL,
-	mode		email_mode	NOT NULL
+	mode		email_mode	NOT NULL,
+
+	ended_at	TIMESTAMPTZ
+		CHECK (status = 'pending' OR ended_at IS NOT NULL)
 );
 CREATE INDEX ON queued_emails(created_at);
 CREATE INDEX ON queued_emails(status);
@@ -330,3 +333,9 @@ CREATE TABLE queued_email_headers (
 
 	PRIMARY KEY (email, name)
 );
+
+CREATE TABLE queued_email_resend_ids (
+	email	INTEGER		NOT NULL	REFERENCES queued_emails,
+	id	VARCHAR(256)	NOT NULL
+);
+CREATE INDEX ON queued_email_resend_ids(email);

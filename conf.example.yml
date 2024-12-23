@@ -56,7 +56,7 @@ postgres:
   port: 5432
 
 email:
-  resend_api_key: "<ResendAPIKey>"
+  postmark_api_key: "<PostmarkAPIKey>"
   queue:
     max_retries: 3
     period: 5s # time.Duration

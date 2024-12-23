@@ -6,44 +6,54 @@ import (
 	"log"
 	"time"
 
-	"github.com/resend/resend-go/v2"
 	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/email/emailqueue/internal/postmark"
+	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
-const resendBatchSize = 100
+const postmarkBatchSize = 500
 
-func Run(s *model.Store) error {
-	r := resend.NewClient(config.Config.Email.ResendApiKey)
+func Run(c *httpclient.Client, s *model.Store) error {
+	period := config.Config.Email.Queue.Period
+	if period == 0 {
+		return fmt.Errorf("no period")
+	}
 	for {
 		if err := s.ExecTx(
 			context.TODO(),
 			func(q *model.Queries) error {
-				return runbatchtx(r, q)
+				return runbatchtx(c, q)
 			},
 		); err != nil {
 			return err
 		}
-		time.Sleep(config.Config.Email.Queue.Period)
+		time.Sleep(period)
 	}
 }
 
-func runbatchtx(r *resend.Client, q *model.Queries) error {
-	emails, err := q.GetTopNQueuedEmails(context.TODO(), resendBatchSize)
+func runbatchtx(c *httpclient.Client, q *model.Queries) error {
+	emails, err := q.GetTopNQueuedEmails(context.TODO(), postmarkBatchSize)
 	if err != nil {
 		return fmt.Errorf("get top N: %w", err)
 	}
 	for _, e := range emails {
-		if err := trysend(&e, r, q); err != nil {
+		if err := trysend(&e, c, q); err != nil {
 			return fmt.Errorf("try send: %w", err)
 		}
 	}
 	return nil
 }
 
-func trysend(e *model.QueuedEmail, r *resend.Client, q *model.Queries) error {
-	if err := send(e, r, q); err != nil {
+func trysend(e *model.QueuedEmail, c *httpclient.Client, q *model.Queries) error {
+	headers, err := getheaders(e.ID, q)
+	if err != nil {
+		return fmt.Errorf("headers: %w", err)
+	}
+	if err := postmark.NewEmail(
+		e.FromAddr, e.ToAddr, e.Subject, e.Body, e.Mode, headers,
+	).Send(c); err != nil {
 		/* TODO: detect critical error perhaps? */
 		log.Printf("email send error %d: %s\n", e.ID, err)
 
@@ -71,47 +81,6 @@ func trysend(e *model.QueuedEmail, r *resend.Client, q *model.Queries) error {
 		return fmt.Errorf("mark sent: %w", err)
 	}
 	return nil
-}
-
-func send(e *model.QueuedEmail, r *resend.Client, q *model.Queries) error {
-	headers, err := getheaders(e.ID, q)
-	if err != nil {
-		return fmt.Errorf("headers: %w", err)
-	}
-	switch e.Mode {
-	case model.EmailModePlaintext:
-		_, err := r.Emails.SendWithContext(
-			context.TODO(),
-			&resend.SendEmailRequest{
-				From:    e.FromAddr,
-				To:      []string{e.ToAddr},
-				Subject: e.Subject,
-				Text:    e.Body,
-				Headers: headers,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("plaintext: %w", err)
-		}
-		return nil
-	case model.EmailModeHtml:
-		_, err := r.Emails.SendWithContext(
-			context.TODO(),
-			&resend.SendEmailRequest{
-				From:    e.FromAddr,
-				To:      []string{e.ToAddr},
-				Subject: e.Subject,
-				Html:    e.Body,
-				Headers: headers,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("html: %w", err)
-		}
-		return nil
-	default:
-		return fmt.Errorf("unknown mode %q", e.Mode)
-	}
 }
 
 func getheaders(emailid int32, q *model.Queries) (map[string]string, error) {
