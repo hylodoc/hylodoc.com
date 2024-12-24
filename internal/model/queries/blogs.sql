@@ -2,7 +2,6 @@
 INSERT INTO blogs (
 	user_id,
 	gh_repository_id,
-	gh_url,
 	repository_path,
 	theme,
 	subdomain,
@@ -13,7 +12,7 @@ INSERT INTO blogs (
 	blog_type,
 	email_mode
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
 RETURNING *;
 

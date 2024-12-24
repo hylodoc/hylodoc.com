@@ -15,13 +15,6 @@ SELECT *
 FROM repositories
 WHERE repository_id = $1;
 
--- name: GetRepositoryByBlogID :one
-SELECT *
-FROM repositories r
-INNER JOIN blogs b
-ON b.gh_repository_id = r.repository_id
-WHERE b.id = $1;
-
 -- name: ListOrderedRepositoriesByUserID :many
 SELECT r.*
 FROM repositories r

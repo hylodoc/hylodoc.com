@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/model"
 )
@@ -49,11 +50,18 @@ func GetBlogsInfo(s *model.Store, userID int32) ([]BlogInfo, error) {
 	return info, nil
 }
 
-func ghurl(blog model.Blog) string {
-	if blog.BlogType == model.BlogTypeRepository {
-		return blog.GhUrl.String
+func getghurl(blog *model.Blog, s *model.Store) (string, error) {
+	if blog.BlogType != model.BlogTypeRepository {
+		return "", nil
 	}
-	return ""
+	assert.Assert(blog.GhRepositoryID.Valid)
+	repo, err := s.GetRepositoryByGhRepositoryID(
+		context.TODO(), blog.GhRepositoryID.Int64,
+	)
+	if err != nil {
+		return "", fmt.Errorf("get repo: %w", err)
+	}
+	return repo.Url, nil
 }
 
 func getname(blog model.Blog) string {
@@ -119,6 +127,10 @@ func getBlogInfo(s *model.Store, blogID int32) (BlogInfo, error) {
 	if err != nil {
 		return BlogInfo{}, fmt.Errorf("islive error: %w", err)
 	}
+	ghurl, err := getghurl(&blog, s)
+	if err != nil {
+		return BlogInfo{}, fmt.Errorf("ghurl: %w", err)
+	}
 	return BlogInfo{
 		ID:                       blog.ID,
 		Name:                     getname(blog),
@@ -127,7 +139,7 @@ func getBlogInfo(s *model.Store, blogID int32) (BlogInfo, error) {
 		Url:                      buildUrl(blog.Subdomain.String()),
 		ConfigureCustomDomainUrl: buildConfigureCustomDomainUrl(blog.ID),
 		SetDomainUrl:             buildSetDomainUrl(blog.ID),
-		RepositoryUrl:            ghurl(blog),
+		RepositoryUrl:            ghurl,
 		SubscriberMetricsUrl:     buildSubscriberMetricsUrl(blog.ID),
 		MetricsUrl:               buildMetricsUrl(blog.ID),
 		ConfigUrl:                buildConfigUrl(blog.ID),

@@ -143,9 +143,8 @@ CREATE TABLE blogs (
 	live_hash		VARCHAR(1000)	NOT NULL,
 
 	gh_repository_id	BIGINT				UNIQUE		DEFAULT(NULL),
-	gh_url			VARCHAR(255)			UNIQUE		DEFAULT(NULL),
-	test_branch		VARCHAR(255),
-	live_branch		VARCHAR(255),
+	test_branch		VARCHAR(100),
+	live_branch		VARCHAR(100),
 
 	is_live			BOOLEAN		NOT NULL			DEFAULT(false),
 
@@ -163,13 +162,11 @@ CREATE TABLE blogs (
 		(
 			blog_type = 'repository'
 			AND gh_repository_id	IS NOT NULL
-			AND gh_url		IS NOT NULL
 			AND test_branch		IS NOT NULL
 			AND live_branch 	IS NOT NULL
 		) OR (
 			blog_type = 'folder'
 			AND gh_repository_id	IS NULL
-			AND gh_url		IS NULL
 			AND test_branch		IS NULL
 			AND live_branch 	IS NULL
 		)

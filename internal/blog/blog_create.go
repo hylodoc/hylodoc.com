@@ -136,10 +136,6 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 			Valid: true,
 			Int64: intRepoID,
 		},
-		GhUrl: sql.NullString{
-			Valid:  true,
-			String: buildRepositoryUrl(repo.FullName),
-		},
 		RepositoryPath: repopath,
 		Theme:          theme,
 		Subdomain:      sub,
