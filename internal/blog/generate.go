@@ -27,8 +27,12 @@ func GetFreshGeneration(blogid int32, s *model.Store) (int32, error) {
 	if err != nil {
 		return -1, fmt.Errorf("cannot get blog: %w", err)
 	}
+	path, err := getpathondisk(&b, s)
+	if err != nil {
+		return -1, fmt.Errorf("path: %w", err)
+	}
 	site, err := ssg.GenerateSiteWithBindings(
-		b.RepositoryPath,
+		path,
 		filepath.Join(
 			config.Config.Progstack.WebsitesPath,
 			b.Subdomain.String(),
@@ -77,7 +81,10 @@ func GetFreshGeneration(blogid int32, s *model.Store) (int32, error) {
 			return -1, fmt.Errorf("cannot set title %q: %w", title, err)
 		}
 	}
-	gen, err := s.InsertGeneration(context.TODO(), b.LiveHash)
+	if !b.LiveHash.Valid {
+		return -1, fmt.Errorf("no live hash: %w", err)
+	}
+	gen, err := s.InsertGeneration(context.TODO(), b.LiveHash.String)
 	if err != nil {
 		return -1, fmt.Errorf("error inserting generation: %w", err)
 	}
@@ -117,6 +124,21 @@ func GetFreshGeneration(blogid int32, s *model.Store) (int32, error) {
 		}
 	}
 	return gen, nil
+}
+
+func getpathondisk(blog *model.Blog, s *model.Store) (string, error) {
+	if blog.BlogType == model.BlogTypeFolder {
+		assert.Assert(blog.FolderPath.Valid)
+		return blog.FolderPath.String, nil
+	}
+	assert.Assert(blog.GhRepositoryID.Valid)
+	repo, err := s.GetRepositoryByGhRepositoryID(
+		context.TODO(), blog.GhRepositoryID.Int64,
+	)
+	if err != nil {
+		return "", fmt.Errorf("get repo: %w", err)
+	}
+	return repo.PathOnDisk, nil
 }
 
 func upsertPost(

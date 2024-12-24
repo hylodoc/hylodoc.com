@@ -2,8 +2,7 @@
 INSERT INTO blogs (
 	user_id,
 	gh_repository_id,
-	gh_url,
-	repository_path,
+	folder_path,
 	theme,
 	subdomain,
 	test_branch,
@@ -13,7 +12,7 @@ INSERT INTO blogs (
 	blog_type,
 	email_mode
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
 RETURNING *;
 
@@ -44,6 +43,11 @@ WHERE id = $2;
 -- name: UpdateBlogName :exec
 UPDATE blogs
 SET name = @name::VARCHAR
+WHERE id = $1;
+
+-- name: UpdateBlogLiveHash :exec
+UPDATE blogs
+SET live_hash = @live_hash::VARCHAR
 WHERE id = $1;
 
 -- name: CheckBlogOwnership :one
@@ -79,10 +83,10 @@ SELECT id
 FROM blogs b
 WHERE user_id = $1;
 
--- name: ListBlogRepoPathsByUserID :many
-SELECT repository_path
+-- name: ListBlogFolderPathsByUserID :many
+SELECT folder_path::VARCHAR
 FROM blogs b
-WHERE user_id = $1;
+WHERE user_id = $1 AND blog_type = 'folder';
 
 -- name: GetBlogIsLive :one
 SELECT is_live
@@ -106,10 +110,10 @@ INNER JOIN repositories r
 ON b.gh_repository_id = r.id
 WHERE r.installation_id = $1;
 
--- name: CountBlogsByUserID :one
+-- name: CountLiveBlogsByUserID :one
 SELECT COUNT(*) AS blog_count
 FROM blogs
-WHERE user_id = $1;
+WHERE user_id = $1 AND is_live = true;
 
 -- name: SetBlogThemeByID :exec
 UPDATE blogs

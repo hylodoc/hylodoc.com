@@ -15,7 +15,7 @@ func CanCreateSite(s *model.Store, sesh *session.Session) (bool, error) {
 		return false, fmt.Errorf("error calculating user storage used: %w", err)
 	}
 	/* get user's site count */
-	blogCount, err := s.CountBlogsByUserID(context.TODO(), sesh.GetUserID())
+	blogCount, err := s.CountLiveBlogsByUserID(context.TODO(), sesh.GetUserID())
 	if err != nil {
 		return false, fmt.Errorf("error getting user project count: %w", err)
 	}

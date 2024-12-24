@@ -4,9 +4,10 @@ INSERT INTO repositories (
 	repository_id,
 	url,
 	name,
-	full_name
+	full_name,
+	path_on_disk
 ) VALUES (
-	$1, $2, $3, $4, $5
+	$1, $2, $3, $4, $5, $6
 )
 RETURNING *;
 
@@ -15,12 +16,12 @@ SELECT *
 FROM repositories
 WHERE repository_id = $1;
 
--- name: GetRepositoryByBlogID :one
-SELECT *
+-- name: ListRepositoryPathsOnDiskByUserID :many
+SELECT r.path_on_disk
 FROM repositories r
-INNER JOIN blogs b
-ON b.gh_repository_id = r.repository_id
-WHERE b.id = $1;
+INNER JOIN installations i
+	ON i.gh_installation_id = r.installation_id
+WHERE i.user_id = $1;
 
 -- name: ListOrderedRepositoriesByUserID :many
 SELECT r.*

@@ -2,8 +2,9 @@ package authz
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -11,23 +12,38 @@ import (
 )
 
 func UserStorageUsed(s *model.Store, userID int32) (int64, error) {
-	paths, err := s.ListBlogRepoPathsByUserID(context.TODO(), userID)
+	paths, err := listUserDiskPaths(userID, s)
 	if err != nil {
-		if err != sql.ErrNoRows {
-			return 0, err
-		}
-		return 0, nil
+		return -1, fmt.Errorf("paths: %w", err)
 	}
 	/* loop over repos */
 	var totalBytes int64
 	for _, path := range paths {
+		if _, err := os.Stat(path); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			return -1, fmt.Errorf("stat: %w", err)
+		}
 		bytes, err := dirBytes(path)
 		if err != nil {
-			return 0, fmt.Errorf("error calculating usage for user `%d' path `%s': %w", userID, path, err)
+			return -1, fmt.Errorf("path: %w", err)
 		}
 		totalBytes += bytes
 	}
 	return totalBytes, nil
+}
+
+func listUserDiskPaths(userID int32, s *model.Store) ([]string, error) {
+	folders, err := s.ListBlogFolderPathsByUserID(context.TODO(), userID)
+	if err != nil {
+		return nil, fmt.Errorf("folder: %w", err)
+	}
+	repos, err := s.ListRepositoryPathsOnDiskByUserID(context.TODO(), userID)
+	if err != nil {
+		return nil, fmt.Errorf("repo: %w", err)
+	}
+	return append(folders, repos...), nil
 }
 
 /* calculate the disk usage of a single folder */

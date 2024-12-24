@@ -108,5 +108,8 @@ func cloneRepo(
 			ReferenceName: plumbing.ReferenceName(branch),
 		},
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("git error: %w", err)
+	}
+	return nil
 }
