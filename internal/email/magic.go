@@ -5,6 +5,7 @@ import (
 
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email/internal/emailtemplate"
+	"github.com/xr0-org/progstack/internal/model"
 )
 
 const (
@@ -25,7 +26,9 @@ func (s *sender) SendRegisterLink(token string) error {
 	if err != nil {
 		return fmt.Errorf("cannot render template: %w", err)
 	}
-	if err := s.send(magicRegisterLinkSubject, text); err != nil {
+	if err := s.send(
+		magicRegisterLinkSubject, text, model.PostmarkStreamOutbound,
+	); err != nil {
 		return fmt.Errorf("send error: %w", err)
 	}
 	return nil
@@ -44,7 +47,9 @@ func (s *sender) SendLoginLink(token string) error {
 	if err != nil {
 		return fmt.Errorf("cannot render template: %w", err)
 	}
-	if err := s.send(magicLoginLinkSubject, text); err != nil {
+	if err := s.send(
+		magicLoginLinkSubject, text, model.PostmarkStreamOutbound,
+	); err != nil {
 		return fmt.Errorf("send error: %w", err)
 	}
 	return nil

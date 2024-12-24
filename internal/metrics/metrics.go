@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -8,14 +9,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/xr0-org/progstack/internal/logging"
+	"github.com/xr0-org/progstack/internal/model"
 )
 
 var (
 	/* service metrics */
-	httpRequestTotal = prometheus.NewCounterVec(
+	httpRequest = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "http_requests_total",
-			Help: "Total number of http requests",
+			Name: "http_request",
+			Help: "hylodoc service request",
 		},
 		[]string{"method", "path", "status", "error_type"},
 	)
@@ -23,72 +25,115 @@ var (
 	httpRequestDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "http_request_duration_seconds",
-			Help:    "Duration of http requests",
+			Help:    "hylodoc service request duration",
 			Buckets: prometheus.DefBuckets,
 		},
 		[]string{"method", "path", "status", "error_type"},
 	)
 
-	httpRequestSuccessTotal = prometheus.NewCounterVec(
+	httpRequestSuccess = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "http_request_success_total",
-			Help: "Total number of successful http requests",
+			Name: "http_request_success",
+			Help: "hylodoc service request success",
 		},
 		[]string{"method", "path", "status", "error_type"},
 	)
 
-	httpRequestErrorsTotal = prometheus.NewCounterVec(
+	httpRequestErrors = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "http_request_errors_total",
-			Help: "Total number of failed http requests",
+			Name: "http_request_error",
+			Help: "hylodoc service request error",
 		},
 		[]string{"method", "path", "status", "error_type"},
 	)
 
 	/* downstream metrics */
-	httpClientRequestTotal = prometheus.NewCounterVec(
+	httpClientRequest = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "http_client_request_total",
-			Help: "Total number of client requests",
+			Name: "http_client_request",
+			Help: "downstream request",
 		},
 		[]string{"method", "url"},
 	)
 
-	httpClientSuccessTotal = prometheus.NewCounterVec(
+	httpClientSuccess = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "http_client_success_total",
-			Help: "Total number of successful http client requests",
+			Name: "http_client_success",
+			Help: "downstream request success",
 		},
 		[]string{"method", "url", "status"},
 	)
 
-	httpClientErrorsTotal = prometheus.NewCounterVec(
+	httpClientErrors = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "http_client_errors_total",
-			Help: "Total number of http client errors"},
+			Name: "http_client_error",
+			Help: "downstream request error"},
 		[]string{"method", "url", "status"},
 	)
 
 	httpClientDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "http_client_duration_seconds",
-			Help:    "Duration of http client calls",
+			Help:    "downstream request duration",
 			Buckets: prometheus.DefBuckets,
 		},
 		[]string{"method", "url", "status"},
 	)
+
+	/* custom email error */
+	emailBatchRequest = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "email_batch_request",
+			Help: "email batch request",
+		},
+		[]string{"email_type"},
+	)
+	emailBatchSuccess = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "email_batch_success",
+			Help: "email batch success",
+		},
+		[]string{"email_type"},
+	)
+	emailBatchError = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "email_batch_error",
+			Help: "email batch error",
+		},
+		[]string{"email_type"},
+	)
+	emailInBatchSuccess = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "email_in_batch_success",
+			Help: "email in batch success",
+		},
+		[]string{"postmark_stream"},
+	)
+	emailInBatchError = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "email_in_batch_error",
+			Help: "email in batch error",
+		},
+		[]string{"postmark_stream"},
+	)
 )
 
 func Initialize() {
-	prometheus.MustRegister(httpRequestTotal)
+	prometheus.MustRegister(httpRequest)
+	prometheus.MustRegister(httpRequestSuccess)
+	prometheus.MustRegister(httpRequestErrors)
 	prometheus.MustRegister(httpRequestDuration)
-	prometheus.MustRegister(httpRequestSuccessTotal)
-	prometheus.MustRegister(httpRequestErrorsTotal)
 
-	prometheus.MustRegister(httpClientRequestTotal)
-	prometheus.MustRegister(httpClientSuccessTotal)
-	prometheus.MustRegister(httpClientErrorsTotal)
+	prometheus.MustRegister(httpClientRequest)
+	prometheus.MustRegister(httpClientSuccess)
+	prometheus.MustRegister(httpClientErrors)
 	prometheus.MustRegister(httpClientDuration)
+
+	prometheus.MustRegister(emailBatchRequest)
+	prometheus.MustRegister(emailBatchSuccess)
+	prometheus.MustRegister(emailBatchError)
+	prometheus.MustRegister(emailInBatchSuccess)
+	prometheus.MustRegister(emailInBatchError)
 }
 
 type responseWriterWithStatus struct {
@@ -126,7 +171,7 @@ func Middleware(next http.Handler) http.Handler {
 		next.ServeHTTP(rec, r)
 		duration := time.Since(start).Seconds()
 
-		httpRequestTotal.WithLabelValues(
+		httpRequest.WithLabelValues(
 			r.Method,
 			r.URL.Path,
 			http.StatusText(rec.statusCode),
@@ -135,7 +180,7 @@ func Middleware(next http.Handler) http.Handler {
 
 		/* handle errors */
 		if rec.statusCode >= 200 && rec.statusCode < 400 {
-			httpRequestSuccessTotal.WithLabelValues(
+			httpRequestSuccess.WithLabelValues(
 				r.Method,
 				r.URL.Path,
 				http.StatusText(rec.statusCode),
@@ -143,7 +188,7 @@ func Middleware(next http.Handler) http.Handler {
 			).Inc()
 		} else {
 			errorType := classifyError(rec.statusCode, logger)
-			httpRequestErrorsTotal.WithLabelValues(
+			httpRequestErrors.WithLabelValues(
 				r.Method,
 				r.URL.Path,
 				http.StatusText(rec.statusCode),
@@ -179,17 +224,37 @@ func Handler() http.Handler {
 }
 
 func RecordClientRequest(method, url string) {
-	httpClientRequestTotal.WithLabelValues(method, url).Inc()
+	httpClientRequest.WithLabelValues(method, url).Inc()
 }
 
 func RecordClientSuccess(method, url, status string) {
-	httpClientSuccessTotal.WithLabelValues(method, url, status).Inc()
+	httpClientSuccess.WithLabelValues(method, url, status).Inc()
 }
 
 func RecordClientErrors(method, url, status string) {
-	httpClientErrorsTotal.WithLabelValues(method, url, status).Inc()
+	httpClientErrors.WithLabelValues(method, url, status).Inc()
 }
 
 func RecordClientDuration(method, url string, duration float64, status string) {
 	httpClientDuration.WithLabelValues(method, url, status).Observe(duration)
+}
+
+func RecordEmailBatchRequest() {
+	emailBatchSuccess.WithLabelValues("batch").Inc()
+}
+
+func RecordEmailBatchSuccess() {
+	emailBatchSuccess.WithLabelValues("batch").Inc()
+}
+
+func RecordEmailBatchError() {
+	emailBatchError.WithLabelValues("batch").Inc()
+}
+
+func RecordEmailInBatchSuccess(stream model.PostmarkStream) {
+	emailInBatchSuccess.WithLabelValues(fmt.Sprintf("%s", stream)).Inc()
+}
+
+func RecordEmailInBatchError(stream model.PostmarkStream) {
+	emailInBatchError.WithLabelValues(fmt.Sprintf("%s", stream)).Inc()
 }

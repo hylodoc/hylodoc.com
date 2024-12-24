@@ -7,6 +7,7 @@ letsencrypt/
 .DS_Store
 conf.yml
 docker-compose.yml
+prometheus.yml
 *.swp
 *.swo
 *.pem

@@ -306,6 +306,7 @@ CREATE TABLE stripe_subscriptions (
 );
 
 CREATE TYPE queue_status AS ENUM ('pending', 'sent', 'failed');
+CREATE TYPE postmark_stream AS ENUM ('broadcast', 'outbound');
 
 CREATE TABLE queued_emails (
 	id		SERIAL		PRIMARY KEY,
@@ -318,6 +319,7 @@ CREATE TABLE queued_emails (
 	subject		VARCHAR(1000)	NOT NULL,
 	body		TEXT		NOT NULL,
 	mode		email_mode	NOT NULL,
+	stream		postmark_stream	NOT NULL,
 
 	ended_at	TIMESTAMPTZ
 		CHECK (status = 'pending' OR ended_at IS NOT NULL)

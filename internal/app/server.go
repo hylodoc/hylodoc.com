@@ -27,8 +27,9 @@ import (
 
 const (
 	/* TODO: make configurable */
-	httpPort  = 80
-	httpsPort = 443
+	httpPort        = 80
+	httpsPort       = 443
+	metricsHttpPort = 8000
 )
 
 func Serve(httpClient *httpclient.Client, store *model.Store) error {
@@ -62,7 +63,6 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 
 	/* init metrics */
 	metrics.Initialize()
-	r.Handle("/metrics", metrics.Handler())
 
 	r.HandleFunc("/", index(mixpanelClient))
 	r.HandleFunc("/register", authNService.Register())
@@ -125,6 +125,20 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 
 	/* register subrouter */
 	r.PathPrefix("/").Handler(authR)
+
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", metrics.Handler())
+		log.Printf(
+			"listening (metrics) on http://localhost:%d...\n",
+			metricsHttpPort,
+		)
+		if err := http.ListenAndServe(
+			fmt.Sprintf(":%d", metricsHttpPort), mux,
+		); err != nil {
+			log.Fatal("fatal metrics error", err)
+		}
+	}()
 
 	go func() {
 		mux := http.NewServeMux()

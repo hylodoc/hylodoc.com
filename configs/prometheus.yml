@@ -5,4 +5,4 @@ scrape_configs:
   - job_name: "go_app"
     scrape_interval: 5s
     static_configs:
-      - targets: ["progstack:7999"]
+      - targets: ["progstack:8000"]

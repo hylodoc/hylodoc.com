@@ -31,12 +31,13 @@ func NewSender(
 	return &sender{to, from, mode, store}
 }
 
-func (s *sender) send(subject, body string) error {
-	return s.sendwithheaders(subject, body, nil)
+func (s *sender) send(subject, body string, stream model.PostmarkStream) error {
+	return s.sendwithheaders(subject, body, nil, stream)
 }
 
 func (s *sender) sendwithheaders(
 	subject, body string, headers map[string]string,
+	stream model.PostmarkStream,
 ) error {
 	return emailqueue.NewEmail(
 		s.from.Addr(),
@@ -44,6 +45,7 @@ func (s *sender) sendwithheaders(
 		subject,
 		body,
 		s.emailmode,
+		stream,
 		headers,
 	).Queue(s._store)
 }

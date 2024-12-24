@@ -10,6 +10,7 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email/emailqueue/internal/postmark"
 	"github.com/xr0-org/progstack/internal/httpclient"
+	"github.com/xr0-org/progstack/internal/metrics"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
@@ -65,7 +66,10 @@ func buildbatch(
 			return nil, fmt.Errorf("headers: %w", err)
 		}
 		batch[i] = postmark.NewEmail(
-			e.FromAddr, e.ToAddr, e.Subject, e.Body, e.Mode, headers,
+			e.FromAddr, e.ToAddr, e.Subject, e.Body,
+			e.Mode,
+			e.Stream,
+			headers,
 		)
 	}
 	return batch, nil
@@ -80,8 +84,10 @@ func processresp(
 		); err != nil {
 			return fmt.Errorf("mark sent: %w", err)
 		}
+		metrics.RecordEmailInBatchSuccess(e.Stream)
 		return nil
 	}
+	metrics.RecordEmailInBatchError(e.Stream)
 	log.Printf(
 		"e.ID send error %d: code: %d, message: %s\n",
 		e.ID, resp.ErrorCode(), resp.Message(),

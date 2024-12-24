@@ -13,10 +13,10 @@ import (
 var testRegistry = prometheus.NewRegistry()
 
 func resetTestMetrics() {
-	testRegistry.Unregister(httpRequestTotal)
+	testRegistry.Unregister(httpRequest)
 	testRegistry.Unregister(httpRequestDuration)
 
-	testRegistry.MustRegister(httpRequestTotal)
+	testRegistry.MustRegister(httpRequest)
 	testRegistry.MustRegister(httpRequestDuration)
 }
 
@@ -45,13 +45,13 @@ func TestMetricsMiddlewareSuccess(t *testing.T) {
 	}
 
 	/* test that middleware recorded three successful calls */
-	totalCount := testutil.ToFloat64(httpRequestTotal.WithLabelValues("GET", "/", "OK", "none"))
+	totalCount := testutil.ToFloat64(httpRequest.WithLabelValues("GET", "/", "OK", "none"))
 	if totalCount != 3 {
 		t.Errorf("Expected total count to be 3, got %f", totalCount)
 	}
 
 	/* recorded three successful calls */
-	totalSuccessCount := testutil.ToFloat64(httpRequestSuccessTotal.WithLabelValues("GET", "/", "OK", "none"))
+	totalSuccessCount := testutil.ToFloat64(httpRequestSuccess.WithLabelValues("GET", "/", "OK", "none"))
 	if totalSuccessCount != 3 {
 		t.Errorf("Expected total error count to be 3, got %f", totalSuccessCount)
 	}
@@ -82,18 +82,18 @@ func TestMetricsMiddlewareError(t *testing.T) {
 	}
 
 	/* recorded four total calls */
-	totalCount := testutil.ToFloat64(httpRequestTotal.WithLabelValues("GET", "/path", "Internal Server Error", "none"))
+	totalCount := testutil.ToFloat64(httpRequest.WithLabelValues("GET", "/path", "Internal Server Error", "none"))
 	if totalCount != 4 {
 		t.Errorf("Expected total count to be 3, got %f", totalCount)
 	}
 
 	/* recorded four errors */
-	totalErrorCount := testutil.ToFloat64(httpRequestErrorsTotal.WithLabelValues("GET", "/path", "Internal Server Error", "internal"))
+	totalErrorCount := testutil.ToFloat64(httpRequestErrors.WithLabelValues("GET", "/path", "Internal Server Error", "internal"))
 	if totalErrorCount != 4 {
 		t.Errorf("Expected total error count to be 4, got %f", totalErrorCount)
 	}
 
-	totalSuccessCount := testutil.ToFloat64(httpRequestSuccessTotal.WithLabelValues("GET", "/path", "OK", "none"))
+	totalSuccessCount := testutil.ToFloat64(httpRequestSuccess.WithLabelValues("GET", "/path", "OK", "none"))
 	if totalSuccessCount != 0 {
 		t.Errorf("Expected no success, got %f", totalSuccessCount)
 	}

@@ -7,24 +7,31 @@ import (
 	"github.com/xr0-org/progstack/internal/model"
 )
 
-type Email struct {
+type Email interface {
+	Queue(*model.Store) error
+}
+
+type email struct {
 	from, to, subject, body string
 	mode                    model.EmailMode
+	stream                  model.PostmarkStream
 	headers                 map[string]string
 }
 
 func NewEmail(
-	from, to, subject, body string, mode model.EmailMode,
+	from, to, subject, body string,
+	mode model.EmailMode,
+	stream model.PostmarkStream,
 	headers map[string]string,
-) *Email {
-	return &Email{from, to, subject, body, mode, headers}
+) Email {
+	return &email{from, to, subject, body, mode, stream, headers}
 }
 
-func (e *Email) Queue(store *model.Store) error {
+func (e *email) Queue(store *model.Store) error {
 	return store.ExecTx(context.TODO(), e.queuetx)
 }
 
-func (e *Email) queuetx(q *model.Queries) error {
+func (e *email) queuetx(q *model.Queries) error {
 	id, err := q.InsertQueuedEmail(
 		context.TODO(),
 		model.InsertQueuedEmailParams{
@@ -33,6 +40,7 @@ func (e *Email) queuetx(q *model.Queries) error {
 			Subject:  e.subject,
 			Body:     e.body,
 			Mode:     e.mode,
+			Stream:   e.stream,
 		},
 	)
 	if err != nil {

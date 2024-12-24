@@ -9,6 +9,7 @@ import (
 
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
+	"github.com/xr0-org/progstack/internal/metrics"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
@@ -19,14 +20,17 @@ type Email interface {
 type email struct {
 	from, to, subject, body string
 	mode                    model.EmailMode
+	stream                  model.PostmarkStream
 	headers                 map[string]string
 }
 
 func NewEmail(
-	from, to, subject, body string, mode model.EmailMode,
+	from, to, subject, body string,
+	mode model.EmailMode,
+	stream model.PostmarkStream,
 	headers map[string]string,
 ) Email {
-	return &email{from, to, subject, body, mode, headers}
+	return &email{from, to, subject, body, mode, stream, headers}
 }
 
 type payload struct {
@@ -36,7 +40,7 @@ type payload struct {
 	TextBody      string
 	HtmlBody      string
 	Headers       []header
-	MessageStream string
+	MessageStream model.PostmarkStream
 }
 
 func (e *email) payload() (*payload, error) {
@@ -49,7 +53,7 @@ func (e *email) payload() (*payload, error) {
 			Subject:       e.subject,
 			TextBody:      e.body,
 			Headers:       headers,
-			MessageStream: "outbound", /* XXX */
+			MessageStream: e.stream,
 		}, nil
 	case model.EmailModeHtml:
 		return &payload{
@@ -58,7 +62,7 @@ func (e *email) payload() (*payload, error) {
 			Subject:       e.subject,
 			HtmlBody:      e.body,
 			Headers:       headers,
-			MessageStream: "outbound", /* XXX */
+			MessageStream: e.stream,
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid mode %q", e.mode)
@@ -105,6 +109,7 @@ func SendBatch(emails []Email, c *httpclient.Client) ([]Response, error) {
 		"X-Postmark-Server-Token",
 		config.Config.Email.PostmarkApiKey,
 	)
+	metrics.RecordEmailBatchRequest()
 	resp, err := c.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("do: %w", err)
@@ -115,7 +120,7 @@ func SendBatch(emails []Email, c *httpclient.Client) ([]Response, error) {
 		return nil, fmt.Errorf("read: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		/* TODO: metric */
+		metrics.RecordEmailBatchError()
 		return nil, fmt.Errorf(
 			"status: %d, body: %s",
 			resp.StatusCode,
@@ -126,6 +131,7 @@ func SendBatch(emails []Email, c *httpclient.Client) ([]Response, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal batch: %w", err)
 	}
+	metrics.RecordEmailBatchSuccess()
 	return emailresps, nil
 }
 

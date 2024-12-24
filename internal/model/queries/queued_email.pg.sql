@@ -1,8 +1,8 @@
 -- name: InsertQueuedEmail :one
 INSERT INTO queued_emails (
-	from_addr, to_addr, subject, body, mode
+	from_addr, to_addr, subject, body, mode, stream
 ) VALUES (
-	$1, $2, $3, $4, $5
+	$1, $2, $3, $4, $5, $6
 )
 RETURNING id;
 

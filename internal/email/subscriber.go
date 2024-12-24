@@ -5,6 +5,7 @@ import (
 
 	"github.com/xr0-org/progstack/internal/email/internal/emailtemplate"
 	"github.com/xr0-org/progstack/internal/email/postbody"
+	"github.com/xr0-org/progstack/internal/model"
 )
 
 func (s *sender) SendNewSubscriberEmail(sitename, unsublink string) error {
@@ -18,6 +19,7 @@ func (s *sender) SendNewSubscriberEmail(sitename, unsublink string) error {
 		fmt.Sprintf("Welcome to %s", sitename),
 		text,
 		unsubscribeheaders(unsublink),
+		model.PostmarkStreamOutbound,
 	); err != nil {
 		return fmt.Errorf("error sending email: %w", err)
 	}
@@ -46,6 +48,7 @@ func (s *sender) SendNewPostUpdate(
 	}
 	if err := s.sendwithheaders(
 		posttitle, text, unsubscribeheaders(unsublink),
+		model.PostmarkStreamBroadcast,
 	); err != nil {
 		return fmt.Errorf("error sending email: %w", err)
 	}
