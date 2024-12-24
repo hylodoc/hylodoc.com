@@ -15,6 +15,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/xr0-org/progstack/internal/analytics"
+	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/logging"
@@ -309,11 +310,9 @@ func (b *BlogService) folderSubmit(w http.ResponseWriter, r *http.Request) error
 		return fmt.Errorf("error getting blog `%d': %w", intBlogID, err)
 	}
 
-	logger.Printf("src: %s\n", src)
-	logger.Printf("dst: %s\n", blog.RepositoryPath)
-
 	/* extract to appropriate path for folders */
-	if err := clearAndExtract(src, blog.RepositoryPath); err != nil {
+	assert.Assert(blog.FolderPath.Valid)
+	if err := clearAndExtract(src, blog.FolderPath.String); err != nil {
 		return err
 	}
 
@@ -380,7 +379,7 @@ func parseFolderUpdateRequest(r *http.Request) (string, error) {
 	return tmpFile.Name(), nil
 }
 
-type SetStatusSubmitResponse struct {
+type MessageResponse struct {
 	Message string `json:"message"`
 }
 
@@ -421,7 +420,7 @@ func (b *BlogService) SetStatusSubmit() http.HandlerFunc {
 		} else {
 			message = fmt.Sprintf("%s was taken offline successfully.", change.Domain)
 		}
-		if err = json.NewEncoder(w).Encode(SetStatusSubmitResponse{
+		if err = json.NewEncoder(w).Encode(MessageResponse{
 			Message: message,
 		}); err != nil {
 			logger.Printf("Failed to encode response: %v\n", err)
@@ -568,4 +567,57 @@ func (b *BlogService) ConfigDomain() http.HandlerFunc {
 			logger,
 		)
 	}
+}
+
+func (b *BlogService) SyncRepository() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger := logging.Logger(r)
+		logger.Println("SyncRepository handler...")
+
+		b.mixpanel.Track("SyncRepository", r)
+
+		message := "Successfully synced repository"
+		if err := b.syncRepository(w, r); err != nil {
+			var customErr *util.CustomError
+			if errors.As(err, &customErr) {
+				logger.Printf("Client Error: %v\n", customErr)
+				http.Error(w, customErr.Error(), http.StatusBadRequest)
+				return
+			} else {
+				logger.Printf("Internal Server Error: %v\n", err)
+				http.Error(w, "", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(MessageResponse{
+			Message: message,
+		}); err != nil {
+			logger.Printf("Error encoding response: %v\n", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func (b *BlogService) syncRepository(w http.ResponseWriter, r *http.Request) error {
+	logger := logging.Logger(r)
+
+	blogID := mux.Vars(r)["blogID"]
+	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	if err != nil {
+		return err
+	}
+	blog, err := b.store.GetBlogByID(context.TODO(), int32(intBlogID))
+	if err != nil {
+		return fmt.Errorf("error getting blog `%d': %w", intBlogID, err)
+	}
+	if err := UpdateRepositoryOnDisk(
+		b.client, b.store, &blog, logger,
+	); err != nil {
+		return fmt.Errorf("update error: %w", err)
+	}
+	return nil
 }

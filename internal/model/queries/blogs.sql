@@ -2,7 +2,7 @@
 INSERT INTO blogs (
 	user_id,
 	gh_repository_id,
-	repository_path,
+	folder_path,
 	theme,
 	subdomain,
 	test_branch,
@@ -45,6 +45,11 @@ UPDATE blogs
 SET name = @name::VARCHAR
 WHERE id = $1;
 
+-- name: UpdateBlogLiveHash :exec
+UPDATE blogs
+SET live_hash = @live_hash::VARCHAR
+WHERE id = $1;
+
 -- name: CheckBlogOwnership :one
 SELECT EXISTS (
 	SELECT 1
@@ -78,10 +83,10 @@ SELECT id
 FROM blogs b
 WHERE user_id = $1;
 
--- name: ListBlogRepoPathsByUserID :many
-SELECT repository_path
+-- name: ListBlogFolderPathsByUserID :many
+SELECT folder_path::VARCHAR
 FROM blogs b
-WHERE user_id = $1;
+WHERE user_id = $1 AND blog_type = 'folder';
 
 -- name: GetBlogIsLive :one
 SELECT is_live

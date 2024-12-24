@@ -31,6 +31,8 @@ type BlogInfo struct {
 	UpdatedAt                time.Time
 	IsRepository             bool
 	IsLive                   bool
+	Hash                     string
+	SyncUrl                  string
 }
 
 func GetBlogsInfo(s *model.Store, userID int32) ([]BlogInfo, error) {
@@ -118,6 +120,13 @@ func buildConfigUrl(blogID int32) string {
 	)
 }
 
+func buildSyncUrl(blogID int32) string {
+	return fmt.Sprintf(
+		"/user/blogs/%d/sync",
+		blogID,
+	)
+}
+
 func getBlogInfo(s *model.Store, blogID int32) (BlogInfo, error) {
 	blog, err := s.GetBlogByID(context.TODO(), blogID)
 	if err != nil {
@@ -150,6 +159,8 @@ func getBlogInfo(s *model.Store, blogID int32) (BlogInfo, error) {
 		UpdatedAt:                blog.UpdatedAt,
 		IsRepository:             blog.BlogType == model.BlogTypeRepository,
 		IsLive:                   isLive,
+		Hash:                     blog.LiveHash.String,
+		SyncUrl:                  buildSyncUrl(blog.ID),
 	}, nil
 }
 

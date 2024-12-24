@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/xr0-org/progstack/internal/authn"
@@ -370,6 +371,10 @@ func handleInstallationRepositoriesAdded(
 			Name:           repo.Name,
 			FullName:       repo.FullName,
 			Url:            fmt.Sprintf("https://github.com/%s", repo.FullName),
+			PathOnDisk: filepath.Join(
+				config.Config.Progstack.RepositoriesPath,
+				repo.FullName,
+			),
 		})
 		if err != nil {
 			/* XXX: cleanup delete from disk */
@@ -463,9 +468,7 @@ func handlePush(
 		return nil
 	}
 
-	if err := blog.UpdateRepositoryOnDisk(
-		c, s, event.Repository.ID, branchName, logger,
-	); err != nil {
+	if err := blog.UpdateRepositoryOnDisk(c, s, &b, logger); err != nil {
 		return fmt.Errorf("error pulling latest changes: %w", err)
 	}
 	return nil

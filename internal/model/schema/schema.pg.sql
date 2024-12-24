@@ -111,6 +111,7 @@ CREATE TABLE repositories (
 	full_name		VARCHAR(255)	NOT NULL,
 	url			VARCHAR(255)	NOT NULL,
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
+	path_on_disk		VARCHAR(1000)	NOT NULL,
 
 	CONSTRAINT fk_gh_installation_id
 		FOREIGN KEY (installation_id)
@@ -139,12 +140,13 @@ CREATE TABLE blogs (
 	from_address		VARCHAR(255)	NOT NULL,
 	blog_type		blog_type	NOT NULL,
 	email_mode		email_mode	NOT NULL,
-	repository_path		VARCHAR(255)	NOT NULL,			-- path on disk
-	live_hash		VARCHAR(1000)	NOT NULL,
+	live_hash		VARCHAR(1000),
 
 	gh_repository_id	BIGINT				UNIQUE		DEFAULT(NULL),
 	test_branch		VARCHAR(100),
 	live_branch		VARCHAR(100),
+
+	folder_path		VARCHAR(1000),			-- path on disk
 
 	is_live			BOOLEAN		NOT NULL			DEFAULT(false),
 
@@ -164,11 +166,13 @@ CREATE TABLE blogs (
 			AND gh_repository_id	IS NOT NULL
 			AND test_branch		IS NOT NULL
 			AND live_branch 	IS NOT NULL
+			AND folder_path		IS NULL
 		) OR (
 			blog_type = 'folder'
 			AND gh_repository_id	IS NULL
 			AND test_branch		IS NULL
 			AND live_branch 	IS NULL
+			AND folder_path		IS NOT NULL
 		)
 	)
 );
@@ -302,21 +306,21 @@ CREATE TABLE stripe_subscriptions (
 	updated_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now())
 );
 
-CREATE TYPE queue_status AS ENUM ('pending', 'sent', 'failed');
+CREATE TYPE queued_email_status AS ENUM ('pending', 'sent', 'failed');
 CREATE TYPE postmark_stream AS ENUM ('broadcast', 'outbound');
 
 CREATE TABLE queued_emails (
-	id		SERIAL		PRIMARY KEY,
-	created_at	TIMESTAMPTZ	NOT NULL	DEFAULT(now()),
-	status		queue_status	NOT NULL	DEFAULT('pending'),
-	fail_count	INTEGER		NOT NULL	DEFAULT(0),
+	id		SERIAL			PRIMARY KEY,
+	created_at	TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
+	status		queued_email_status	NOT NULL	DEFAULT('pending'),
+	fail_count	INTEGER			NOT NULL	DEFAULT(0),
 
-	from_addr	VARCHAR(1000)	NOT NULL,
-	to_addr		VARCHAR(1000)	NOT NULL,
-	subject		VARCHAR(1000)	NOT NULL,
-	body		TEXT		NOT NULL,
-	mode		email_mode	NOT NULL,
-	stream		postmark_stream	NOT NULL,
+	from_addr	VARCHAR(1000)		NOT NULL,
+	to_addr		VARCHAR(1000)		NOT NULL,
+	subject		VARCHAR(1000)		NOT NULL,
+	body		TEXT			NOT NULL,
+	mode		email_mode		NOT NULL,
+	stream		postmark_stream		NOT NULL,
 
 	ended_at	TIMESTAMPTZ
 		CHECK (status = 'pending' OR ended_at IS NOT NULL)

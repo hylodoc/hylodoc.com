@@ -13,10 +13,10 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/xr0-org/progstack-ssg/pkg/ssg"
+	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/dns"
@@ -78,7 +78,9 @@ type CreateRepositoryBlogRequest struct {
 	Flow         string `json:"flow"`
 }
 
-func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Request) (string, error) {
+func (b *BlogService) createRepositoryBlog(
+	w http.ResponseWriter, r *http.Request,
+) (string, error) {
 	logger := logging.Logger(r)
 
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
@@ -101,28 +103,9 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 		return "", fmt.Errorf("could not convert repositoryID `%s' to int64: %w", req.RepositoryID, err)
 	}
 
-	repo, err := b.store.GetRepositoryByGhRepositoryID(context.TODO(), intRepoID)
-	if err != nil {
-		return "", fmt.Errorf("could not get repository for ghRepoId `%d': %w", intRepoID, err)
-	}
-
 	theme, err := validateTheme(req.Theme)
 	if err != nil {
 		return "", err
-	}
-
-	repopath := buildRepositoryPath(repo.FullName)
-
-	if err := UpdateRepositoryOnDisk(
-		b.client, b.store, intRepoID, req.LiveBranch,
-		logger,
-	); err != nil {
-		return "", fmt.Errorf("error pulling latest changes on live branch: %w", err)
-	}
-
-	h, err := ssg.GetSiteHash(repopath)
-	if err != nil {
-		return "", fmt.Errorf("cannot get hash: %w", err)
 	}
 
 	sub, err := dns.ParseSubdomain(req.Subdomain)
@@ -136,9 +119,8 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 			Valid: true,
 			Int64: intRepoID,
 		},
-		RepositoryPath: repopath,
-		Theme:          theme,
-		Subdomain:      sub,
+		Theme:     theme,
+		Subdomain: sub,
 		TestBranch: sql.NullString{
 			Valid:  true,
 			String: req.TestBranch,
@@ -147,9 +129,8 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 			Valid:  true,
 			String: req.LiveBranch,
 		},
-		LiveHash:  h,
 		BlogType:  model.BlogTypeRepository,
-		EmailMode: model.EmailModePlaintext,
+		EmailMode: model.EmailModeHtml,
 		FromAddress: fmt.Sprintf(
 			"%s@%s",
 			sub, config.Config.Progstack.EmailDomain,
@@ -157,6 +138,12 @@ func (b *BlogService) createRepositoryBlog(w http.ResponseWriter, r *http.Reques
 	})
 	if err != nil {
 		return "", fmt.Errorf("could not create blog: %w", err)
+	}
+
+	if err := UpdateRepositoryOnDisk(
+		b.client, b.store, &blog, logger,
+	); err != nil {
+		return "", fmt.Errorf("error pulling latest changes on live branch: %w", err)
 	}
 
 	// add owner as subscriber
@@ -198,25 +185,17 @@ func validateTheme(theme string) (model.BlogTheme, error) {
 	}
 }
 
-func buildRepositoryPath(repoFullName string) string {
-	return filepath.Join(
-		config.Config.Progstack.RepositoriesPath,
-		repoFullName,
-	)
-}
-
 func UpdateRepositoryOnDisk(
-	c *httpclient.Client, s *model.Store, ghRepoId int64, branch string,
+	c *httpclient.Client, s *model.Store, blog *model.Blog,
 	logger *log.Logger,
 ) error {
-	logger.Printf("updating repository `%d' on disk...\n", ghRepoId)
-
-	/* get repository */
-	repo, err := s.GetRepositoryByGhRepositoryID(context.TODO(), ghRepoId)
+	assert.Assert(blog.GhRepositoryID.Valid)
+	repo, err := s.GetRepositoryByGhRepositoryID(
+		context.TODO(), blog.GhRepositoryID.Int64,
+	)
 	if err != nil {
-		return err
+		return fmt.Errorf("get repo: %w", err)
 	}
-
 	accessToken, err := authn.GetInstallationAccessToken(
 		c,
 		config.Config.Github.AppID,
@@ -224,16 +203,29 @@ func UpdateRepositoryOnDisk(
 		config.Config.Github.PrivateKeyPath,
 	)
 	if err != nil {
-		return fmt.Errorf("access token error: %w", err)
+		return fmt.Errorf("access token: %w", err)
 	}
-
+	assert.Assert(blog.LiveBranch.Valid)
 	if err := cloneRepo(
-		buildRepositoryPath(repo.FullName),
+		repo.PathOnDisk,
 		repo.Url,
-		branch,
+		blog.LiveBranch.String,
 		accessToken,
 	); err != nil {
-		return fmt.Errorf("clone error: %w", err)
+		return fmt.Errorf("clone: %w", err)
+	}
+	h, err := ssg.GetSiteHash(repo.PathOnDisk)
+	if err != nil {
+		return fmt.Errorf("get site hash: %w", err)
+	}
+	if err := s.UpdateBlogLiveHash(
+		context.TODO(),
+		model.UpdateBlogLiveHashParams{
+			ID:       blog.ID,
+			LiveHash: h,
+		},
+	); err != nil {
+		return fmt.Errorf("update live hash: %w", err)
 	}
 	return nil
 }
@@ -285,8 +277,11 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		return "", err
 	}
 
-	userIDString := strconv.FormatInt(int64(sesh.GetUserID()), 10)
-	dst := buildFolderPath(userIDString)
+	dst := filepath.Join(
+		config.Config.Progstack.FoldersPath,
+		strconv.FormatInt(int64(sesh.GetUserID()), 10),
+		uuid.New().String(),
+	)
 
 	logger.Printf("src: %s\n", req.src)
 	logger.Printf("dst: %s\n", dst)
@@ -311,11 +306,12 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		GhRepositoryID: sql.NullInt64{
 			Valid: false,
 		},
-		RepositoryPath: dst,
-		Subdomain:      sub,
-		Theme:          req.theme,
-		BlogType:       model.BlogTypeFolder,
-		LiveHash:       h,
+		FolderPath: sql.NullString{dst, true},
+		Subdomain:  sub,
+		Theme:      req.theme,
+		BlogType:   model.BlogTypeFolder,
+		LiveHash:   sql.NullString{h, true},
+		EmailMode:  model.EmailModeHtml,
 		FromAddress: fmt.Sprintf(
 			"%s@%s",
 			sub, config.Config.Progstack.EmailDomain,
@@ -423,64 +419,47 @@ func isValidFileType(filename string) bool {
 	return allowedExtensions[ext]
 }
 
-func buildFolderPath(userID string) string {
-	return filepath.Join(
-		config.Config.Progstack.FoldersPath,
-		userID,
-		uuid.New().String(),
-	)
-}
-
 func extractZip(zipPath, dest string) error {
-	/* open zip file */
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
-		return fmt.Errorf("failed to open zip file: %w", err)
+		return fmt.Errorf("read zip: %w", err)
 	}
 	defer r.Close()
-
-	/* loop over files in zip archive */
 	for _, f := range r.File {
-		/* create the destination path by removing the top-level * directory */
 		destPath := filepath.Join(dest, f.Name)
 
-		/* remove the top-level directory if it exists */
-		if strings.Contains(destPath, "/") {
-			parts := strings.SplitN(f.Name, "/", 2) /* split only on the first "/" */
-			if len(parts) > 1 {
-				destPath = filepath.Join(dest, parts[1]) /* use the second part onwards */
-			}
+		/* ensure directory exists */
+		if err := os.MkdirAll(
+			filepath.Dir(destPath), os.ModePerm,
+		); err != nil {
+			return fmt.Errorf("create directory: %w", err)
 		}
 
-		/* ensure the directory exists */
-		if err := os.MkdirAll(filepath.Dir(destPath), os.ModePerm); err != nil {
-			return fmt.Errorf("failed to create directory: %w", err)
-		}
-
-		/* check if the current file is actually a directory */
 		if f.FileInfo().IsDir() {
-			/* skip creating a file for directories */
+			/* skip creating file for directories */
 			continue
 		}
 
-		/* open the file inside the zip archive */
-		srcFile, err := f.Open()
-		if err != nil {
-			return fmt.Errorf("failed to open file in zip: %w", err)
+		if err := copyzippedfile(f, destPath); err != nil {
+			return fmt.Errorf("copy: %w", err)
 		}
-		defer srcFile.Close()
+	}
+	return nil
+}
 
-		/* create the destination file */
-		dstFile, err := os.Create(destPath)
-		if err != nil {
-			return fmt.Errorf("failed to create destination file: %w", err)
-		}
-		defer dstFile.Close()
-
-		/* copy the content */
-		if _, err := io.Copy(dstFile, srcFile); err != nil {
-			return fmt.Errorf("failed to copy file contents: %w", err)
-		}
+func copyzippedfile(f *zip.File, dstPath string) error {
+	src, err := f.Open()
+	if err != nil {
+		return fmt.Errorf("src: %w", err)
+	}
+	defer src.Close()
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		return fmt.Errorf("dst: %w", err)
+	}
+	defer dst.Close()
+	if _, err := io.Copy(dst, src); err != nil {
+		return err
 	}
 	return nil
 }

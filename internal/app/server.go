@@ -110,6 +110,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	blogR.HandleFunc("/set-live-branch", blogService.LiveBranchSubmit())
 	blogR.HandleFunc("/set-folder", blogService.FolderSubmit())
 	blogR.HandleFunc("/set-status", blogService.SetStatusSubmit())
+	blogR.HandleFunc("/sync", blogService.SyncRepository())
 	blogR.HandleFunc("/email", blogService.SendPostEmail())
 
 	blogR.HandleFunc("/metrics", blogService.SiteMetrics())

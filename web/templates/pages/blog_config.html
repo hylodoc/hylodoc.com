@@ -109,6 +109,14 @@
 </section>
 {{ end }}
 
+<section>
+	<div class="container">
+		<h3>Manually sync repository with Github</h3>
+		<p>Hash: {{ .Data.Blog.Hash }}</p>
+		<a href="{{ .Data.Blog.SyncUrl }}" class="button">Sync</a>
+	</div>
+</section>
+
 <!-- Change theme -->
 <section>
 	<div class="container">
