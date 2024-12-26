@@ -12,7 +12,8 @@
 <!-- Configure domains and subdomain -->
 <section>
 	<div class="container">
-		<h3>Subdomain</h3>
+		<h3>Domains</h3>
+		<h4>Subdomain</h4>
 		<!-- need these as templates so that multiple blogs can be setup at once -->
 		<form id="subdomainForm" onsubmit="return false;">
 			<label for="subdomainInput">Configure subdomain</label>
@@ -33,7 +34,7 @@
 			<div id="availabilityMessage" class="availability-message"></div>
 		</form>
 
-		<h3>Custom Domain</h3>
+		<h4>Custom Domain</h4>
 		<p>
 			{{ if .Data.Blog.Domain }}
 			<b>{{.Data.Blog.Domain}}</b>.
@@ -41,79 +42,6 @@
 			{{ end }}
 			<a href="{{ .Data.Blog.ConfigureCustomDomainUrl }}">Click here</a> to configure.
 		</p>
-	</div>
-</section>
-
-<!-- Configure git -->
-{{ if .Data.Blog.IsRepository }}
-<section>
-	<div class="container">
-		<h3>Git</h3>
-
-		<!-- Submit git branch for test builds -->
-		<form id="test-branch-form" onsubmit="return false;">
-			<label for="testBranch">Set git branch for test site generation</label>
-			<div class="row">
-				<div class="four columns">
-					<input
-						class="u-full-width"
-						autocomplete="off"
-						type="text"
-						id="testBranch"
-						value="{{ if .Data.Blog.TestBranch }}{{ .Data.Blog.TestBranch }}{{ end }}"
-						placeholder="Enter test-build branch"
-					/>
-				</div>
-				<div class="three columns u-pull-left">
-					<button type="submit">Save</button>
-				</div>
-			</div>
-		</form>
-
-		<!-- Submit git branch for live builds -->
-		<form id="live-branch-form" onsubmit="return false;">
-			<label for="liveBranch">Set git branch for live builds</label>
-			<div class="row">
-				<div class="four columns">
-					<input
-						class="u-full-width"
-						autocomplete="off"
-						type="text"
-						id="liveBranch"
-						value="{{ if .Data.Blog.LiveBranch }}{{ .Data.Blog.LiveBranch }}{{ end }}"
-						placeholder="Enter live-build branch"
-					/>
-				</div>
-				<div class="three columns u-pull-left">
-					<button type="submit">Save</button>
-				</div>
-			</div>
-		</form>
-	</div>
-</section>
-{{ else }}
-<section>
-	<div class="container">
-		<form id="folderUpdateForm" enctype="multipart/form-data">
-			<!-- Select folder -->
-			<div class="row">
-				<div class="four columns">
-					<label for="folder">Select Folder (ZIP):</label>
-					<input type="file" id="folder" name="folder" accept=".zip" required>
-				</div>
-			</div>
-
-			<button type="submit" id="folderUpdateBtn">Update</button>
-		</form>
-	</div>
-</section>
-{{ end }}
-
-<section>
-	<div class="container">
-		<h3>Manually sync repository with Github</h3>
-		<p>Hash: {{ .Data.Blog.Hash }}</p>
-		<a href="{{ .Data.Blog.SyncUrl }}" class="button">Sync</a>
 	</div>
 </section>
 
@@ -139,6 +67,81 @@
 		</form>
 	</div>
 </section>
+
+
+
+<!-- Configure git -->
+{{ if .Data.Blog.IsRepository }}
+<section>
+	<div class="container">
+		<h3>Repo</h3>
+
+		<h4>Branches</h4>
+		<!-- Submit git branch for test builds -->
+		<form id="test-branch-form" onsubmit="return false;">
+			<label for="testBranch">Test branch</label>
+			<div class="row">
+				<div class="four columns">
+					<input
+						class="u-full-width"
+						autocomplete="off"
+						type="text"
+						id="testBranch"
+						value="{{ if .Data.Blog.TestBranch }}{{ .Data.Blog.TestBranch }}{{ end }}"
+						placeholder="Enter test-build branch"
+					/>
+				</div>
+				<div class="three columns u-pull-left">
+					<button type="submit">Save</button>
+				</div>
+			</div>
+		</form>
+
+		<!-- Submit git branch for live builds -->
+		<form id="live-branch-form" onsubmit="return false;">
+			<label for="liveBranch">Live branch</label>
+			<div class="row">
+				<div class="four columns">
+					<input
+						class="u-full-width"
+						autocomplete="off"
+						type="text"
+						id="liveBranch"
+						value="{{ if .Data.Blog.LiveBranch }}{{ .Data.Blog.LiveBranch }}{{ end }}"
+						placeholder="Enter live-build branch"
+					/>
+				</div>
+				<div class="three columns u-pull-left">
+					<button type="submit">Save</button>
+				</div>
+			</div>
+		</form>
+
+
+		<h4>Manual sync</h4>
+		<p>Current hash: {{ .Data.Blog.Hash }}</p>
+		<p>Hit the button below to manually sync with the repository on
+		GitHub.</p>
+		<a href="{{ .Data.Blog.SyncUrl }}" class="button">Sync</a>
+	</div>
+</section>
+{{ else }}
+<section>
+	<div class="container">
+		<form id="folderUpdateForm" enctype="multipart/form-data">
+			<!-- Select folder -->
+			<div class="row">
+				<div class="four columns">
+					<label for="folder">Select Folder (ZIP):</label>
+					<input type="file" id="folder" name="folder" accept=".zip" required>
+				</div>
+			</div>
+
+			<button type="submit" id="folderUpdateBtn">Update</button>
+		</form>
+	</div>
+</section>
+{{ end }}
 
 <!-- Toggle site between live/offline -->
 <section>

@@ -576,7 +576,6 @@ func (b *BlogService) SyncRepository() http.HandlerFunc {
 
 		b.mixpanel.Track("SyncRepository", r)
 
-		message := "Successfully synced repository"
 		if err := b.syncRepository(w, r); err != nil {
 			var customErr *util.CustomError
 			if errors.As(err, &customErr) {
@@ -588,16 +587,6 @@ func (b *BlogService) SyncRepository() http.HandlerFunc {
 				http.Error(w, "", http.StatusInternalServerError)
 				return
 			}
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(MessageResponse{
-			Message: message,
-		}); err != nil {
-			logger.Printf("Error encoding response: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
 		}
 	}
 }
@@ -619,5 +608,15 @@ func (b *BlogService) syncRepository(w http.ResponseWriter, r *http.Request) err
 	); err != nil {
 		return fmt.Errorf("update error: %w", err)
 	}
+	http.Redirect(
+		w, r,
+		fmt.Sprintf(
+			"%s://%s/user/blogs/%d/config",
+			config.Config.Progstack.Protocol,
+			config.Config.Progstack.ServiceName,
+			blog.ID,
+		),
+		http.StatusTemporaryRedirect,
+	)
 	return nil
 }
