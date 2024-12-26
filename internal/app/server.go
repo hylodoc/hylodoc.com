@@ -122,7 +122,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 		).InstallationCallback(),
 	)
 	r.HandleFunc("/stripe/webhook", billingService.StripeWebhook())
-	r.HandleFunc("/pricing", billingService.Pricing())
+	r.HandleFunc("/pricing", handler.AsHttp(billingService.Pricing))
 
 	r.HandleFunc("/blogs/{blogID}/subscribe", blogService.SubscribeToBlog()).Methods("POST")
 	r.HandleFunc("/blogs/unsubscribe", blogService.UnsubscribeFromBlog())
@@ -144,7 +144,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	authR.HandleFunc("/create-folder-blog", blogService.CreateFolderBlog())
 
 	/* billing */
-	authR.HandleFunc("/stripe/billing-portal", billingService.BillingPortal())
+	authR.HandleFunc("/stripe/billing-portal", handler.AsHttp(billingService.BillingPortal))
 
 	blogR := authR.PathPrefix("/blogs/{blogID}").Subrouter()
 	blogR.Use(blogService.Middleware)
