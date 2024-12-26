@@ -104,17 +104,17 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	/* init metrics */
 	metrics.Initialize()
 
-	r.HandleFunc("/", handler.AsHttp(index, store))
+	r.HandleFunc("/", handler.AsHttp(index))
 	authNService := authn.NewAuthNService(httpClient, store, mixpanelClient)
-	r.HandleFunc("/register", authNService.Register())
-	r.HandleFunc("/login", authNService.Login())
-	r.HandleFunc("/gh/login", authNService.GithubLogin())
-	r.HandleFunc("/gh/oauthcallback", authNService.GithubOAuthCallback())
-	r.HandleFunc("/gh/linkcallback", authNService.GithubLinkCallback())
-	r.HandleFunc("/magic/register", authNService.MagicRegister())
-	r.HandleFunc("/magic/registercallback", authNService.MagicRegisterCallback())
-	r.HandleFunc("/magic/login", authNService.MagicLogin())
-	r.HandleFunc("/magic/logincallback", authNService.MagicLoginCallback())
+	r.HandleFunc("/register", handler.AsHttp(authNService.Register))
+	r.HandleFunc("/login", handler.AsHttp(authNService.Login))
+	r.HandleFunc("/gh/login", handler.AsHttp(authNService.GithubLogin))
+	r.HandleFunc("/gh/oauthcallback", handler.AsHttp(authNService.GithubOAuthCallback))
+	r.HandleFunc("/gh/linkcallback", handler.AsHttp(authNService.GithubLinkCallback))
+	r.HandleFunc("/magic/register", handler.AsHttp(authNService.MagicRegister))
+	r.HandleFunc("/magic/registercallback", handler.AsHttp(authNService.MagicRegisterCallback))
+	r.HandleFunc("/magic/login", handler.AsHttp(authNService.MagicLogin))
+	r.HandleFunc("/magic/logincallback", handler.AsHttp(authNService.MagicLoginCallback))
 	r.HandleFunc(
 		"/gh/installcallback",
 		installation.NewInstallationService(
@@ -132,8 +132,8 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	authR.Use(authn.Middleware)
 	userService := user.NewUserService(store, mixpanelClient)
 	authR.HandleFunc("/", userService.Home())
-	authR.HandleFunc("/auth/logout", authNService.Logout())
-	authR.HandleFunc("/gh/linkgithub", authNService.LinkGithubAccount())
+	authR.HandleFunc("/auth/logout", handler.AsHttp(authNService.Logout))
+	authR.HandleFunc("/gh/linkgithub", handler.AsHttp(authNService.LinkGithubAccount))
 	authR.HandleFunc("/account", userService.Account())
 	authR.HandleFunc("/subdomain-check", blogService.SubdomainCheck())
 	authR.HandleFunc("/create-new-blog", userService.CreateNewBlog())

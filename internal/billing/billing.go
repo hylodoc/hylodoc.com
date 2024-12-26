@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"strings"
 
@@ -99,9 +100,8 @@ func (b *BillingService) Pricing() http.HandlerFunc {
 }
 
 func AutoSubscribeToFreePlan(
-	s *model.Store, r *http.Request, user model.User,
+	user model.User, s *model.Store, logger *log.Logger,
 ) error {
-	logger := logging.Logger(r)
 	logger.Println("AutoSubscribeToFreePlan...")
 
 	/* create customer in stripe */

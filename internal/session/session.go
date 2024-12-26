@@ -22,14 +22,14 @@ var (
 )
 
 type Session struct {
-	id              string    `json:"id"`
-	userID          *int32    `json:"user_id,omitempty"` /* nil for unauth sessions */
-	email           *string   `json:"email,omitempty"`
-	username        *string   `json:"username,omitempty"`
-	githubLinked    bool      `json:"github_linked,omitempty"`
-	githubEmail     *string   `json:"github_email,omitempty"`
-	expiresAt       time.Time `json:"expires_at"`
-	isAuthenticated bool      `json:"is_authenticated"`
+	id              uuid.UUID
+	userID          *int32
+	email           *string
+	username        *string
+	githubLinked    bool
+	githubEmail     *string
+	expiresAt       time.Time
+	isAuthenticated bool
 }
 
 func CreateUnauthSession(
@@ -53,7 +53,7 @@ func CreateUnauthSession(
 	})
 
 	return &Session{
-		id:              unauthSession.ID.String(),
+		id:              unauthSession.ID,
 		expiresAt:       unauthSession.ExpiresAt,
 		isAuthenticated: false,
 	}, nil
@@ -98,7 +98,7 @@ func convertRowToSession(row model.GetAuthSessionRow) *Session {
 		ghEmail = row.GhEmail.String
 	}
 	return &Session{
-		id:              row.ID.String(),
+		id:              row.ID,
 		userID:          &row.UserID,
 		email:           &row.Email,
 		username:        &row.Username,
@@ -109,29 +109,10 @@ func convertRowToSession(row model.GetAuthSessionRow) *Session {
 	}
 }
 
-func EndAuthSession(
-	s *model.Store, w http.ResponseWriter, sessionID string,
-	logger *log.Logger,
-) error {
+func (sesh *Session) End(s *model.Store, logger *log.Logger) error {
 	logger.Println("ending auth session...")
 
-	uuid, err := uuid.Parse(sessionID)
-	if err != nil {
-		return fmt.Errorf("could not parse sessionID: %w", err)
-	}
-	err = s.EndAuthSession(context.TODO(), uuid)
-	if err != nil {
-		return err
-	}
-	/* expire the cookie */
-	http.SetCookie(w, &http.Cookie{
-		Name:    CookieName,
-		Value:   "",
-		Path:    "/",
-		Expires: time.Unix(0, 0),
-		MaxAge:  -1,
-	})
-	return nil
+	return s.EndAuthSession(context.TODO(), sesh.id)
 }
 
 func GetSession(
@@ -159,7 +140,7 @@ func GetSession(
 	if err == nil {
 		logger.Printf("Found unauth session\n")
 		return &Session{
-			id:        unauth.ID.String(),
+			id:        unauth.ID,
 			expiresAt: unauth.ExpiresAt,
 		}, nil
 	}
@@ -171,7 +152,7 @@ func GetSession(
 
 /* both */
 func (s *Session) GetSessionID() string {
-	return s.id
+	return s.id.String()
 }
 
 func (s *Session) IsAuthenticated() bool {

@@ -7,14 +7,13 @@ import (
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/logging"
-	"github.com/xr0-org/progstack/internal/model"
 )
 
 type HandlerFunc func(request.Request) (response.Response, error)
 
-func AsHttp(h HandlerFunc, s *model.Store) http.HandlerFunc {
+func AsHttp(h HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := execute(h, s, w, r); err != nil {
+		if err := execute(h, w, r); err != nil {
 			/* TODO: error page */
 			logging.Logger(r).Println("AsHttp error", err)
 			http.Error(w, "", http.StatusInternalServerError)
@@ -24,10 +23,9 @@ func AsHttp(h HandlerFunc, s *model.Store) http.HandlerFunc {
 }
 
 func execute(
-	h HandlerFunc, s *model.Store,
-	w http.ResponseWriter, httpReq *http.Request,
+	h HandlerFunc, w http.ResponseWriter, httpReq *http.Request,
 ) error {
-	req, err := request.NewRequest(httpReq)
+	req, err := request.NewRequest(httpReq, w)
 	if err != nil {
 		return fmt.Errorf("request: %w", err)
 	}
