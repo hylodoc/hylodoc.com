@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/util"
 )
@@ -98,6 +97,7 @@ type InstallationTxParams struct {
 	UserID               int32
 	Email                string
 	RepositoriesTxParams []RepositoryTxParams
+	RepositoriesPath     string
 }
 
 func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxParams) error {
@@ -117,7 +117,7 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 				FullName:       repositoryTxParams.FullName,
 				Url:            fmt.Sprintf("https://github.com/%s", repositoryTxParams.FullName), /* ghUrl not always in events */
 				PathOnDisk: filepath.Join(
-					config.Config.Progstack.RepositoriesPath,
+					arg.RepositoriesPath,
 					repositoryTxParams.FullName,
 				),
 			})

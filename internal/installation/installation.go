@@ -195,6 +195,7 @@ func buildCreateInstallationTxParams(installationID int64, userID int32, ghEmail
 		})
 	}
 	iTxParams.RepositoriesTxParams = repositoryTxParams
+	iTxParams.RepositoriesPath = config.Config.Progstack.RepositoriesPath
 	return iTxParams
 }
 
