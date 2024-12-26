@@ -3,7 +3,6 @@ package blog
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -11,10 +10,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/xr0-org/progstack/internal/app/handler/request"
+	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/blog/emaildata"
 	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
@@ -24,49 +23,33 @@ type SiteData struct {
 	CumulativeCounts template.JS
 }
 
-func (b *BlogService) SiteMetrics() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("SiteMetrics handler...")
+func (b *BlogService) SiteMetrics(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("SiteMetrics handler...")
 
-		b.mixpanel.Track("SiteMetrics", r)
+	r.MixpanelTrack("SiteMetrics")
 
-		if err := b.siteMetrics(w, r); err != nil {
-			var customErr *util.CustomError
-			if errors.As(err, &customErr) {
-				http.Error(
-					w, customErr.Error(), customErr.Code,
-				)
-			} else {
-				http.Error(
-					w,
-					"Internal Server Error",
-					http.StatusInternalServerError,
-				)
-			}
-			return
-		}
-	}
-}
-
-func (b *BlogService) siteMetrics(w http.ResponseWriter, r *http.Request) error {
-	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	sesh := r.Session()
+	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return util.CreateCustomError("", http.StatusNotFound)
+		return nil, util.CreateCustomError("", http.StatusNotFound)
 	}
-	blogidint, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
+	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
-		return fmt.Errorf("cannot parse blog id: %w", err)
+		return nil, fmt.Errorf("parse int: %w", err)
 	}
-	blog, err := b.store.GetBlogByID(context.TODO(), int32(blogidint))
+	blog, err := b.store.GetBlogByID(context.TODO(), int32(intBlogID))
 	if err != nil {
-		return fmt.Errorf("cannot get blog: %w", err)
+		return nil, fmt.Errorf("get blog: %w", err)
 	}
 	data, err := b.getSiteMetrics(blog.ID)
 	if err != nil {
-		return fmt.Errorf("error getting subscriber metrics: %w", err)
+		return nil, fmt.Errorf("get site metrics: %w", err)
 	}
-	util.ExecTemplate(w, []string{"site_metrics.html", "posts.html"},
+	return response.NewTemplate(
+		[]string{"site_metrics.html", "posts.html"},
 		util.PageInfo{
 			Data: struct {
 				Title    string
@@ -84,9 +67,8 @@ func (b *BlogService) siteMetrics(w http.ResponseWriter, r *http.Request) error 
 			},
 		},
 		template.FuncMap{},
-		logging.Logger(r),
-	)
-	return nil
+		logger,
+	), nil
 }
 
 type postdata struct {

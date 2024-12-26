@@ -11,13 +11,12 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/gorilla/mux"
+	"github.com/xr0-org/progstack/internal/app/handler/request"
+	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/dns"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -25,54 +24,38 @@ type SubdomainRequest struct {
 	Subdomain string `json:"subdomain"`
 }
 
-type SubdomainCheckResponse struct {
-	Available bool   `json:"available"`
-	Message   string `json:"message"`
-}
+func (b *BlogService) SubdomainCheck(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("SubdomainCheck handler...")
 
-func (b *BlogService) SubdomainCheck() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("SubdomainCheck handler...")
+	r.MixpanelTrack("SubdomainCheck")
 
-		b.mixpanel.Track("SubdomainCheck", r)
-
-		available := true
-		message := "Subdomain is available"
-		if err := b.subdomainCheck(w, r); err != nil {
-			var customErr *util.CustomError
-			if errors.As(err, &customErr) {
-				logger.Printf("Client error: %v\n", customErr)
-				available = false
-				message = customErr.Error()
-			} else {
-				logger.Printf("Internal Server Error: %v\n", err)
-				http.Error(w, "", http.StatusInternalServerError)
-				return
-			}
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(SubdomainCheckResponse{
-			Available: available,
-			Message:   message,
-		}); err != nil {
-			logger.Printf("Error encoding reponse: %v\n", err)
-			http.Error(
-				w,
-				"Error encoding reponse",
-				http.StatusInternalServerError,
-			)
-			return
-		}
+	type checkresp struct {
+		Available bool   `json:"available"`
+		Message   string `json:"message"`
 	}
+	if err := b.subdomainCheck(r); err != nil {
+		var customErr *util.CustomError
+		if errors.As(err, &customErr) {
+			return response.NewJson(
+				checkresp{false, customErr.Error()},
+			)
+		}
+		return nil, fmt.Errorf("check: %w", err)
+	}
+	return response.NewJson(checkresp{true, "Subdomain is available"})
 }
 
-func (b *BlogService) subdomainCheck(w http.ResponseWriter, r *http.Request) error {
+func (b *BlogService) subdomainCheck(r request.Request) error {
 	var req SubdomainRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return err
+	body, err := r.ReadBody()
+	if err != nil {
+		return fmt.Errorf("read body: %w", err)
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return fmt.Errorf("decode: %w", err)
 	}
 	sub, err := dns.ParseSubdomain(req.Subdomain)
 	if err != nil {
@@ -95,10 +78,6 @@ func (b *BlogService) subdomainCheck(w http.ResponseWriter, r *http.Request) err
 			http.StatusBadRequest,
 		)
 	}
-	if err = validateSubdomain(req.Subdomain); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -144,47 +123,36 @@ func validateSubdomain(subdomain string) error {
 	return nil
 }
 
-func (b *BlogService) SubdomainSubmit() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("SubdomainSubmit handler...")
+func (b *BlogService) SubdomainSubmit(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("SubdomainSubmit handler...")
 
-		b.mixpanel.Track("SubdomainSubmit", r)
+	r.MixpanelTrack("SubdomainSubmit")
 
-		if err := b.subdomainSubmit(w, r); err != nil {
-			logger.Println("Error submiting subdomain")
-			var customErr *util.CustomError
-			if errors.As(err, &customErr) {
-				logger.Printf("Custom error: %v\n", customErr)
-				/* user error */
-				w.WriteHeader(customErr.Code)
-				response := map[string]string{"message": customErr.Error()}
-				json.NewEncoder(w).Encode(response)
-				return
-			} else {
-				logger.Printf("Internal Server Error: %v\n", err)
-				/* generic error */
-				w.WriteHeader(http.StatusInternalServerError)
-				response := map[string]string{"message": "An unexpected error occurred"}
-				json.NewEncoder(w).Encode(response)
-				return
-			}
-		}
-		/* success */
-		w.WriteHeader(http.StatusOK)
-		response := map[string]string{"message": "Subdomain successfully registered!"}
-		json.NewEncoder(w).Encode(response)
+	type submitresp struct {
+		Message string `json:"message"`
 	}
+	if err := b.subdomainSubmit(r); err != nil {
+		logger.Println("Error submiting subdomain")
+		var customErr *util.CustomError
+		if errors.As(err, &customErr) {
+			return response.NewJson(&submitresp{customErr.Error()})
+		} else {
+			return nil, fmt.Errorf("subdomain submit: %w", err)
+		}
+	}
+	return response.NewJson(&submitresp{"Subdomain successfully registered!"})
 }
 
-func (b *BlogService) subdomainSubmit(w http.ResponseWriter, r *http.Request) error {
-	blogID, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
-	if err != nil {
-		return fmt.Errorf("cannot parse id: %w", err)
-	}
-
+func (b *BlogService) subdomainSubmit(r request.Request) error {
 	var req SubdomainRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	body, err := r.ReadBody()
+	if err != nil {
+		return fmt.Errorf("read body: %w", err)
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
 		return fmt.Errorf("cannot decode request: %w", err)
 	}
 
@@ -200,9 +168,17 @@ func (b *BlogService) subdomainSubmit(w http.ResponseWriter, r *http.Request) er
 		return fmt.Errorf("subdomain: %w", err)
 	}
 
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return fmt.Errorf("no blogID")
+	}
+	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	if err != nil {
+		return fmt.Errorf("parse blogID: %w", err)
+	}
 	if err := b.store.UpdateSubdomainTx(
 		context.TODO(), model.UpdateSubdomainTxParams{
-			BlogID:    int32(blogID),
+			BlogID:    int32(intBlogID),
 			Subdomain: sub,
 		},
 	); err != nil {
@@ -211,67 +187,33 @@ func (b *BlogService) subdomainSubmit(w http.ResponseWriter, r *http.Request) er
 	return nil
 }
 
-func (b *BlogService) DomainSubmit() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("DomainSubmit handler...")
+func (b *BlogService) DomainSubmit(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("DomainSubmit handler...")
 
-		b.mixpanel.Track("DomainSubmit", r)
+	r.MixpanelTrack("DomainSubmit")
 
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Println("No auth session")
-			http.Error(w, "", http.StatusNotFound)
-			return
-		}
-
-		can, err := authz.CanConfigureCustomDomain(b.store, sesh)
-		if err != nil {
-			logger.Printf("Error performing action: %v", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-		if !can {
-			logger.Printf("User not authorized")
-			http.Error(w, "", http.StatusForbidden)
-			return
-		}
-
-		if err := b.domainSubmit(w, r); err != nil {
-			logger.Println("Error submiting domain")
-			var customErr *util.CustomError
-			if errors.As(err, &customErr) {
-				logger.Printf("Custom error: %v\n", customErr)
-				/* user error */
-				w.WriteHeader(customErr.Code)
-				response := map[string]string{"message": customErr.Error()}
-				json.NewEncoder(w).Encode(response)
-				return
-			} else {
-				logger.Printf("Internal Server Error: %v\n", err)
-				/* generic error */
-				w.WriteHeader(http.StatusInternalServerError)
-				response := map[string]string{"message": "An unexpected error occurred"}
-				json.NewEncoder(w).Encode(response)
-				return
-			}
-		}
+	if err := authz.CanConfigureCustomDomain(
+		b.store, r.Session(),
+	); err != nil {
+		return nil, fmt.Errorf("can configure custom domain: %w", err)
 	}
-}
 
-func (b *BlogService) domainSubmit(w http.ResponseWriter, r *http.Request) error {
-	blogID, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
+	blogIDRaw, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, util.CreateCustomError("", http.StatusNotFound)
+	}
+	blogID, err := strconv.ParseInt(blogIDRaw, 10, 32)
 	if err != nil {
-		return fmt.Errorf("cannot parse id: %w", err)
+		return nil, fmt.Errorf("parse blogID: %w", err)
 	}
 
-	if r.Method != http.MethodPost {
-		return util.CreateCustomError(
-			"Invalid request method", http.StatusMethodNotAllowed,
-		)
-	}
-	if err := r.ParseForm(); err != nil {
-		return util.CreateCustomError(
+	domain, err := r.GetPostFormValue("domain")
+	if err != nil {
+		r.Logger().Printf("cannot get post form value: %v\n", err)
+		return nil, util.CreateCustomError(
 			"Error parsing form", http.StatusBadRequest,
 		)
 	}
@@ -280,16 +222,13 @@ func (b *BlogService) domainSubmit(w http.ResponseWriter, r *http.Request) error
 		context.TODO(), model.UpdateDomainByIDParams{
 			ID: int32(blogID),
 			Domain: wrapNullString(
-				strings.TrimSpace(
-					strings.ToLower(r.FormValue("domain")),
-				),
+				strings.TrimSpace(strings.ToLower(domain)),
 			),
 		},
 	); err != nil {
-		return err
+		return nil, fmt.Errorf("update domain: %w", err)
 	}
-	http.Redirect(
-		w, r,
+	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s/user/blogs/%d/config",
 			config.Config.Progstack.Protocol,
@@ -297,8 +236,7 @@ func (b *BlogService) domainSubmit(w http.ResponseWriter, r *http.Request) error
 			blogID,
 		),
 		http.StatusTemporaryRedirect,
-	)
-	return nil
+	), nil
 }
 
 func wrapNullString(domain string) sql.NullString {

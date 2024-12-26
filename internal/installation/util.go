@@ -1,32 +1,23 @@
 package installation
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 
-	"github.com/xr0-org/progstack/internal/logging"
+	"github.com/xr0-org/progstack/internal/app/handler/request"
 )
 
 /* validates that an event actually comes from our GithubApp by using the webhook
 * secret configured on the GithubApp */
-func validateSignature(r *http.Request, secret string) error {
-	logger := logging.Logger(r)
-	logger.Println("Validating github signature...")
-	body, err := ioutil.ReadAll(r.Body)
+func validateSignature(r request.Request, secret string) error {
+	body, err := r.ReadBody()
 	if err != nil {
-		return fmt.Errorf("error reading body: %w", err)
+		return fmt.Errorf("read body: %w", err)
 	}
-	defer r.Body.Close()
 
-	/* place back in request */
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-
-	signature := r.Header.Get("X-Hub-Signature-256")
+	signature := r.GetHeader("X-Hub-Signature-256")
 	if signature == "" {
 		return fmt.Errorf("missing X-Hub-Signature-256 header")
 	}
@@ -40,7 +31,10 @@ func validateSignature(r *http.Request, secret string) error {
 	expectedSignature := "sha256=" + hex.EncodeToString(expectedMAC)
 	ok := hmac.Equal([]byte(signature), []byte(expectedSignature))
 	if !ok {
-		return fmt.Errorf("expected signature: %s but got: %s", expectedSignature, signature)
+		return fmt.Errorf(
+			"expected signature: %s but got: %s",
+			expectedSignature, signature,
+		)
 	}
 	return nil
 }

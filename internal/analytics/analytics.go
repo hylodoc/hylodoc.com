@@ -23,14 +23,13 @@ func NewMixpanelClientWrapper(token string) *MixpanelClientWrapper {
 	}
 }
 
-func (m *MixpanelClientWrapper) Track(event string, r *http.Request) error {
+func (m *MixpanelClientWrapper) Track(event string, r *http.Request) {
 	logger := logging.Logger(r)
 	go func() {
 		if err := m.track(r, event); err != nil {
 			logger.Printf("Error emitting analytics: %v", err)
 		}
 	}()
-	return nil
 }
 
 func (m *MixpanelClientWrapper) track(r *http.Request, event string) error {

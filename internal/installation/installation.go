@@ -7,16 +7,16 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/xr0-org/progstack/internal/app/handler/request"
+	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/util"
 )
@@ -43,45 +43,49 @@ func NewInstallationService(
 	}
 }
 
-func (i *InstallationService) InstallationCallback() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("InstallationCallback handler...")
-
-		if err := i.installationCallback(w, r); err != nil {
-			logger.Printf("error in installation callback: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
+func (i *InstallationService) InstallationCallback(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("InstallationCallback handler...")
+	if err := i.installationcallback(r); err != nil {
+		return nil, err
 	}
+	return response.NewEmpty(), nil
 }
 
-func (i *InstallationService) installationCallback(w http.ResponseWriter, r *http.Request) error {
+func (i *InstallationService) installationcallback(
+	r request.Request,
+) error {
+	logger := r.Logger()
+
 	/* validate authenticity using Github webhook secret */
-	if err := validateSignature(r, config.Config.Github.WebhookSecret); err != nil {
-		return fmt.Errorf("error validating github signature: %w", err)
+	if err := validateSignature(
+		r, config.Config.Github.WebhookSecret,
+	); err != nil {
+		return fmt.Errorf("validate github signature: %w", err)
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := r.ReadBody()
 	if err != nil {
-		return fmt.Errorf("error reading request body: %w", err)
+		return fmt.Errorf("request body: %w", err)
 	}
-
-	/* handle kinds of events */
-	logger := logging.Logger(r)
-	eventType := r.Header.Get("X-GitHub-Event")
-	switch eventType {
+	switch eventType := r.GetHeader("X-GitHub-Event"); eventType {
 	case "installation":
 		return handleInstallation(i.client, i.store, body, logger)
 	case "installation_repositories":
-		return handleInstallationRepositories(i.client, i.store, body, logger)
+		return handleInstallationRepositories(
+			i.client, i.store, body, logger,
+		)
 	case "push":
 		return handlePush(i.client, i.store, body, logger)
 	default:
-		logging.Logger(r).Printf("unhandled event type: %s\n", eventType)
+		logger.Printf(
+			"unhandled event type %q: %s\n",
+			eventType, string(body),
+		)
+		return nil
 	}
-	return nil
 }
 
 func handleInstallation(

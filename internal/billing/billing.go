@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"strings"
 
-	"github.com/xr0-org/progstack/internal/analytics"
+	"github.com/xr0-org/progstack/internal/app/handler/request"
+	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
@@ -22,86 +23,75 @@ import (
 )
 
 type BillingService struct {
-	store    *model.Store
-	mixpanel *analytics.MixpanelClientWrapper
+	store *model.Store
 }
 
 func NewBillingService(
-	s *model.Store, m *analytics.MixpanelClientWrapper,
+	s *model.Store,
 ) *BillingService {
 	/* set private key for stripe client */
 	stripe.Key = config.Config.Stripe.SecretKey
 
 	return &BillingService{
-		store:    s,
-		mixpanel: m,
+		store: s,
 	}
 }
 
-func (b *BillingService) Pricing() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("Pricing handler...")
+func (b *BillingService) Pricing(r request.Request) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("Pricing handler...")
 
-		b.mixpanel.Track("Pricing", r)
+	r.MixpanelTrack("Pricing")
 
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Println("No session")
-			http.Error(w, "", http.StatusNotFound)
-			return
-		}
-
-		util.ExecTemplate(w, []string{"pricing.html"},
-			util.PageInfo{
-				Data: struct {
-					Title             string
-					UserInfo          *session.UserInfo
-					TierNames         []string
-					Features          []string
-					SubscriptionTiers []authz.SubscriptionFeatures
-				}{
-					Title:    "Pricing",
-					UserInfo: session.ConvertSessionToUserInfo(sesh),
-					TierNames: []string{
-						"Scout",
-						"Wayfarer",
-						"Voyager",
-						"Pathfinder",
-					},
-					Features: []string{
-						"projects",
-						"storage",
-						"visitorsPerMonth",
-						"customDomain",
-						"themes",
-						"codeStyle",
-						"images",
-						"emailSubscribers",
-						"analytics",
-						"rss",
-						"likes",
-						"comments",
-						"teamMembers",
-						"passwordProtectedPages",
-						"downloadablePdfPages",
-						"paidSubscribers",
-					},
-					SubscriptionTiers: authz.OrderedSubscriptionTiers(),
+	return response.NewTemplate(
+		[]string{"pricing.html"},
+		util.PageInfo{
+			Data: struct {
+				Title             string
+				UserInfo          *session.UserInfo
+				TierNames         []string
+				Features          []string
+				SubscriptionTiers []authz.SubscriptionFeatures
+			}{
+				Title:    "Pricing",
+				UserInfo: session.ConvertSessionToUserInfo(r.Session()),
+				TierNames: []string{
+					"Scout",
+					"Wayfarer",
+					"Voyager",
+					"Pathfinder",
 				},
+				Features: []string{
+					"projects",
+					"storage",
+					"visitorsPerMonth",
+					"customDomain",
+					"themes",
+					"codeStyle",
+					"images",
+					"emailSubscribers",
+					"analytics",
+					"rss",
+					"likes",
+					"comments",
+					"teamMembers",
+					"passwordProtectedPages",
+					"downloadablePdfPages",
+					"paidSubscribers",
+				},
+				SubscriptionTiers: authz.OrderedSubscriptionTiers(),
 			},
-			template.FuncMap{
-				"join": strings.Join,
-			},
-			logger,
-		)
-	}
+		},
+		template.FuncMap{
+			"join": strings.Join,
+		},
+		logger,
+	), nil
 }
 
 func AutoSubscribeToFreePlan(
-	s *model.Store, r *http.Request, user model.User,
+	user model.User, s *model.Store, logger *log.Logger,
 ) error {
-	logger := logging.Logger(r)
 	logger.Println("AutoSubscribeToFreePlan...")
 
 	/* create customer in stripe */
@@ -164,39 +154,36 @@ func createSubscription(customerID, priceID string) (*stripe.Subscription, error
 	return subscription, nil
 }
 
-func (b *BillingService) BillingPortal() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("BillingPortal handler...")
+func (b *BillingService) BillingPortal(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("BillingPortal handler...")
 
-		b.mixpanel.Track("BillingPortal", r)
+	r.MixpanelTrack("BillingPortal")
 
-		url, err := b.billingPortal(w, r)
-		if err != nil {
-			logger.Printf("error redirecting to billing portal: %v", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-
-		logger.Println("Redirecting User to billing portal...")
-		http.Redirect(w, r, url, http.StatusSeeOther)
+	url, err := b.billingPortal(r)
+	if err != nil {
+		return nil, err
 	}
+	return response.NewRedirect(url, http.StatusSeeOther), nil
 }
 
-func (b *BillingService) billingPortal(w http.ResponseWriter, r *http.Request) (string, error) {
-	userSession, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-	if !ok {
-		return "", fmt.Errorf("error getting session")
-	}
-
-	sub, err := b.store.GetStripeSubscriptionByUserID(context.TODO(), userSession.GetUserID())
+func (b *BillingService) billingPortal(r request.Request) (string, error) {
+	sub, err := b.store.GetStripeSubscriptionByUserID(
+		context.TODO(), r.Session().GetUserID(),
+	)
 	if err != nil {
 		return "", fmt.Errorf("could not get subcription for user: %w", err)
 	}
 
 	params := &stripe.BillingPortalSessionParams{
-		Customer:  stripe.String(sub.StripeCustomerID),
-		ReturnURL: stripe.String(fmt.Sprintf("%s://%s/user/account", config.Config.Progstack.Protocol, config.Config.Progstack.ServiceName)),
+		Customer: stripe.String(sub.StripeCustomerID),
+		ReturnURL: stripe.String(fmt.Sprintf(
+			"%s://%s/user/account",
+			config.Config.Progstack.Protocol,
+			config.Config.Progstack.ServiceName,
+		)),
 	}
 
 	/* set private key for stripe client */

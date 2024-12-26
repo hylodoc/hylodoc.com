@@ -6,49 +6,42 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/xr0-org/progstack/internal/app/handler/request"
+	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/email/emailaddr"
 	"github.com/xr0-org/progstack/internal/email/postbody"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
-func (b *BlogService) SendPostEmail() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("SendPostEmail handler...")
+func (b *BlogService) SendPostEmail(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("SendPostEmail handler...")
 
-		b.mixpanel.Track("SendPostEmail", r)
+	r.MixpanelTrack("SendPostEmail")
 
-		if err := b.sendPostEmail(w, r); err != nil {
-			logger.Printf("Error sending email: %v", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-	}
-}
-
-func (b *BlogService) sendPostEmail(
-	w http.ResponseWriter, r *http.Request,
-) error {
-	token, err := uuid.Parse(r.URL.Query().Get("token"))
+	token, err := uuid.Parse(r.GetURLQueryValue("token"))
 	if err != nil {
-		return fmt.Errorf("failed to parse token: %w", err)
+		return nil, fmt.Errorf("parse uuid: %w", err)
 	}
-	post, err := b.store.GetPostByToken(context.TODO(), token)
+	post, err := b.store.GetPostByToken(
+		context.TODO(), token,
+	)
 	if err != nil {
-		return fmt.Errorf("cannot get post: %w", err)
+		return nil, fmt.Errorf("get post: %w", err)
 	}
 	blog, err := b.store.GetBlogByID(context.TODO(), post.Blog)
 	if err != nil {
-		return fmt.Errorf("cannot get blog: %w", err)
+		return nil, fmt.Errorf("get blog: %w", err)
 	}
 	subscribers, err := b.store.ListActiveSubscribersByBlogID(
 		context.TODO(), blog.ID,
 	)
 	if err != nil {
-		return fmt.Errorf("cannot get subscribers: %w", err)
+		return nil, fmt.Errorf("get active subscribers: %w", err)
 	}
 	fromaddr := emailaddr.NewNamedAddr(
 		getsitename(&blog),
@@ -68,10 +61,10 @@ func (b *BlogService) sendPostEmail(
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("cannot insert email: %w", err)
+			return nil, fmt.Errorf("cannot insert email: %w", err)
 		}
 		if err != nil {
-			return fmt.Errorf("url error: %w", err)
+			return nil, fmt.Errorf("url error: %w", err)
 		}
 		if err := email.NewSender(
 			emailaddr.NewAddr(sub.Email),
@@ -101,7 +94,7 @@ func (b *BlogService) sendPostEmail(
 				post.TextEmailPath,
 			),
 		); err != nil {
-			return fmt.Errorf(
+			return nil, fmt.Errorf(
 				"error with subscriber %q: %w", sub.Email, err,
 			)
 		}
@@ -113,10 +106,9 @@ func (b *BlogService) sendPostEmail(
 			Blog: post.Blog,
 		},
 	); err != nil {
-		return fmt.Errorf("cannot set post email sent: %w", err)
+		return nil, fmt.Errorf("cannot set post email sent: %w", err)
 	}
-	http.Redirect(
-		w, r,
+	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s/user/blogs/%d/metrics",
 			config.Config.Progstack.Protocol,
@@ -124,6 +116,5 @@ func (b *BlogService) sendPostEmail(
 			blog.ID,
 		),
 		http.StatusTemporaryRedirect,
-	)
-	return nil
+	), nil
 }

@@ -4,74 +4,76 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net/http"
 
 	"github.com/stripe/stripe-go/v78"
 	"github.com/stripe/stripe-go/v78/price"
 	"github.com/stripe/stripe-go/v78/product"
 	"github.com/stripe/stripe-go/v78/subscription"
 	"github.com/stripe/stripe-go/v78/webhook"
+	"github.com/xr0-org/progstack/internal/app/handler/request"
+	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
-func (b *BillingService) StripeWebhook() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("Stripe webhook...")
+func (b *BillingService) StripeWebhook(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("Stripe webhook...")
+	if err := b.stripeWebhook(r); err != nil {
+		return nil, err
+	}
+	return response.NewEmpty(), nil
+}
 
-		if err := b.stripeWebhook(w, r); err != nil {
-			logger.Printf("error processing event: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
+func (b *BillingService) stripeWebhook(r request.Request) error {
+	logger := r.Logger()
 
-			return
-		}
-		w.WriteHeader(http.StatusOK)
+	payload, err := r.ReadBody()
+	if err != nil {
+		return fmt.Errorf("read body: %w", err)
+	}
+
+	if _, err := webhook.ConstructEvent(
+		payload,
+		r.GetHeader("Stripe-Signature"),
+		config.Config.Stripe.WebhookSigningSecret,
+	); err != nil {
+		/* TODO: verify */
+		logger.Printf("invalid webhook signature: %s\n", err)
+	}
+
+	event, err := parseEvent(payload)
+	if err != nil {
+		return fmt.Errorf("parse event: %w", err)
+	}
+	switch event.Type {
+	case "customer.subscription.created":
+		return handleCustomerSubscriptionCreated(
+			b.store, event, logger,
+		)
+	case "customer.subscription.deleted":
+		return handleCustomerSubscriptionDeleted(
+			b.store, event, logger,
+		)
+	case "customer.subscription.updated":
+		return handleCustomerSubscriptionUpdated(
+			b.store, event, logger,
+		)
+	default:
+		logger.Printf(
+			"unhandled event type %q: %s\n",
+			event.Type, string(payload),
+		)
+		return nil
 	}
 }
 
-func (b *BillingService) stripeWebhook(w http.ResponseWriter, r *http.Request) error {
-	logger := logging.Logger(r)
-
-	const MaxBodyBytes = int64(65536)
-	r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
-	payload, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return fmt.Errorf("error reading body: %w", err)
-	}
-
-	logger.Println("verifying stripe event signature...")
-	_, err = webhook.ConstructEvent(
-		payload,
-		r.Header.Get("Stripe-Signature"),
-		config.Config.Stripe.WebhookSigningSecret,
-	)
-	if err != nil {
-		fmt.Errorf("error verifying webhook signature: %w", err)
-	}
-	logger.Println("stripe event signature verified.")
-
-	event := stripe.Event{}
-	if err := json.Unmarshal(payload, &event); err != nil {
-		return fmt.Errorf("error unpacking payload into event: %w", err)
-	}
-	logger.Printf("%s\n", eventString(&event))
-
-	switch event.Type {
-	case "customer.subscription.created":
-		return handleCustomerSubscriptionCreated(b.store, &event, logger)
-	case "customer.subscription.deleted":
-		return handleCustomerSubscriptionDeleted(b.store, &event, logger)
-	case "customer.subscription.updated":
-		return handleCustomerSubscriptionUpdated(b.store, &event, logger)
-	default:
-		logger.Printf("unhandled event type: %s\n", event.Type)
-		logger.Printf("event: %v\n", event)
-	}
-	return nil
+func parseEvent(payload []byte) (*stripe.Event, error) {
+	var event stripe.Event
+	return &event, json.Unmarshal(payload, &event)
 }
 
 func handleCustomerSubscriptionCreated(

@@ -8,7 +8,9 @@ import (
 	"text/template"
 
 	"github.com/gorilla/mux"
-	"github.com/xr0-org/progstack/internal/analytics"
+	"github.com/xr0-org/progstack/internal/app/handler"
+	"github.com/xr0-org/progstack/internal/app/handler/request"
+	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/blog"
@@ -33,100 +35,6 @@ const (
 )
 
 func Serve(httpClient *httpclient.Client, store *model.Store) error {
-	bootid, err := store.Boot(context.TODO())
-	if err != nil {
-		return fmt.Errorf("cannot boot: %w", err)
-	}
-	log.Println("bootid", bootid)
-
-	r := mux.NewRouter()
-
-	/* middleware */
-	r.Use(session.NewSessionService(store).Middleware)
-	r.Use(logging.Middleware)
-	r.Use(metrics.Middleware)
-	r.Use(routing.NewRoutingService(store).Middleware)
-
-	/* public routes */
-
-	/* init services */
-	mixpanelClient := analytics.NewMixpanelClientWrapper(
-		config.Config.Mixpanel.Token,
-	)
-	authNService := authn.NewAuthNService(httpClient, store, mixpanelClient)
-	userService := user.NewUserService(store, mixpanelClient)
-	billingService := billing.NewBillingService(store, mixpanelClient)
-	installationService := installation.NewInstallationService(
-		httpClient, store,
-	)
-	blogService := blog.NewBlogService(httpClient, store, mixpanelClient)
-
-	/* init metrics */
-	metrics.Initialize()
-
-	r.HandleFunc("/", index(mixpanelClient))
-	r.HandleFunc("/register", authNService.Register())
-	r.HandleFunc("/login", authNService.Login())
-	r.HandleFunc("/gh/login", authNService.GithubLogin())
-	r.HandleFunc("/gh/oauthcallback", authNService.GithubOAuthCallback())
-	r.HandleFunc("/gh/linkcallback", authNService.GithubLinkCallback())
-	r.HandleFunc("/magic/register", authNService.MagicRegister())
-	r.HandleFunc("/magic/registercallback", authNService.MagicRegisterCallback())
-	r.HandleFunc("/magic/login", authNService.MagicLogin())
-	r.HandleFunc("/magic/logincallback", authNService.MagicLoginCallback())
-	r.HandleFunc("/gh/installcallback", installationService.InstallationCallback())
-	r.HandleFunc("/stripe/webhook", billingService.StripeWebhook())
-	r.HandleFunc("/pricing", billingService.Pricing())
-
-	r.HandleFunc("/blogs/{blogID}/subscribe", blogService.SubscribeToBlog()).Methods("POST")
-	r.HandleFunc("/blogs/unsubscribe", blogService.UnsubscribeFromBlog())
-
-	/* authenticated routes */
-	authR := r.PathPrefix("/user").Subrouter()
-	authR.Use(authn.Middleware)
-	authR.HandleFunc("/", userService.Home())
-	authR.HandleFunc("/auth/logout", authNService.Logout())
-	authR.HandleFunc("/gh/linkgithub", authNService.LinkGithubAccount())
-	authR.HandleFunc("/account", userService.Account())
-	authR.HandleFunc("/subdomain-check", blogService.SubdomainCheck())
-	authR.HandleFunc("/create-new-blog", userService.CreateNewBlog())
-	authR.HandleFunc("/repository-flow", userService.RepositoryFlow())
-	authR.HandleFunc("/github-installation", userService.GithubInstallation())
-	authR.HandleFunc("/folder-flow", userService.FolderFlow())
-	authR.HandleFunc("/create-repository-blog", blogService.CreateRepositoryBlog())
-	authR.HandleFunc("/create-folder-blog", blogService.CreateFolderBlog())
-
-	/* billing */
-	authR.HandleFunc("/stripe/billing-portal", billingService.BillingPortal())
-
-	blogR := authR.PathPrefix("/blogs/{blogID}").Subrouter()
-	blogR.Use(blogService.Middleware)
-	blogR.HandleFunc("/config", blogService.Config())
-	blogR.HandleFunc("/set-subdomain", blogService.SubdomainSubmit())
-	blogR.HandleFunc("/config-domain", blogService.ConfigDomain())
-	blogR.HandleFunc("/set-domain", blogService.DomainSubmit())
-	blogR.HandleFunc("/set-theme", blogService.ThemeSubmit())
-	blogR.HandleFunc("/set-test-branch", blogService.TestBranchSubmit())
-	blogR.HandleFunc("/set-live-branch", blogService.LiveBranchSubmit())
-	blogR.HandleFunc("/set-folder", blogService.FolderSubmit())
-	blogR.HandleFunc("/set-status", blogService.SetStatusSubmit())
-	blogR.HandleFunc("/sync", blogService.SyncRepository())
-	blogR.HandleFunc("/email", blogService.SendPostEmail())
-
-	blogR.HandleFunc("/metrics", blogService.SiteMetrics())
-	blogR.HandleFunc("/subscriber/metrics", blogService.SubscriberMetrics())
-	blogR.HandleFunc("/subscriber/export", blogService.ExportSubscribers())
-	blogR.HandleFunc("/subscriber/edit", blogService.EditSubscriber())
-	blogR.HandleFunc("/subscriber/delete", blogService.DeleteSubscriber())
-
-	/* serve static content */
-	r.PathPrefix("/static/css").Handler(http.StripPrefix("/static/css", http.FileServer(http.Dir("./web/static/css"))))
-	r.PathPrefix("/static/js").Handler(http.StripPrefix("/static/js", http.FileServer(http.Dir("./web/static/js"))))
-	r.PathPrefix("/static/img").Handler(http.StripPrefix("/static/img", http.FileServer(http.Dir("./web/static/img"))))
-
-	/* register subrouter */
-	r.PathPrefix("/").Handler(authR)
-
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", metrics.Handler())
@@ -169,6 +77,115 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 		}
 	}()
 
+	bootid, err := store.Boot(context.TODO())
+	if err != nil {
+		return fmt.Errorf("cannot boot: %w", err)
+	}
+	log.Println("bootid", bootid)
+
+	r := mux.NewRouter()
+
+	/* middleware */
+	r.Use(session.NewSessionService(store).Middleware)
+	r.Use(logging.Middleware)
+	r.Use(metrics.Middleware)
+	r.Use(routing.NewRoutingService(store).Middleware)
+
+	/* public routes */
+
+	/* init services */
+	billingService := billing.NewBillingService(store)
+	blogService := blog.NewBlogService(httpClient, store)
+
+	/* init metrics */
+	metrics.Initialize()
+
+	handler.Handle(r, "/", index)
+	authNService := authn.NewAuthNService(httpClient, store)
+	handler.Handle(r, "/register", authNService.Register)
+	handler.Handle(r, "/login", authNService.Login)
+	handler.Handle(r, "/gh/login", authNService.GithubLogin)
+	handler.Handle(r, "/gh/oauthcallback", authNService.GithubOAuthCallback)
+	handler.Handle(r, "/gh/linkcallback", authNService.GithubLinkCallback)
+	handler.Handle(r, "/magic/register", authNService.MagicRegister)
+	handler.Handle(r, "/magic/registercallback", authNService.MagicRegisterCallback)
+	handler.Handle(r, "/magic/login", authNService.MagicLogin)
+	handler.Handle(r, "/magic/logincallback", authNService.MagicLoginCallback)
+	handler.Handle(
+		r,
+		"/gh/installcallback",
+		installation.NewInstallationService(
+			httpClient, store,
+		).InstallationCallback,
+	)
+	handler.Handle(r, "/stripe/webhook", billingService.StripeWebhook)
+	handler.Handle(r, "/pricing", billingService.Pricing)
+
+	handler.Handle(r, "/blogs/{blogID}/subscribe", blogService.SubscribeToBlog).Methods("POST")
+	handler.Handle(r, "/blogs/unsubscribe", blogService.UnsubscribeFromBlog)
+
+	/* authenticated routes */
+	authR := r.PathPrefix("/user").Subrouter()
+	authR.Use(authn.Middleware)
+	userService := user.NewUserService(store)
+	handler.Handle(authR, "/", userService.Home)
+	handler.Handle(authR, "/auth/logout", authNService.Logout)
+	handler.Handle(authR, "/gh/linkgithub", authNService.LinkGithubAccount)
+	handler.Handle(authR, "/account", userService.Account)
+	handler.Handle(authR, "/subdomain-check", blogService.SubdomainCheck)
+	handler.Handle(authR, "/create-new-blog", userService.CreateNewBlog)
+	handler.Handle(authR, "/repository-flow", userService.RepositoryFlow)
+	handler.Handle(authR, "/github-installation", userService.GithubInstallation)
+	handler.Handle(authR, "/folder-flow", userService.FolderFlow)
+	handler.Handle(authR, "/create-repository-blog", blogService.CreateRepositoryBlog)
+	handler.Handle(authR, "/create-folder-blog", blogService.CreateFolderBlog)
+
+	/* billing */
+	handler.Handle(authR, "/stripe/billing-portal", billingService.BillingPortal)
+
+	blogR := authR.PathPrefix("/blogs/{blogID}").Subrouter()
+	blogR.Use(blogService.Middleware)
+	handler.Handle(blogR, "/config", blogService.Config)
+	handler.Handle(blogR, "/set-subdomain", blogService.SubdomainSubmit)
+	handler.Handle(blogR, "/config-domain", blogService.ConfigDomain)
+	handler.Handle(blogR, "/set-domain", blogService.DomainSubmit)
+	handler.Handle(blogR, "/set-theme", blogService.ThemeSubmit)
+	handler.Handle(blogR, "/set-test-branch", blogService.TestBranchSubmit)
+	handler.Handle(blogR, "/set-live-branch", blogService.LiveBranchSubmit)
+	handler.Handle(blogR, "/set-folder", blogService.FolderSubmit)
+	handler.Handle(blogR, "/set-status", blogService.SetStatusSubmit)
+	handler.Handle(blogR, "/sync", blogService.SyncRepository)
+	handler.Handle(blogR, "/email", blogService.SendPostEmail)
+
+	handler.Handle(blogR, "/metrics", blogService.SiteMetrics)
+	handler.Handle(blogR, "/subscriber/metrics", blogService.SubscriberMetrics)
+	handler.Handle(blogR, "/subscriber/export", blogService.ExportSubscribers)
+	handler.Handle(blogR, "/subscriber/edit", blogService.EditSubscriber)
+	handler.Handle(blogR, "/subscriber/delete", blogService.DeleteSubscriber)
+
+	/* serve static content */
+	r.PathPrefix("/static/css").Handler(
+		http.StripPrefix(
+			"/static/css",
+			http.FileServer(http.Dir("./web/static/css")),
+		),
+	)
+	r.PathPrefix("/static/js").Handler(
+		http.StripPrefix(
+			"/static/js",
+			http.FileServer(http.Dir("./web/static/js")),
+		),
+	)
+	r.PathPrefix("/static/img").Handler(
+		http.StripPrefix(
+			"/static/img",
+			http.FileServer(http.Dir("./web/static/img")),
+		),
+	)
+
+	/* XXX: makes `/user` serve `/user/` */
+	r.PathPrefix("/").Handler(authR)
+
 	m := &autocert.Manager{
 		Cache:  autocert.DirCache(config.Config.Progstack.CertsPath),
 		Prompt: autocert.AcceptTOS,
@@ -194,40 +211,33 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	}
 }
 
-func index(mixpanel *analytics.MixpanelClientWrapper) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("Index handler...")
+func index(r request.Request) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("Index handler...")
 
-		mixpanel.Track("Index", r)
+	r.MixpanelTrack("Index")
 
-		/* get email/username from context */
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Println("No session")
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-		if sesh.IsAuthenticated() {
-			logger.Println("Redirecting unauthenticated user")
-			http.Redirect(w, r, "/user/", http.StatusSeeOther)
-			return
-		}
+	sesh := r.Session()
 
-		/* get repositories for unauth session */
-
-		util.ExecTemplate(w, []string{"index.html"},
-			util.PageInfo{
-				Data: struct {
-					Title    string
-					UserInfo *session.UserInfo
-				}{
-					Title:    "Progstack - blogging for devs",
-					UserInfo: session.ConvertSessionToUserInfo(sesh),
-				},
-			},
-			template.FuncMap{},
-			logger,
-		)
+	if sesh.IsAuthenticated() {
+		logger.Println("Redirecting unauthenticated user")
+		return response.NewRedirect(
+			"/user/", http.StatusFound,
+		), nil
 	}
+
+	return response.NewTemplate(
+		[]string{"index.html"},
+		util.PageInfo{
+			Data: struct {
+				Title    string
+				UserInfo *session.UserInfo
+			}{
+				Title:    "Progstack - blogging for devs",
+				UserInfo: session.ConvertSessionToUserInfo(sesh),
+			},
+		},
+		template.FuncMap{},
+		logger,
+	), nil
 }
