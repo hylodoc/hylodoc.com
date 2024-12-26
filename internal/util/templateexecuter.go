@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -31,7 +32,21 @@ type PageInfo struct {
 	NewUpdates bool
 }
 
-func ExecTemplate(w http.ResponseWriter, names []string, info PageInfo, funcMap template.FuncMap, logger *log.Logger) {
+func ExecTemplate(
+	w http.ResponseWriter, names []string, info PageInfo,
+	funcMap template.FuncMap, logger *log.Logger,
+) {
+	if err := tryExecTemplate(w, names, info, funcMap, logger); err != nil {
+		http.Error(
+			w, "error loading page", http.StatusInternalServerError,
+		)
+	}
+}
+
+func tryExecTemplate(
+	w http.ResponseWriter, names []string, info PageInfo,
+	funcMap template.FuncMap, logger *log.Logger,
+) error {
 	tmpl, err := template.New(names[0]).Funcs(funcMap).ParseFiles(
 		append(
 			prependDir(names, "pages"),
@@ -39,13 +54,10 @@ func ExecTemplate(w http.ResponseWriter, names []string, info PageInfo, funcMap 
 		)...,
 	)
 	if err != nil {
-		logger.Println("cannot load template", err)
-		http.Error(w, "error loading page", http.StatusInternalServerError)
-		return
+		return fmt.Errorf("load: %w", err)
 	}
 	if err := tmpl.Execute(w, info); err != nil {
-		logger.Println("cannot execute template", err)
-		http.Error(w, "error loading page", http.StatusInternalServerError)
-		return
+		return fmt.Errorf("execute: %w", err)
 	}
+	return nil
 }

@@ -27,12 +27,6 @@ func (s *SessionService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := logging.Logger(r)
 
-		/* ignore /metrics used by prometheus */
-		if r.URL.Path == "/metrics" {
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		cookie, err := r.Cookie(CookieName)
 		if err != nil {
 			logger.Printf("Error getting cookie: %v", err)
