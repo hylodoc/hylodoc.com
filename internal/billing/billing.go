@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authz"
@@ -24,19 +23,17 @@ import (
 )
 
 type BillingService struct {
-	store    *model.Store
-	mixpanel *analytics.MixpanelClientWrapper
+	store *model.Store
 }
 
 func NewBillingService(
-	s *model.Store, m *analytics.MixpanelClientWrapper,
+	s *model.Store,
 ) *BillingService {
 	/* set private key for stripe client */
 	stripe.Key = config.Config.Stripe.SecretKey
 
 	return &BillingService{
-		store:    s,
-		mixpanel: m,
+		store: s,
 	}
 }
 

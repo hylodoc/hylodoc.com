@@ -68,6 +68,7 @@ func (r *request) ReadBody() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+		r.Logger().Printf("request body: %s\n", string(body))
 		defer r.r.Body.Close()
 		r._body = body
 		r._readbody = true
@@ -115,5 +116,7 @@ func (r *request) GetRouteVar(key string) (string, bool) {
 }
 
 func (r *request) GetHeader(name string) string {
-	return r.r.Header.Get(name)
+	v := r.r.Header.Get(name)
+	r.Logger().Printf("%s: %s\n", name, v)
+	return v
 }

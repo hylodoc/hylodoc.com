@@ -10,5 +10,5 @@ type suberr struct {
 
 func newSubErr(err error) *suberr { return &suberr{err} }
 
-func (err *suberr) Error() string        { return err.Error() }
-func (err *suberr) Is(target error) bool { return target == SubscriptionError }
+func (se *suberr) Error() string        { return se.err.Error() }
+func (se *suberr) Is(target error) bool { return target == SubscriptionError }

@@ -14,7 +14,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/billing"
@@ -40,19 +39,16 @@ var (
 )
 
 type AuthNService struct {
-	store    *model.Store
-	client   *httpclient.Client
-	mixpanel *analytics.MixpanelClientWrapper
+	store  *model.Store
+	client *httpclient.Client
 }
 
 func NewAuthNService(
 	c *httpclient.Client, s *model.Store,
-	mixpanel *analytics.MixpanelClientWrapper,
 ) AuthNService {
 	return AuthNService{
-		client:   c,
-		store:    s,
-		mixpanel: mixpanel,
+		client: c,
+		store:  s,
 	}
 }
 

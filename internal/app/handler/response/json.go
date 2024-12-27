@@ -3,6 +3,8 @@ package response
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/xr0-org/progstack/internal/logging"
 )
 
 type jsonresponse struct {
@@ -20,5 +22,6 @@ func NewJson(data any) (Response, error) {
 func (resp *jsonresponse) Respond(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
+	logging.Logger(r).Printf("response body: %s\n", string(resp.b))
 	w.Write(resp.b)
 }

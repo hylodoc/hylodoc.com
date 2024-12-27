@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authz"
@@ -22,17 +21,11 @@ import (
 )
 
 type UserService struct {
-	store    *model.Store
-	mixpanel *analytics.MixpanelClientWrapper
+	store *model.Store
 }
 
-func NewUserService(
-	s *model.Store, m *analytics.MixpanelClientWrapper,
-) *UserService {
-	return &UserService{
-		store:    s,
-		mixpanel: m,
-	}
+func NewUserService(s *model.Store) *UserService {
+	return &UserService{s}
 }
 
 func (u *UserService) Home(r request.Request) (response.Response, error) {

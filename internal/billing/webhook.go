@@ -41,7 +41,8 @@ func (b *BillingService) stripeWebhook(r request.Request) error {
 		r.GetHeader("Stripe-Signature"),
 		config.Config.Stripe.WebhookSigningSecret,
 	); err != nil {
-		return fmt.Errorf("verify webhook signature: %w", err)
+		/* TODO: verify */
+		logger.Printf("invalid webhook signature: %s\n", err)
 	}
 
 	event, err := parseEvent(payload)

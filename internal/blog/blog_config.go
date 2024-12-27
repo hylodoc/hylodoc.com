@@ -13,7 +13,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/assert"
@@ -25,20 +24,14 @@ import (
 )
 
 type BlogService struct {
-	client   *httpclient.Client
-	store    *model.Store
-	mixpanel *analytics.MixpanelClientWrapper
+	client *httpclient.Client
+	store  *model.Store
 }
 
 func NewBlogService(
 	client *httpclient.Client, store *model.Store,
-	mixpanel *analytics.MixpanelClientWrapper,
 ) *BlogService {
-	return &BlogService{
-		client:   client,
-		store:    store,
-		mixpanel: mixpanel,
-	}
+	return &BlogService{client, store}
 }
 
 /* Blog configuration page */

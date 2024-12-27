@@ -8,7 +8,6 @@ import (
 	"text/template"
 
 	"github.com/gorilla/mux"
-	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/app/handler"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
@@ -95,17 +94,14 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	/* public routes */
 
 	/* init services */
-	mixpanelClient := analytics.NewMixpanelClientWrapper(
-		config.Config.Mixpanel.Token,
-	)
-	billingService := billing.NewBillingService(store, mixpanelClient)
-	blogService := blog.NewBlogService(httpClient, store, mixpanelClient)
+	billingService := billing.NewBillingService(store)
+	blogService := blog.NewBlogService(httpClient, store)
 
 	/* init metrics */
 	metrics.Initialize()
 
 	handler.Handle(r, "/", index)
-	authNService := authn.NewAuthNService(httpClient, store, mixpanelClient)
+	authNService := authn.NewAuthNService(httpClient, store)
 	handler.Handle(r, "/register", authNService.Register)
 	handler.Handle(r, "/login", authNService.Login)
 	handler.Handle(r, "/gh/login", authNService.GithubLogin)
@@ -131,7 +127,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	/* authenticated routes */
 	authR := r.PathPrefix("/user").Subrouter()
 	authR.Use(authn.Middleware)
-	userService := user.NewUserService(store, mixpanelClient)
+	userService := user.NewUserService(store)
 	handler.Handle(authR, "/", userService.Home)
 	handler.Handle(authR, "/auth/logout", authNService.Logout)
 	handler.Handle(authR, "/gh/linkgithub", authNService.LinkGithubAccount)
