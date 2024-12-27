@@ -8,6 +8,7 @@ type empty struct{}
 
 func NewEmpty() Response { return &empty{} }
 
-func (e *empty) Respond(w http.ResponseWriter, r *http.Request) {
+func (e *empty) Respond(w http.ResponseWriter, r *http.Request) error {
 	w.WriteHeader(http.StatusOK)
+	return nil
 }

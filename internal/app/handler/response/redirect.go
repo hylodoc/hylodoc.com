@@ -11,6 +11,7 @@ func NewRedirect(url string, status int) Response {
 	return &redirect{url, status}
 }
 
-func (redirect *redirect) Respond(w http.ResponseWriter, r *http.Request) {
+func (redirect *redirect) Respond(w http.ResponseWriter, r *http.Request) error {
 	http.Redirect(w, r, redirect.url, redirect.status)
+	return nil
 }

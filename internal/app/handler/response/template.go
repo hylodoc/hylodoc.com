@@ -22,6 +22,6 @@ func NewTemplate(
 	return &tmpl{names, info, funcMap, logger}
 }
 
-func (t *tmpl) Respond(w http.ResponseWriter, _ *http.Request) {
-	util.ExecTemplate(w, t.names, t.info, t.funcMap, t.logger)
+func (t *tmpl) Respond(w http.ResponseWriter, _ *http.Request) error {
+	return util.ExecTemplate(w, t.names, t.info, t.funcMap, t.logger)
 }

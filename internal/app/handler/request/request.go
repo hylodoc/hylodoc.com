@@ -44,18 +44,16 @@ type request struct {
 	mixpanel *analytics.MixpanelClientWrapper
 }
 
-func NewRequest(r *http.Request, w http.ResponseWriter) (Request, error) {
-	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-	if !ok {
-		return nil, fmt.Errorf("no session")
-	}
+func NewRequest(
+	r *http.Request, w http.ResponseWriter, sesh *session.Session,
+) Request {
 	return &request{
 		r, false, nil,
 		w,
 		logging.Logger(r),
 		sesh,
 		analytics.NewMixpanelClientWrapper(config.Config.Mixpanel.Token),
-	}, nil
+	}
 }
 
 func (r *request) Logger() *log.Logger                 { return r.logger }

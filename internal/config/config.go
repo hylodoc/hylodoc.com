@@ -39,6 +39,8 @@ type ProgstackParams struct {
 	AccountsEmail     string `mapstructure:"accounts_email"`
 	CustomDomainCNAME string `mapstructure:"custom_domain_cname"`
 	CustomDomainIP    string `mapstructure:"custom_domain_ip"`
+	DiscordURL        string `mapstructure:"discord_url"`
+	OpenIssueURL      string `mapstructure:"open_issue_url"`
 }
 
 type ProgstackSsgParams struct {
