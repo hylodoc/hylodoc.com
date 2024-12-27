@@ -8,24 +8,29 @@ import (
 	"github.com/xr0-org/progstack/internal/session"
 )
 
-func CanCreateSite(s *model.Store, sesh *session.Session) (bool, error) {
+func CanCreateSite(s *model.Store, sesh *session.Session) error {
 	/* get user's storage footprint */
 	storageUsed, err := UserStorageUsed(s, sesh.GetUserID())
 	if err != nil {
-		return false, fmt.Errorf("error calculating user storage used: %w", err)
+		return fmt.Errorf("calculate user storage used: %w", err)
 	}
 	/* get user's site count */
 	blogCount, err := s.CountLiveBlogsByUserID(context.TODO(), sesh.GetUserID())
 	if err != nil {
-		return false, fmt.Errorf("error getting user project count: %w", err)
+		return fmt.Errorf("get user project count: %w", err)
 	}
 	/* get user's tier features */
 	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
 	if err != nil {
-		return false, fmt.Errorf("error getting user subscription: %w", err)
+		return fmt.Errorf("get user subscription: %w", err)
 	}
 	tier := SubscriptionTiers[string(plan)]
-	return tier.canCreateProject(storageUsed, int(blogCount))
+	if err := tier.canCreateProject(
+		storageUsed, int(blogCount),
+	); err != nil {
+		return newSubErr(err)
+	}
+	return nil
 }
 
 func CanConfigureCustomDomain(s *model.Store, sesh *session.Session) (bool, error) {
@@ -223,23 +228,25 @@ var SubscriptionTiers = map[string]SubscriptionFeatures{
 	},
 }
 
-func (s *SubscriptionFeatures) canCreateProject(bytesUsed int64, blogCount int) (bool, error) {
+func (s *SubscriptionFeatures) canCreateProject(
+	bytesUsed int64, blogCount int,
+) error {
 	if blogCount >= s.Projects {
-		return false, fmt.Errorf(
-			"site count %d excess max %d for plan",
+		return fmt.Errorf(
+			"site count %d excess max %d",
 			blogCount,
 			s.Projects,
 		)
 	}
 	maxBytes := megabytesToBytes(int64(s.Storage))
 	if bytesUsed > maxBytes {
-		return false, fmt.Errorf(
+		return fmt.Errorf(
 			"used %d of %d bytes",
 			bytesUsed,
 			maxBytes,
 		)
 	}
-	return true, nil
+	return nil
 }
 
 func megabytesToBytes(mb int64) int64 {

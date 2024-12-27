@@ -1,12 +1,16 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
+	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/logging"
+	"github.com/xr0-org/progstack/internal/util"
 )
 
 type HandlerFunc func(request.Request) (response.Response, error)
@@ -14,12 +18,28 @@ type HandlerFunc func(request.Request) (response.Response, error)
 func AsHttp(h HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := execute(h, w, r); err != nil {
-			/* TODO: error page */
-			logging.Logger(r).Println("AsHttp error", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
+			handleError(err, w, logging.Logger(r))
 		}
 	}
+}
+
+func handleError(err error, w http.ResponseWriter, logger *log.Logger) {
+	/* TODO: error page */
+	if errors.Is(err, authz.SubscriptionError) {
+		logger.Println("authz error", err)
+		http.Error(w, "", http.StatusUnauthorized)
+	} else if err, ok := asCustomError(err); ok {
+		logger.Println("custom error", err)
+		http.Error(w, err.Error(), err.Code)
+	} else {
+		logger.Println("AsHttp error", err)
+		http.Error(w, "", http.StatusInternalServerError)
+	}
+}
+
+func asCustomError(err error) (*util.CustomError, bool) {
+	var customErr *util.CustomError
+	return customErr, errors.As(err, &customErr)
 }
 
 func execute(

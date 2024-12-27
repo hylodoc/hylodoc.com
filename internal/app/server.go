@@ -131,15 +131,23 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	authR := r.PathPrefix("/user").Subrouter()
 	authR.Use(authn.Middleware)
 	userService := user.NewUserService(store, mixpanelClient)
-	authR.HandleFunc("/", userService.Home())
+	authR.HandleFunc("/", handler.AsHttp(userService.Home))
 	authR.HandleFunc("/auth/logout", handler.AsHttp(authNService.Logout))
-	authR.HandleFunc("/gh/linkgithub", handler.AsHttp(authNService.LinkGithubAccount))
-	authR.HandleFunc("/account", userService.Account())
+	authR.HandleFunc("/gh/linkgithub", handler.AsHttp(
+		authNService.LinkGithubAccount,
+	))
+	authR.HandleFunc("/account", handler.AsHttp(userService.Account))
 	authR.HandleFunc("/subdomain-check", blogService.SubdomainCheck())
-	authR.HandleFunc("/create-new-blog", userService.CreateNewBlog())
-	authR.HandleFunc("/repository-flow", userService.RepositoryFlow())
-	authR.HandleFunc("/github-installation", userService.GithubInstallation())
-	authR.HandleFunc("/folder-flow", userService.FolderFlow())
+	authR.HandleFunc("/create-new-blog", handler.AsHttp(
+		userService.CreateNewBlog,
+	))
+	authR.HandleFunc("/repository-flow", handler.AsHttp(
+		userService.RepositoryFlow,
+	))
+	authR.HandleFunc("/github-installation", handler.AsHttp(
+		userService.GithubInstallation,
+	))
+	authR.HandleFunc("/folder-flow", handler.AsHttp(userService.FolderFlow))
 	authR.HandleFunc("/create-repository-blog", blogService.CreateRepositoryBlog())
 	authR.HandleFunc("/create-folder-blog", blogService.CreateFolderBlog())
 
