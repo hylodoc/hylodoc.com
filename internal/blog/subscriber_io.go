@@ -15,6 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/lib/pq"
+	"github.com/xr0-org/progstack/internal/app/handler/request"
+	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/email/emailaddr"
@@ -23,21 +25,6 @@ import (
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
-
-func (b *BlogService) SubscribeToBlog() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("SubscribeToBlog handler...")
-
-		b.mixpanel.Track("SubscribeToBlog", r)
-
-		if err := b.subscribeToBlog(w, r); err != nil {
-			logger.Printf("Error subscribing to blog: %v", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-	}
-}
 
 type SubscribeRequest struct {
 	Email string `json:"email"`
@@ -51,30 +38,36 @@ func (sr *SubscribeRequest) validate() error {
 	return nil
 }
 
-func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) error {
-	logger := logging.Logger(r)
+func (b *BlogService) SubscribeToBlog(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("SubscribeToBlog handler...")
 
-	if r.Method != http.MethodPost {
-		return fmt.Errorf("must be POST")
-	}
-	if err := r.ParseForm(); err != nil {
-		return fmt.Errorf("cannot parse form: %w", err)
-	}
+	r.MixpanelTrack("SubscribeToBlog")
+
 	/* TODO: validate email format */
-	e := r.FormValue("email")
-
-	blogID, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
+	e, err := r.GetPostFormValue("email")
 	if err != nil {
-		return fmt.Errorf("cannot parse blogID: %w", err)
+		return nil, fmt.Errorf("get email: %w", err)
+	}
+
+	blogIDRaw, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, fmt.Errorf("no blogID")
+	}
+	blogID, err := strconv.ParseInt(blogIDRaw, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("parse blogID: %w", err)
 	}
 	blog, err := b.store.GetBlogByID(context.TODO(), int32(blogID))
 	if err != nil {
-		return fmt.Errorf("cannot get blog: %w", err)
+		return nil, fmt.Errorf("get blog: %w", err)
 	}
 
 	unsubtoken, err := b.createsubscriber(e, blog.ID, logger)
 	if err != nil {
-		return fmt.Errorf("cannot create subscriber: %w", err)
+		return nil, fmt.Errorf("create subscriber: %w", err)
 	}
 	sitename := getsitename(&blog)
 	if err := email.NewSender(
@@ -98,11 +91,10 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 			unsubtoken,
 		),
 	); err != nil {
-		return fmt.Errorf("cannot send new subscriber email: %w", err)
+		return nil, fmt.Errorf("send new subscriber email: %w", err)
 	}
 
-	http.Redirect(
-		w, r,
+	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s.%s/subscribed",
 			config.Config.Progstack.Protocol,
@@ -110,8 +102,7 @@ func (b *BlogService) subscribeToBlog(w http.ResponseWriter, r *http.Request) er
 			config.Config.Progstack.ServiceName,
 		),
 		http.StatusTemporaryRedirect,
-	)
-	return nil
+	), nil
 }
 
 func getsitename(blog *model.Blog) string {
@@ -171,38 +162,29 @@ func isUniqueActiveSubscriberPerBlogViolation(err error) bool {
 		pqerr.Constraint == "unique_active_subscriber_per_blog"
 }
 
-func (b *BlogService) UnsubscribeFromBlog() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("UnsubscribeFromBlog handler...")
-		b.mixpanel.Track("UnsubscribeFromBlog", r)
-		if err := b.unsubscribeFromBlog(w, r); err != nil {
-			logger.Printf("error in unsubscribeFromBlog handler: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	}
-}
+func (b *BlogService) UnsubscribeFromBlog(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("UnsubscribeFromBlog handler...")
+	r.MixpanelTrack("UnsubscribeFromBlog")
 
-func (b *BlogService) unsubscribeFromBlog(w http.ResponseWriter, r *http.Request) error {
-	token, err := uuid.Parse(r.URL.Query().Get("token"))
+	token, err := uuid.Parse(r.GetURLQueryValue("token"))
 	if err != nil {
-		return fmt.Errorf("failed to parse token: %w", err)
+		return nil, fmt.Errorf("parse token: %w", err)
 	}
 	sub, err := b.store.GetSubscriberByToken(context.TODO(), token)
 	if err != nil {
-		return fmt.Errorf("cannot get subscriber: %w", err)
+		return nil, fmt.Errorf("get subscriber: %w", err)
 	}
 	if err := b.store.DeleteSubscriber(context.TODO(), sub.ID); err != nil {
-		return fmt.Errorf("error deleting subcriber: %w", err)
+		return nil, fmt.Errorf("delete subcriber: %w", err)
 	}
 	blog, err := b.store.GetBlogByID(context.TODO(), sub.BlogID)
 	if err != nil {
-		return fmt.Errorf("cannot get blog: %w", err)
+		return nil, fmt.Errorf("get blog: %w", err)
 	}
-	http.Redirect(
-		w, r,
+	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s.%s/unsubscribed",
 			config.Config.Progstack.Protocol,
@@ -210,14 +192,7 @@ func (b *BlogService) unsubscribeFromBlog(w http.ResponseWriter, r *http.Request
 			config.Config.Progstack.ServiceName,
 		),
 		http.StatusTemporaryRedirect,
-	)
-	return nil
-}
-
-func (b *BlogService) ImportSubscribers() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-
-	}
+	), nil
 }
 
 func (b *BlogService) EditSubscriber() http.HandlerFunc {

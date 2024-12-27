@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -16,103 +15,64 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/xr0-org/progstack-ssg/pkg/ssg"
+	"github.com/xr0-org/progstack/internal/app/handler/request"
+	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/httpclient"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
-
-const maxFileSize = 10 * 1024 * 1024 /* Limit file size to 10MB */
 
 type CreateBlogResponse struct {
 	Url     string `json:"url"`
 	Message string `json:"message"`
 }
 
-func (b *BlogService) CreateRepositoryBlog() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("CreateRepositoryBlog handler...")
+func (b *BlogService) CreateRepositoryBlog(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("CreateRepositoryBlog handler...")
 
-		b.mixpanel.Track("CreateRepositoryBlog", r)
+	r.MixpanelTrack("CreateRepositoryBlog")
 
-		message := "Successfully created repository-based blog!"
-		url, err := b.createRepositoryBlog(w, r)
-		if err != nil {
-			var customErr *util.CustomError
-			if errors.As(err, &customErr) {
-				logger.Printf("Client Error: %v\n", customErr)
-				http.Error(w, customErr.Error(), http.StatusBadRequest)
-				return
-			} else {
-				logger.Printf("Internal Server Error: %v\n", err)
-				http.Error(w, "", http.StatusInternalServerError)
-				return
-			}
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(CreateBlogResponse{
-			Url:     url,
-			Message: message,
-		}); err != nil {
-			logger.Printf("Error encoding response: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
+	var req struct {
+		Subdomain    string `json:"subdomain"`
+		RepositoryID string `json:"repository_id"`
+		Theme        string `json:"theme"`
+		TestBranch   string `json:"test_branch"`
+		LiveBranch   string `json:"live_branch"`
+		Flow         string `json:"flow"`
 	}
-}
-
-type CreateRepositoryBlogRequest struct {
-	Subdomain    string `json:"subdomain"`
-	RepositoryID string `json:"repository_id"`
-	Theme        string `json:"theme"`
-	TestBranch   string `json:"test_branch"`
-	LiveBranch   string `json:"live_branch"`
-	Flow         string `json:"flow"`
-}
-
-func (b *BlogService) createRepositoryBlog(
-	w http.ResponseWriter, r *http.Request,
-) (string, error) {
-	logger := logging.Logger(r)
-
-	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-	if !ok {
-		return "", fmt.Errorf("user not found")
-	}
-
-	var req CreateRepositoryBlogRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Printf("Error decoding body: %v\n", err)
-		return "", util.CreateCustomError(
+	if err := json.NewDecoder(r.Body()).Decode(&req); err != nil {
+		return nil, util.CreateCustomError(
 			"error decoding request body",
 			http.StatusBadRequest,
 		)
 	}
-	fmt.Printf("req: %v", req)
 
 	intRepoID, err := strconv.ParseInt(req.RepositoryID, 10, 64)
 	if err != nil {
-		return "", fmt.Errorf("could not convert repositoryID `%s' to int64: %w", req.RepositoryID, err)
+		return nil, fmt.Errorf(
+			"convert repositoryID `%s' to int64: %w",
+			req.RepositoryID, err,
+		)
 	}
 
 	theme, err := validateTheme(req.Theme)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("validate theme: %w", err)
 	}
 
 	sub, err := dns.ParseSubdomain(req.Subdomain)
 	if err != nil {
-		return "", fmt.Errorf("subdomain: %w", err)
+		return nil, fmt.Errorf("parse subdomain: %w", err)
 	}
 
+	sesh := r.Session()
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
 		UserID: sesh.GetUserID(),
 		GhRepositoryID: sql.NullInt64{
@@ -137,13 +97,13 @@ func (b *BlogService) createRepositoryBlog(
 		),
 	})
 	if err != nil {
-		return "", fmt.Errorf("could not create blog: %w", err)
+		return nil, fmt.Errorf("create blog: %w", err)
 	}
 
 	if err := UpdateRepositoryOnDisk(
 		b.client, b.store, &blog, logger,
 	); err != nil {
-		return "", fmt.Errorf("error pulling latest changes on live branch: %w", err)
+		return nil, fmt.Errorf("update repo on disk: %w", err)
 	}
 
 	// add owner as subscriber
@@ -154,17 +114,22 @@ func (b *BlogService) createRepositoryBlog(
 			Email:  sesh.GetEmail(),
 		},
 	); err != nil {
-		return "", fmt.Errorf("error subscribing owner: %w", err)
+		return nil, fmt.Errorf("subscribe owner: %w", err)
 	}
 
 	if !blog.GhRepositoryID.Valid {
-		return "", fmt.Errorf("invalid blog repositoryID")
+		return nil, fmt.Errorf("invalid blog repositoryID")
 	}
 
 	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
-		return "", fmt.Errorf("error setting blog to live: %w", err)
+		return nil, fmt.Errorf("set blog to live: %w", err)
 	}
-	return buildUrl(blog.Subdomain.String()), nil
+	return response.NewJson(
+		CreateBlogResponse{
+			Url:     buildUrl(blog.Subdomain.String()),
+			Message: "Successfully created repository-based blog!",
+		},
+	)
 }
 
 func buildRepositoryUrl(fullName string) string {
@@ -230,77 +195,62 @@ func UpdateRepositoryOnDisk(
 	return nil
 }
 
-func (b *BlogService) CreateFolderBlog() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("CreateFolderBlog handler...")
+func (b *BlogService) CreateFolderBlog(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("CreateFolderBlog handler...")
 
-		message := "Successfully created folder-based blog."
-		url, err := b.createFolderBlog(w, r)
-		if err != nil {
-			var customErr *util.CustomError
-			if errors.As(err, &customErr) {
-				logger.Printf("Client Error: %v\n", customErr)
-				message = customErr.Error()
-			} else {
-				/* internal error */
-				logger.Printf("Internal Server Error: %v\n", err)
-				http.Error(w, "", http.StatusInternalServerError)
-				return
-			}
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
-		if err = json.NewEncoder(w).Encode(CreateBlogResponse{
-			Url:     url,
-			Message: message,
-		}); err != nil {
-			logger.Printf("Error encoding response: %v", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-	}
-}
-
-func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (string, error) {
-	logger := logging.Logger(r)
-
-	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-	if !ok {
-		logger.Println("No auth session")
-		return "", util.CreateCustomError("", http.StatusNotFound)
-	}
-
-	req, err := parseCreateFolderBlogRequest(r)
+	subdomain, err := r.GetFormValue("subdomain")
 	if err != nil {
-		return "", err
+		return nil, util.CreateCustomError(
+			"Invalid subdomain", http.StatusBadRequest,
+		)
+	}
+	if subdomain == "" {
+		return nil, util.CreateCustomError(
+			"Subdomain is required", http.StatusBadRequest,
+		)
+	}
+	rawtheme, err := r.GetFormValue("theme")
+	if err != nil {
+		return nil, fmt.Errorf("get theme: %w", err)
+	}
+	theme, err := validateTheme(rawtheme)
+	if err != nil {
+		return nil, util.CreateCustomError(
+			"Invalid theme",
+			http.StatusBadRequest,
+		)
+	}
+
+	folderpath, err := getUploadedFolderPath(r)
+	if err != nil {
+		return nil, fmt.Errorf("get uploaded folder path: %w", err)
 	}
 
 	dst := filepath.Join(
 		config.Config.Progstack.FoldersPath,
-		strconv.FormatInt(int64(sesh.GetUserID()), 10),
+		strconv.FormatInt(int64(r.Session().GetUserID()), 10),
 		uuid.New().String(),
 	)
 
-	logger.Printf("src: %s\n", req.src)
-	logger.Printf("dst: %s\n", dst)
-
 	/* extract to disk for folders */
-	if err := extractZip(req.src, dst); err != nil {
-		return "", fmt.Errorf("error extracting .zip: %w", err)
+	if err := extractZip(folderpath, dst); err != nil {
+		return nil, fmt.Errorf("extract .zip: %w", err)
 	}
 
 	h, err := ssg.GetSiteHash(dst)
 	if err != nil {
-		return "", fmt.Errorf("cannot get hash: %w", err)
+		return nil, fmt.Errorf("get hash: %w", err)
 	}
 
-	sub, err := dns.ParseSubdomain(req.subdomain)
+	sub, err := dns.ParseSubdomain(subdomain)
 	if err != nil {
-		return "", fmt.Errorf("subdomain: %w", err)
+		return nil, fmt.Errorf("parse subdomain: %w", err)
 	}
 
+	sesh := r.Session()
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
 		UserID: sesh.GetUserID(),
 		GhRepositoryID: sql.NullInt64{
@@ -308,7 +258,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		},
 		FolderPath: sql.NullString{dst, true},
 		Subdomain:  sub,
-		Theme:      req.theme,
+		Theme:      theme,
 		BlogType:   model.BlogTypeFolder,
 		LiveHash:   sql.NullString{h, true},
 		EmailMode:  model.EmailModeHtml,
@@ -318,7 +268,7 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 		),
 	})
 	if err != nil {
-		return "", fmt.Errorf("error creating folder-based blog: %w", err)
+		return nil, fmt.Errorf("error creating folder-based blog: %w", err)
 	}
 
 	// subscribe owner
@@ -329,86 +279,17 @@ func (b *BlogService) createFolderBlog(w http.ResponseWriter, r *http.Request) (
 			Email:  sesh.GetEmail(),
 		},
 	); err != nil {
-		return "", fmt.Errorf("error subscribing owner: %w", err)
+		return nil, fmt.Errorf("error subscribing owner: %w", err)
 	}
 	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
-		return "", fmt.Errorf("error setting blog to live: %w", err)
+		return nil, fmt.Errorf("error setting blog to live: %w", err)
 	}
-	return buildUrl(blog.Subdomain.String()), nil
-}
-
-type createFolderBlogRequest struct {
-	subdomain string
-	src       string
-	theme     model.BlogTheme
-}
-
-func parseCreateFolderBlogRequest(r *http.Request) (createFolderBlogRequest, error) {
-	logger := logging.Logger(r)
-
-	/* XXX: Add subscription based file size limits */
-	if err := r.ParseMultipartForm(maxFileSize); err != nil {
-		logger.Printf("Error File too large: %v\n", err)
-		return createFolderBlogRequest{}, util.CreateCustomError(
-			"File too large",
-			http.StatusBadRequest,
-		)
-	}
-
-	subdomain := r.FormValue("subdomain")
-	if subdomain == "" {
-		logger.Println("error reading subdomain")
-		return createFolderBlogRequest{}, util.CreateCustomError(
-			"Subdomain is required",
-			http.StatusBadRequest,
-		)
-	}
-
-	file, header, err := r.FormFile("folder")
-	if err != nil {
-		logger.Printf("Error reading file: %v\n", err)
-		return createFolderBlogRequest{}, util.CreateCustomError(
-			"Invalid file",
-			http.StatusBadRequest,
-		)
-	}
-	defer file.Close()
-
-	if !isValidFileType(header.Filename) {
-		logger.Printf("Invalid file extension for `%s'\n", header.Filename)
-		return createFolderBlogRequest{}, util.CreateCustomError(
-			"Must upload a .zip file",
-			http.StatusBadRequest,
-		)
-	}
-
-	/* create to tmp file */
-	tmpFile, err := os.CreateTemp("", "uploaded-*.zip")
-	if err != nil {
-		return createFolderBlogRequest{}, fmt.Errorf("error creating tmp file: %w", err)
-	}
-	defer tmpFile.Close()
-
-	/* copy uploaded file to tmpFile */
-	if _, err = io.Copy(tmpFile, file); err != nil {
-		return createFolderBlogRequest{}, fmt.Errorf("error copying upload to temp file: %w", err)
-	}
-
-	/* theme */
-	theme, err := validateTheme(r.FormValue("theme"))
-	if err != nil {
-		logger.Printf("Error reading theme")
-		return createFolderBlogRequest{}, util.CreateCustomError(
-			"Invalid theme",
-			http.StatusBadRequest,
-		)
-	}
-
-	return createFolderBlogRequest{
-		subdomain: subdomain,
-		src:       tmpFile.Name(),
-		theme:     theme,
-	}, nil
+	return response.NewJson(
+		CreateBlogResponse{
+			Url:     buildUrl(blog.Subdomain.String()),
+			Message: "Successfully created folder-based blog.",
+		},
+	)
 }
 
 func isValidFileType(filename string) bool {

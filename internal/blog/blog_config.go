@@ -15,6 +15,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/xr0-org/progstack/internal/analytics"
+	"github.com/xr0-org/progstack/internal/app/handler/request"
+	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
@@ -265,59 +267,52 @@ func (b *BlogService) liveBranchSubmit(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
-func (b *BlogService) FolderSubmit() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("FolderSubmit handler...")
+func (b *BlogService) FolderSubmit(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("FolderSubmit handler...")
 
-		b.mixpanel.Track("FolderSubmit", r)
+	r.MixpanelTrack("FolderSubmit")
 
-		if err := b.folderSubmit(w, r); err != nil {
-			logger.Printf("error update folder: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			response := map[string]string{"message": "An unexpected error occured"}
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		response := map[string]string{"message": "Folder updated successfully!"}
-		json.NewEncoder(w).Encode(response)
+	type fsresp struct {
+		Message string `json:"message"`
 	}
+	if err := b.folderSubmit(r); err != nil {
+		return response.NewJson(&fsresp{"An unexpected error occured"})
+	}
+	return response.NewJson(&fsresp{"Folder updated successfully!"})
 }
 
-func (b *BlogService) folderSubmit(w http.ResponseWriter, r *http.Request) error {
-	logger := logging.Logger(r)
+func (b *BlogService) folderSubmit(r request.Request) error {
+	logger := r.Logger()
 
-	_, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-	if !ok {
-		logger.Println("user not found")
-		return util.CreateCustomError("", http.StatusNotFound)
-	}
-
-	src, err := parseFolderUpdateRequest(r)
+	src, err := getUploadedFolderPath(r)
 	if err != nil {
-		return err
+		return fmt.Errorf("get uploaded folder path: %w", err)
 	}
 
-	blogID := mux.Vars(r)["blogID"]
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return fmt.Errorf("no blogID")
+	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
-		return err
+		return fmt.Errorf("parse blogID: %w", err)
 	}
 
 	blog, err := b.store.GetBlogByID(context.TODO(), int32(intBlogID))
 	if err != nil {
-		return fmt.Errorf("error getting blog `%d': %w", intBlogID, err)
+		return fmt.Errorf("get blog `%d': %w", intBlogID, err)
 	}
 
-	/* extract to appropriate path for folders */
 	assert.Assert(blog.FolderPath.Valid)
 	if err := clearAndExtract(src, blog.FolderPath.String); err != nil {
-		return err
+		return fmt.Errorf("clear and extract: %w", err)
 	}
 
 	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
-		return fmt.Errorf("error setting blog to live: %w", err)
+		return fmt.Errorf("set blog to live: %w", err)
 	}
 	return nil
 }
@@ -335,20 +330,11 @@ func clearAndExtract(src, dst string) error {
 	return nil
 }
 
-func parseFolderUpdateRequest(r *http.Request) (string, error) {
-	/* XXX: Add subscription based file size limits */
-	err := r.ParseMultipartForm(maxFileSize) /* 10MB limit */
+func getUploadedFolderPath(r request.Request) (string, error) {
+	logger := r.Logger()
+	file, header, err := r.GetFormFile("folder")
 	if err != nil {
-		logging.Logger(r).Printf("file too large: %v\n", err)
-		return "", util.CreateCustomError(
-			"File too large",
-			http.StatusBadRequest,
-		)
-	}
-
-	file, header, err := r.FormFile("folder")
-	if err != nil {
-		logging.Logger(r).Printf("error reading file: %v\n", err)
+		logger.Printf("error reading file: %v\n", err)
 		return "", util.CreateCustomError(
 			"Invalid file",
 			http.StatusBadRequest,
@@ -357,25 +343,23 @@ func parseFolderUpdateRequest(r *http.Request) (string, error) {
 	defer file.Close()
 
 	if !isValidFileType(header.Filename) {
-		logging.Logger(r).Printf("invalid file extension for `%s'\n", header.Filename)
+		logger.Printf(
+			"invalid file extension for `%s'\n", header.Filename,
+		)
 		return "", util.CreateCustomError(
 			"Must upload a .zip file",
 			http.StatusBadRequest,
 		)
 	}
 
-	/* create to tmp file */
 	tmpFile, err := os.CreateTemp("", "uploaded-*.zip")
 	if err != nil {
-		return "", fmt.Errorf("error creating tmp file: %w", err)
+		return "", fmt.Errorf("create tmp file: %w", err)
 	}
 	defer tmpFile.Close()
-
-	/* copy uploaded file to tmpFile */
 	if _, err = io.Copy(tmpFile, file); err != nil {
-		return "", fmt.Errorf("error copying upload to temp file: %w", err)
+		return "", fmt.Errorf("copy upload to temp file: %w", err)
 	}
-
 	return tmpFile.Name(), nil
 }
 

@@ -2,9 +2,12 @@ package request
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/logging"
@@ -17,11 +20,15 @@ type Request interface {
 
 	/* TODO: refactor authn session handling to remove this */
 	ResponseWriter() http.ResponseWriter
+	Body() io.Reader
 
 	MixpanelTrack(event string) error
 
 	GetURLQueryValue(key string) string
 	GetFormValue(name string) (string, error)
+	GetPostFormValue(name string) (string, error)
+	GetFormFile(name string) (multipart.File, *multipart.FileHeader, error)
+	GetRouteVar(key string) (string, bool)
 }
 
 type request struct {
@@ -39,7 +46,8 @@ func NewRequest(r *http.Request, w http.ResponseWriter) (Request, error) {
 		return nil, fmt.Errorf("no session")
 	}
 	return &request{
-		r, w,
+		r,
+		w,
 		logging.Logger(r),
 		sesh,
 		analytics.NewMixpanelClientWrapper(config.Config.Mixpanel.Token),
@@ -49,6 +57,7 @@ func NewRequest(r *http.Request, w http.ResponseWriter) (Request, error) {
 func (r *request) Logger() *log.Logger                 { return r.logger }
 func (r *request) Session() *session.Session           { return r.sesh }
 func (r *request) ResponseWriter() http.ResponseWriter { return r.w }
+func (r *request) Body() io.Reader                     { return r.r.Body }
 
 func (r *request) MixpanelTrack(event string) error {
 	return r.mixpanel.Track(event, r.r)
@@ -63,4 +72,28 @@ func (r *request) GetFormValue(name string) (string, error) {
 		return "", err
 	}
 	return r.r.FormValue(name), nil
+}
+
+func (r *request) GetPostFormValue(name string) (string, error) {
+	if r.r.Method != http.MethodPost {
+		return "", fmt.Errorf("not POST")
+	}
+	return r.GetFormValue(name)
+}
+
+func (r *request) GetFormFile(
+	name string,
+) (multipart.File, *multipart.FileHeader, error) {
+	/* XXX: add subscription based file size limits */
+	const maxFileSize = 10 * 1024 * 1024 /* limit file size to 10MB */
+
+	if err := r.r.ParseMultipartForm(maxFileSize); err != nil {
+		return nil, nil, err
+	}
+	return r.r.FormFile(name)
+}
+
+func (r *request) GetRouteVar(key string) (string, bool) {
+	v, ok := mux.Vars(r.r)[key]
+	return v, ok
 }

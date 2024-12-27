@@ -124,8 +124,8 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	r.HandleFunc("/stripe/webhook", billingService.StripeWebhook())
 	r.HandleFunc("/pricing", handler.AsHttp(billingService.Pricing))
 
-	r.HandleFunc("/blogs/{blogID}/subscribe", blogService.SubscribeToBlog()).Methods("POST")
-	r.HandleFunc("/blogs/unsubscribe", blogService.UnsubscribeFromBlog())
+	r.HandleFunc("/blogs/{blogID}/subscribe", handler.AsHttp(blogService.SubscribeToBlog)).Methods("POST")
+	r.HandleFunc("/blogs/unsubscribe", handler.AsHttp(blogService.UnsubscribeFromBlog))
 
 	/* authenticated routes */
 	authR := r.PathPrefix("/user").Subrouter()
@@ -137,7 +137,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 		authNService.LinkGithubAccount,
 	))
 	authR.HandleFunc("/account", handler.AsHttp(userService.Account))
-	authR.HandleFunc("/subdomain-check", blogService.SubdomainCheck())
+	authR.HandleFunc("/subdomain-check", handler.AsHttp(blogService.SubdomainCheck))
 	authR.HandleFunc("/create-new-blog", handler.AsHttp(
 		userService.CreateNewBlog,
 	))
@@ -148,8 +148,8 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 		userService.GithubInstallation,
 	))
 	authR.HandleFunc("/folder-flow", handler.AsHttp(userService.FolderFlow))
-	authR.HandleFunc("/create-repository-blog", blogService.CreateRepositoryBlog())
-	authR.HandleFunc("/create-folder-blog", blogService.CreateFolderBlog())
+	authR.HandleFunc("/create-repository-blog", handler.AsHttp(blogService.CreateRepositoryBlog))
+	authR.HandleFunc("/create-folder-blog", handler.AsHttp(blogService.CreateFolderBlog))
 
 	/* billing */
 	authR.HandleFunc("/stripe/billing-portal", handler.AsHttp(billingService.BillingPortal))
@@ -163,7 +163,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	blogR.HandleFunc("/set-theme", blogService.ThemeSubmit())
 	blogR.HandleFunc("/set-test-branch", blogService.TestBranchSubmit())
 	blogR.HandleFunc("/set-live-branch", blogService.LiveBranchSubmit())
-	blogR.HandleFunc("/set-folder", blogService.FolderSubmit())
+	blogR.HandleFunc("/set-folder", handler.AsHttp(blogService.FolderSubmit))
 	blogR.HandleFunc("/set-status", blogService.SetStatusSubmit())
 	blogR.HandleFunc("/sync", blogService.SyncRepository())
 	blogR.HandleFunc("/email", blogService.SendPostEmail())

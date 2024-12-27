@@ -12,6 +12,8 @@ import (
 	"unicode"
 
 	"github.com/gorilla/mux"
+	"github.com/xr0-org/progstack/internal/app/handler/request"
+	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/dns"
@@ -25,54 +27,34 @@ type SubdomainRequest struct {
 	Subdomain string `json:"subdomain"`
 }
 
-type SubdomainCheckResponse struct {
-	Available bool   `json:"available"`
-	Message   string `json:"message"`
-}
+func (b *BlogService) SubdomainCheck(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("SubdomainCheck handler...")
 
-func (b *BlogService) SubdomainCheck() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("SubdomainCheck handler...")
+	r.MixpanelTrack("SubdomainCheck")
 
-		b.mixpanel.Track("SubdomainCheck", r)
-
-		available := true
-		message := "Subdomain is available"
-		if err := b.subdomainCheck(w, r); err != nil {
-			var customErr *util.CustomError
-			if errors.As(err, &customErr) {
-				logger.Printf("Client error: %v\n", customErr)
-				available = false
-				message = customErr.Error()
-			} else {
-				logger.Printf("Internal Server Error: %v\n", err)
-				http.Error(w, "", http.StatusInternalServerError)
-				return
-			}
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(SubdomainCheckResponse{
-			Available: available,
-			Message:   message,
-		}); err != nil {
-			logger.Printf("Error encoding reponse: %v\n", err)
-			http.Error(
-				w,
-				"Error encoding reponse",
-				http.StatusInternalServerError,
-			)
-			return
-		}
+	type checkresp struct {
+		Available bool   `json:"available"`
+		Message   string `json:"message"`
 	}
+	if err := b.subdomainCheck(r); err != nil {
+		var customErr *util.CustomError
+		if errors.As(err, &customErr) {
+			return response.NewJson(
+				checkresp{false, customErr.Error()},
+			)
+		}
+		return nil, fmt.Errorf("check: %w", err)
+	}
+	return response.NewJson(checkresp{true, "Subdomain is available"})
 }
 
-func (b *BlogService) subdomainCheck(w http.ResponseWriter, r *http.Request) error {
+func (b *BlogService) subdomainCheck(r request.Request) error {
 	var req SubdomainRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return err
+	if err := json.NewDecoder(r.Body()).Decode(&req); err != nil {
+		return fmt.Errorf("decode: %w", err)
 	}
 	sub, err := dns.ParseSubdomain(req.Subdomain)
 	if err != nil {
@@ -95,10 +77,6 @@ func (b *BlogService) subdomainCheck(w http.ResponseWriter, r *http.Request) err
 			http.StatusBadRequest,
 		)
 	}
-	if err = validateSubdomain(req.Subdomain); err != nil {
-		return err
-	}
-
 	return nil
 }
 
