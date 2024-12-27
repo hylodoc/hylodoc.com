@@ -22,7 +22,7 @@ type Request interface {
 	ResponseWriter() http.ResponseWriter
 	ReadBody() ([]byte, error)
 
-	MixpanelTrack(event string) error
+	MixpanelTrack(event string)
 
 	GetURLQueryValue(key string) string
 	GetFormValue(name string) (string, error)
@@ -76,8 +76,8 @@ func (r *request) ReadBody() ([]byte, error) {
 	return r._body, nil
 }
 
-func (r *request) MixpanelTrack(event string) error {
-	return r.mixpanel.Track(event, r.r)
+func (r *request) MixpanelTrack(event string) {
+	r.mixpanel.Track(event, r.r)
 }
 
 func (r *request) GetURLQueryValue(key string) string {
