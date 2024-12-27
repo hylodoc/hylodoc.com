@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/metrics"
 )
 
@@ -21,8 +20,6 @@ func NewHttpClient(timeout time.Duration) *Client {
 
 /* sends request and returns response */
 func (c *Client) Do(req *http.Request) (*http.Response, error) {
-	logger := logging.Logger(req)
-
 	start := time.Now()
 
 	/* record downstream request */
@@ -32,10 +29,9 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		logger.Printf("error calling downstream: %v\n", err)
 		/* record downstream error */
 		metrics.RecordClientErrors(
-			req.Method, req.URL.String(), "network_error",
+			req.Method, req.URL.String(), "downstream_error",
 		)
 		return nil, err
 	}

@@ -36,15 +36,14 @@ type Subscriber struct {
 func (b *BlogService) SubscriberMetrics(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("SubscriberMetrics handler...")
+	sesh := r.Session()
+	sesh.Println("SubscriberMetrics handler...")
 
 	r.MixpanelTrack("SubscriberMetrics")
 
-	sesh := r.Session()
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -67,8 +66,6 @@ func (b *BlogService) SubscriberMetrics(
 				SubscriberData: data,
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 

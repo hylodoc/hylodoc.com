@@ -46,7 +46,7 @@ func GetFreshGeneration(blogid int32, s *model.Store) (int32, error) {
 				fmt.Sprintf(
 					"%s://%s/blogs/%d/subscribe",
 					config.Config.Progstack.Protocol,
-					config.Config.Progstack.ServiceName,
+					config.Config.Progstack.RootDomain,
 					b.ID,
 				),
 			),

@@ -131,7 +131,8 @@ CREATE TABLE blogs (
 	user_id			INTEGER		NOT NULL,
 	theme			blog_theme	NOT NULL			DEFAULT('lit'),
 
-	subdomain		VARCHAR(255)	NOT NULL	UNIQUE
+	subdomain		VARCHAR(255)	NOT NULL
+		CONSTRAINT unique_blog_subdomain UNIQUE,
 		CHECK (subdomain NOT IN ('', 'custom-domain-cname-target')),
 
 	domain			VARCHAR(255)			UNIQUE

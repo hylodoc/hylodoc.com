@@ -11,13 +11,13 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/lib/pq"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/util"
 )
 
 type SubdomainRequest struct {
@@ -27,8 +27,8 @@ type SubdomainRequest struct {
 func (b *BlogService) SubdomainCheck(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("SubdomainCheck handler...")
+	sesh := r.Session()
+	sesh.Println("SubdomainCheck handler...")
 
 	r.MixpanelTrack("SubdomainCheck")
 
@@ -37,7 +37,7 @@ func (b *BlogService) SubdomainCheck(
 		Message   string `json:"message"`
 	}
 	if err := b.subdomainCheck(r); err != nil {
-		var customErr *util.CustomError
+		var customErr *customError
 		if errors.As(err, &customErr) {
 			return response.NewJson(
 				checkresp{false, customErr.Error()},
@@ -61,7 +61,7 @@ func (b *BlogService) subdomainCheck(r request.Request) error {
 	if err != nil {
 		var parseErr dns.ParseUserError
 		if errors.As(err, &parseErr) {
-			return util.CreateCustomError(
+			return createCustomError(
 				parseErr.Error(),
 				http.StatusBadRequest,
 			)
@@ -73,7 +73,7 @@ func (b *BlogService) subdomainCheck(r request.Request) error {
 		return fmt.Errorf("error checking for subdomain in db: %w", err)
 	}
 	if exists {
-		return util.CreateCustomError(
+		return createCustomError(
 			"subdomain already exists",
 			http.StatusBadRequest,
 		)
@@ -83,14 +83,14 @@ func (b *BlogService) subdomainCheck(r request.Request) error {
 
 func validateSubdomain(subdomain string) error {
 	if len(subdomain) < 1 || len(subdomain) > 63 {
-		return util.CreateCustomError(
+		return createCustomError(
 			"Subdomain must be between 1 and 63 characters long",
 			http.StatusBadRequest,
 		)
 	}
 	for _, r := range subdomain {
 		if unicode.IsSpace(r) {
-			return util.CreateCustomError(
+			return createCustomError(
 				"Subdomain cannot contain spaces.",
 				http.StatusBadRequest,
 			)
@@ -99,14 +99,14 @@ func validateSubdomain(subdomain string) error {
 	previousChar := ' ' /* start with a space to avoid consecutive check on the first character */
 	for _, r := range subdomain {
 		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-') {
-			return util.CreateCustomError(
+			return createCustomError(
 				"Subdomain can only contain letters, numbers, and hyphens.",
 				http.StatusBadRequest,
 			)
 		}
 		/* check for consecutive hyphens */
 		if r == '-' && previousChar == '-' {
-			return util.CreateCustomError(
+			return createCustomError(
 				"Subdomain cannot contain consecutive hyphens.",
 				http.StatusBadRequest,
 			)
@@ -115,7 +115,7 @@ func validateSubdomain(subdomain string) error {
 	}
 	/* check that it does not start or end with a hyphen */
 	if subdomain[0] == '-' || subdomain[len(subdomain)-1] == '-' {
-		return util.CreateCustomError(
+		return createCustomError(
 			"Subdomain cannot start or end with a hyphen.",
 			http.StatusBadRequest,
 		)
@@ -126,8 +126,8 @@ func validateSubdomain(subdomain string) error {
 func (b *BlogService) SubdomainSubmit(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("SubdomainSubmit handler...")
+	sesh := r.Session()
+	sesh.Println("SubdomainSubmit handler...")
 
 	r.MixpanelTrack("SubdomainSubmit")
 
@@ -135,8 +135,8 @@ func (b *BlogService) SubdomainSubmit(
 		Message string `json:"message"`
 	}
 	if err := b.subdomainSubmit(r); err != nil {
-		logger.Println("Error submiting subdomain")
-		var customErr *util.CustomError
+		sesh.Println("Error submiting subdomain")
+		var customErr *customError
 		if errors.As(err, &customErr) {
 			return response.NewJson(&submitresp{customErr.Error()})
 		} else {
@@ -160,7 +160,7 @@ func (b *BlogService) subdomainSubmit(r request.Request) error {
 	if err != nil {
 		var parseErr dns.ParseUserError
 		if errors.As(err, &parseErr) {
-			return util.CreateCustomError(
+			return createCustomError(
 				parseErr.Error(),
 				http.StatusBadRequest,
 			)
@@ -176,22 +176,35 @@ func (b *BlogService) subdomainSubmit(r request.Request) error {
 	if err != nil {
 		return fmt.Errorf("parse blogID: %w", err)
 	}
-	if err := b.store.UpdateSubdomainTx(
-		context.TODO(), model.UpdateSubdomainTxParams{
-			BlogID:    int32(intBlogID),
+	if err := b.store.UpdateSubdomainByID(
+		context.TODO(), model.UpdateSubdomainByIDParams{
+			ID:        int32(intBlogID),
 			Subdomain: sub,
 		},
 	); err != nil {
+		if isUniqueSubdomainViolation(err) {
+			return createCustomError(
+				"subdomain already exists",
+				http.StatusBadRequest,
+			)
+		}
 		return err
 	}
 	return nil
 }
 
+func isUniqueSubdomainViolation(err error) bool {
+	var pqerr *pq.Error
+	return errors.As(err, &pqerr) &&
+		pqerr.Code.Name() == "unique_violation" &&
+		pqerr.Constraint == "unique_blog_subdomain"
+}
+
 func (b *BlogService) DomainSubmit(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("DomainSubmit handler...")
+	sesh := r.Session()
+	sesh.Println("DomainSubmit handler...")
 
 	r.MixpanelTrack("DomainSubmit")
 
@@ -203,7 +216,7 @@ func (b *BlogService) DomainSubmit(
 
 	blogIDRaw, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	blogID, err := strconv.ParseInt(blogIDRaw, 10, 32)
 	if err != nil {
@@ -212,8 +225,8 @@ func (b *BlogService) DomainSubmit(
 
 	domain, err := r.GetPostFormValue("domain")
 	if err != nil {
-		r.Logger().Printf("cannot get post form value: %v\n", err)
-		return nil, util.CreateCustomError(
+		r.Session().Printf("cannot get post form value: %v\n", err)
+		return nil, createCustomError(
 			"Error parsing form", http.StatusBadRequest,
 		)
 	}
@@ -232,7 +245,7 @@ func (b *BlogService) DomainSubmit(
 		fmt.Sprintf(
 			"%s://%s/user/blogs/%d/config",
 			config.Config.Progstack.Protocol,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 			blogID,
 		),
 		http.StatusTemporaryRedirect,

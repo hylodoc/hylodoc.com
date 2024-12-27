@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/xr0-org/progstack/internal/logging"
+	"github.com/xr0-org/progstack/internal/assert"
+	"github.com/xr0-org/progstack/internal/session"
 )
 
 type jsonresponse struct {
@@ -19,9 +20,12 @@ func NewJson(data any) (Response, error) {
 	return &jsonresponse{b}, nil
 }
 
-func (resp *jsonresponse) Respond(w http.ResponseWriter, r *http.Request) {
+func (resp *jsonresponse) Respond(w http.ResponseWriter, r *http.Request) error {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	logging.Logger(r).Printf("response body: %s\n", string(resp.b))
-	w.Write(resp.b)
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	assert.Assert(ok)
+	sesh.Printf("response body: %s\n", string(resp.b))
+	_, err := w.Write(resp.b)
+	return err
 }

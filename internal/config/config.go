@@ -29,16 +29,21 @@ type Configuration struct {
 }
 
 type ProgstackParams struct {
-	Protocol          string `mapstructure:"protocol"`
-	ServiceName       string `mapstructure:"service_name"`
-	RepositoriesPath  string `mapstructure:"repositories_path"`
-	FoldersPath       string `mapstructure:"folders_path"`
-	CertsPath         string `mapstructure:"certs_path"`
-	WebsitesPath      string `mapstructure:"websites_path"`
-	EmailDomain       string `mapstructure:"email_domain"`
-	AccountsEmail     string `mapstructure:"accounts_email"`
-	CustomDomainCNAME string `mapstructure:"custom_domain_cname"`
-	CustomDomainIP    string `mapstructure:"custom_domain_ip"`
+	Progstack            string `mapstructure:"progstack"`
+	Protocol             string `mapstructure:"protocol"`
+	RootDomain           string `mapstructure:"root_domain"`
+	RepositoriesPath     string `mapstructure:"repositories_path"`
+	FoldersPath          string `mapstructure:"folders_path"`
+	CertsPath            string `mapstructure:"certs_path"`
+	WebsitesPath         string `mapstructure:"websites_path"`
+	EmailDomain          string `mapstructure:"email_domain"`
+	AccountsEmail        string `mapstructure:"accounts_email"`
+	CustomDomainCNAME    string `mapstructure:"custom_domain_cname"`
+	CustomDomainIP       string `mapstructure:"custom_domain_ip"`
+	CustomDomainGuideURL string `mapstructure:"custom_domain_guide_url"`
+	CDN                  string `mapstructure:"cdn"`
+	DiscordURL           string `mapstructure:"discord_url"`
+	OpenIssueURL         string `mapstructure:"open_issue_url"`
 }
 
 type ProgstackSsgParams struct {

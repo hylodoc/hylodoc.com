@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/xr0-org/progstack/internal/logging"
+	"github.com/xr0-org/progstack/internal/app/handler"
+	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/routing/internal/usersite"
+	"github.com/xr0-org/progstack/internal/session"
 )
 
 type RoutingService struct {
@@ -21,25 +23,26 @@ func NewRoutingService(s *model.Store) *RoutingService {
 
 func (s *RoutingService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
 		if err := s.tryRenderUsersite(w, r); err != nil {
 			if errors.Is(err, usersite.ErrIsService) {
 				next.ServeHTTP(w, r)
 			} else {
-				logger.Println("unknown host error:", err)
-				/* TODO: unknown host pages */
-				if errors.Is(err, usersite.ErrUnknownSubdomain) {
-					http.Error(
-						w,
-						"unclaimed subdomain",
-						http.StatusNotFound,
-					)
-				} else {
-					http.Error(
-						w,
-						"unknown domain",
-						http.StatusNotFound,
-					)
+				sesh, ok := r.Context().Value(
+					session.CtxSessionKey,
+				).(*session.Session)
+				assert.Assert(ok)
+				assert.Assert(sesh != nil)
+				switch {
+				case errors.Is(err, usersite.ErrUnknownSubdomain):
+					handler.NotFoundSubdomain(w, r)
+					break
+				case errors.Is(err, usersite.ErrUnknownDomain):
+					handler.NotFoundDomain(w, r)
+					break
+				default:
+					sesh.Println("unknown host error:", err)
+					handler.HandleError(w, r, err)
+					break
 				}
 			}
 		}

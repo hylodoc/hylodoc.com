@@ -18,7 +18,7 @@ func (s *sender) SendRegisterLink(token string) error {
 		fmt.Sprintf(
 			"%s://%s/%s?token=%s",
 			config.Config.Progstack.Protocol,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 			"magic/registercallback",
 			token,
 		),
@@ -39,7 +39,7 @@ func (s *sender) SendLoginLink(token string) error {
 		fmt.Sprintf(
 			"%s://%s/%s?token=%s",
 			config.Config.Progstack.Protocol,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 			"magic/logincallback",
 			token,
 		),

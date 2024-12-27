@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"text/template"
 	"time"
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
@@ -57,15 +56,15 @@ func NewAuthNService(
 func (a *AuthNService) GithubLogin(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("GithubLogin handler...")
+	sesh := r.Session()
+	sesh.Println("GithubLogin handler...")
 	r.MixpanelTrack("GithubLogin")
 	authUrl, err := buildGithubOAuthUrl()
 	if err != nil {
 		return nil, fmt.Errorf("GithubLogin: %w", err)
 	}
 	/* redirect user to GitHub for OAuth authorization */
-	logger.Println("Redirecting to github for Oauth...")
+	sesh.Println("Redirecting to github for Oauth...")
 	return response.NewRedirect(authUrl, http.StatusFound), nil
 }
 
@@ -84,19 +83,19 @@ func buildGithubOAuthUrl() (string, error) {
 func (a *AuthNService) GithubOAuthCallback(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("GithubOAuthCallback handler...")
+	sesh := r.Session()
+	sesh.Println("GithubOAuthCallback handler...")
 	r.MixpanelTrack("GithubOAuthCallback")
 	/* create user or login user */
 	if err := a.githubOAuthCallback(r); err != nil {
 		return nil, fmt.Errorf("OAuthCallback: %w", err)
 	}
-	logger.Println("Redirecting user home...")
+	sesh.Println("Redirecting user home...")
 	return response.NewRedirect("/user/", http.StatusTemporaryRedirect), nil
 }
 
 func (a *AuthNService) githubOAuthCallback(r request.Request) error {
-	logger := r.Logger()
+	sesh := r.Session()
 
 	/* get accessToken */
 	accessToken, err := getOauthAccessToken(
@@ -120,7 +119,7 @@ func (a *AuthNService) githubOAuthCallback(r request.Request) error {
 			return fmt.Errorf("error checking for user existence: %w", err)
 		}
 		/* new user signing in with github, create with github account */
-		logger.Println("Creating user and linking to github account in db...")
+		sesh.Println("Creating user and linking to github account in db...")
 		u, err = a.store.CreateUserWithGithubAccountTx(
 			context.TODO(),
 			model.CreateGithubAccountParams{
@@ -130,21 +129,21 @@ func (a *AuthNService) githubOAuthCallback(r request.Request) error {
 			},
 		)
 		if err != nil {
-			logger.Printf("Error creating user in db: %v", err)
+			sesh.Printf("Error creating user in db: %v", err)
 			return fmt.Errorf("error creating user in db: %w", err)
 		}
 		/* autosubscribe user to stripe */
 		if err = billing.AutoSubscribeToFreePlan(
-			u, a.store, logger,
+			u, a.store, sesh,
 		); err != nil {
 			return fmt.Errorf("error subscribing user to free plan: %w", err)
 		}
 	}
-	logger.Printf("Got user: %v\n", u)
+	sesh.Printf("Got user: %v\n", u)
 
 	/* create Auth Session */
-	if _, err := session.CreateAuthSession(
-		a.store, r.ResponseWriter(), u.ID, authSessionDuration, logger,
+	if _, err := sesh.Authenticate(
+		a.store, r.ResponseWriter(), u.ID, authSessionDuration,
 	); err != nil {
 		return fmt.Errorf("error creating auth session: %w", err)
 	}
@@ -194,18 +193,22 @@ func getOauthAccessToken(
 func (a *AuthNService) LinkGithubAccount(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("LinkGithubAccount handler...")
+	sesh := r.Session()
+	sesh.Println("LinkGithubAccount handler...")
 
 	r.MixpanelTrack("LinkGithubAccount")
-	linkUrl, err := buildGithubLinkUrl(r.Session().GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
+	linkUrl, err := buildGithubLinkUrl(userid)
 	if err != nil {
 		return nil, fmt.Errorf("GithubLinkUrl: %w", err)
 	}
-	logger.Printf("linkUrl: %s\n", linkUrl)
+	sesh.Printf("linkUrl: %s\n", linkUrl)
 
 	/* redirect user to GitHub for OAuth linking accounts */
-	logger.Println("Redirecting to Githbub for OAuth linking...")
+	sesh.Println("Redirecting to Githbub for OAuth linking...")
 	return response.NewRedirect(linkUrl, http.StatusFound), nil
 }
 
@@ -225,8 +228,8 @@ func buildGithubLinkUrl(userID int32) (string, error) {
 func (a *AuthNService) GithubLinkCallback(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("GithubLinkCallback handler...")
+	sesh := r.Session()
+	sesh.Println("GithubLinkCallback handler...")
 
 	r.MixpanelTrack("GithubLinkCallback")
 
@@ -235,7 +238,7 @@ func (a *AuthNService) GithubLinkCallback(
 		 * option) but should also show error nicely */
 		return nil, fmt.Errorf("githubOAuthLinkCallback: %w", err)
 	}
-	logger.Println("Redirecting user home...")
+	sesh.Println("Redirecting user home...")
 	return response.NewRedirect("/user/", http.StatusTemporaryRedirect), nil
 }
 
@@ -337,8 +340,8 @@ func getGithubUserInfo(
 }
 
 func (a *AuthNService) Register(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("Register handler...")
+	sesh := r.Session()
+	sesh.Println("Register handler...")
 	r.MixpanelTrack("Register")
 	return response.NewTemplate(
 		[]string{"register.html"},
@@ -351,16 +354,14 @@ func (a *AuthNService) Register(r request.Request) (response.Response, error) {
 				UserInfo: session.ConvertSessionToUserInfo(r.Session()),
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
 /* Login */
 
 func (a *AuthNService) Login(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("Login handler...")
+	sesh := r.Session()
+	sesh.Println("Login handler...")
 	r.MixpanelTrack("Login")
 
 	return response.NewTemplate([]string{"login.html"},
@@ -375,19 +376,17 @@ func (a *AuthNService) Login(r request.Request) (response.Response, error) {
 				),
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
 /* Logout */
 
 func (a *AuthNService) Logout(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("Logout handler...")
+	sesh := r.Session()
+	sesh.Println("Logout handler...")
 
 	r.MixpanelTrack("Logout")
-	if err := r.Session().End(a.store, r.Logger()); err != nil {
+	if err := r.Session().End(a.store); err != nil {
 		return nil, fmt.Errorf("end session: %w", err)
 	}
 	return response.NewRedirect("/", http.StatusTemporaryRedirect), nil
@@ -398,8 +397,8 @@ func (a *AuthNService) Logout(r request.Request) (response.Response, error) {
 func (a *AuthNService) MagicRegister(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("MagicRegister handler...")
+	sesh := r.Session()
+	sesh.Println("MagicRegister handler...")
 	r.MixpanelTrack("MagicRegister")
 
 	if err := a.magicRegister(r); err != nil {
@@ -452,19 +451,19 @@ func (a *AuthNService) magicRegister(r request.Request) error {
 func (a *AuthNService) MagicRegisterCallback(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("MagicRegisterCallback handler...")
+	sesh := r.Session()
+	sesh.Println("MagicRegisterCallback handler...")
 	r.MixpanelTrack("MagicRegisterCallback")
 
 	if err := a.magicRegisterCallback(r); err != nil {
 		return nil, fmt.Errorf("magic register callback: %w", err)
 	}
-	logger.Println("Redirecting user to home...")
+	sesh.Println("Redirecting user to home...")
 	return response.NewRedirect("/", http.StatusTemporaryRedirect), nil
 }
 
 func (a *AuthNService) magicRegisterCallback(r request.Request) error {
-	logger := r.Logger()
+	sesh := r.Session()
 
 	/* look for magic in db */
 	magic, err := a.store.GetMagicRegisterByToken(
@@ -482,16 +481,16 @@ func (a *AuthNService) magicRegisterCallback(r request.Request) error {
 	if err != nil {
 		return fmt.Errorf("error creating user: %w", err)
 	}
-	logger.Printf("Successfully registered user `%v'\n", u)
+	sesh.Printf("Successfully registered user `%v'\n", u)
 
 	/* autosubscribe user to stripe */
-	if err = billing.AutoSubscribeToFreePlan(*u, a.store, logger); err != nil {
+	if err = billing.AutoSubscribeToFreePlan(*u, a.store, sesh); err != nil {
 		return fmt.Errorf("error subscribing user to free plan: %w", err)
 	}
 
 	/* create Auth Session */
-	if _, err := session.CreateAuthSession(
-		a.store, r.ResponseWriter(), u.ID, authSessionDuration, logger,
+	if _, err := sesh.Authenticate(
+		a.store, r.ResponseWriter(), u.ID, authSessionDuration,
 	); err != nil {
 		return fmt.Errorf("error creating auth session: %w", err)
 	}
@@ -499,8 +498,8 @@ func (a *AuthNService) magicRegisterCallback(r request.Request) error {
 }
 
 func (a *AuthNService) MagicLogin(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("MagicLogin handler...")
+	sesh := r.Session()
+	sesh.Println("MagicLogin handler...")
 	r.MixpanelTrack("MagicLogin")
 
 	if err := a.magicLogin(r); err != nil {
@@ -553,14 +552,14 @@ func (a *AuthNService) magicLogin(r request.Request) error {
 func (a *AuthNService) MagicLoginCallback(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("MagicLoginCallback...")
+	sesh := r.Session()
+	sesh.Println("MagicLoginCallback...")
 	r.MixpanelTrack("MagicLoginCallback")
 
 	if err := a.magicLoginCallback(r); err != nil {
 		return nil, fmt.Errorf("magic login callback: %w", err)
 	}
-	logger.Println("Redirecting user to home...")
+	sesh.Println("Redirecting user to home...")
 	return response.NewRedirect("/user/", http.StatusTemporaryRedirect), nil
 }
 
@@ -578,12 +577,12 @@ func (a *AuthNService) magicLoginCallback(r request.Request) error {
 		return fmt.Errorf("error creating user: %w", err)
 	}
 	/* create Auth Session */
-	logger := r.Logger()
-	if _, err := session.CreateAuthSession(
-		a.store, r.ResponseWriter(), u.ID, authSessionDuration, logger,
+	sesh := r.Session()
+	if _, err := sesh.Authenticate(
+		a.store, r.ResponseWriter(), u.ID, authSessionDuration,
 	); err != nil {
 		return fmt.Errorf("error creating auth session: %w", err)
 	}
-	logger.Printf("Successfully logged in user `%v'\n", u)
+	sesh.Printf("Successfully logged in user `%v'\n", u)
 	return nil
 }

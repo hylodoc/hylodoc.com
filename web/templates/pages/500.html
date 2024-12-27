@@ -1,0 +1,15 @@
+{{ template "header" . }}
+
+<div class="container">
+	<h2>Internal server error</h2>
+	<p>Well, you did it.</p>
+	<p>
+		More seriously, this is almost certainly a bug.
+		Come shout at us on
+		<a href="{{ .Data.DiscordURL }}">Discord</a>
+		or consider filing a bug report
+		<a href="{{ .Data.OpenIssueURL }}">here</a>.
+	</p>
+</div>
+
+{{ template "footer" . }}

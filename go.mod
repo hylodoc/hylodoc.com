@@ -43,7 +43,6 @@ require (
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
-	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lithdew/quickjs v0.0.0-20200714182134-aaa42285c9d2 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect

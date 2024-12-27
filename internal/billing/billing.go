@@ -3,10 +3,7 @@ package billing
 import (
 	"context"
 	"fmt"
-	"html/template"
-	"log"
 	"net/http"
-	"strings"
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
@@ -38,8 +35,8 @@ func NewBillingService(
 }
 
 func (b *BillingService) Pricing(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("Pricing handler...")
+	sesh := r.Session()
+	sesh.Println("Pricing handler...")
 
 	r.MixpanelTrack("Pricing")
 
@@ -82,24 +79,20 @@ func (b *BillingService) Pricing(r request.Request) (response.Response, error) {
 				SubscriptionTiers: authz.OrderedSubscriptionTiers(),
 			},
 		},
-		template.FuncMap{
-			"join": strings.Join,
-		},
-		logger,
 	), nil
 }
 
 func AutoSubscribeToFreePlan(
-	user model.User, s *model.Store, logger *log.Logger,
+	user model.User, s *model.Store, sesh *session.Session,
 ) error {
-	logger.Println("AutoSubscribeToFreePlan...")
+	sesh.Println("AutoSubscribeToFreePlan...")
 
 	/* create customer in stripe */
 	cust, err := createCustomer(user.Email)
 	if err != nil {
 		return fmt.Errorf("error creating stripe customer: %w", err)
 	}
-	logger.Printf("StripeCustomer: %v\n", cust)
+	sesh.Printf("StripeCustomer: %v\n", cust)
 
 	/* create subscription for customer */
 	sub, err := createSubscription(
@@ -108,7 +101,7 @@ func AutoSubscribeToFreePlan(
 	if err != nil {
 		return fmt.Errorf("error creating subscription: %w", err)
 	}
-	logger.Printf("StripeSubscription: %v\n", sub)
+	sesh.Printf("StripeSubscription: %v\n", sub)
 
 	/* write to db */
 	dbsub, err := s.CreateStripeSubscription(
@@ -121,7 +114,7 @@ func AutoSubscribeToFreePlan(
 			StripeStatus:         string(sub.Status),
 		},
 	)
-	logger.Printf("Db sub: %v\n", dbsub)
+	sesh.Printf("Db sub: %v\n", dbsub)
 	return nil
 }
 
@@ -157,8 +150,8 @@ func createSubscription(customerID, priceID string) (*stripe.Subscription, error
 func (b *BillingService) BillingPortal(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("BillingPortal handler...")
+	sesh := r.Session()
+	sesh.Println("BillingPortal handler...")
 
 	r.MixpanelTrack("BillingPortal")
 
@@ -170,8 +163,12 @@ func (b *BillingService) BillingPortal(
 }
 
 func (b *BillingService) billingPortal(r request.Request) (string, error) {
+	userid, err := r.Session().GetUserID()
+	if err != nil {
+		return "", fmt.Errorf("get user id: %w", err)
+	}
 	sub, err := b.store.GetStripeSubscriptionByUserID(
-		context.TODO(), r.Session().GetUserID(),
+		context.TODO(), userid,
 	)
 	if err != nil {
 		return "", fmt.Errorf("could not get subcription for user: %w", err)
@@ -182,7 +179,7 @@ func (b *BillingService) billingPortal(r request.Request) (string, error) {
 		ReturnURL: stripe.String(fmt.Sprintf(
 			"%s://%s/user/account",
 			config.Config.Progstack.Protocol,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 		)),
 	}
 

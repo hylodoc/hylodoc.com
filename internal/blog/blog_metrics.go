@@ -26,15 +26,14 @@ type SiteData struct {
 func (b *BlogService) SiteMetrics(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("SiteMetrics handler...")
+	sesh := r.Session()
+	sesh.Println("SiteMetrics handler...")
 
 	r.MixpanelTrack("SiteMetrics")
 
-	sesh := r.Session()
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -66,8 +65,6 @@ func (b *BlogService) SiteMetrics(
 				PostData: data,
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
@@ -96,7 +93,7 @@ func (b *BlogService) getSiteMetrics(blogid int32) ([]postdata, error) {
 				"%s://%s.%s",
 				config.Config.Progstack.Protocol,
 				blog.Subdomain,
-				config.Config.Progstack.ServiceName,
+				config.Config.Progstack.RootDomain,
 			),
 			p.Url,
 		)
@@ -143,7 +140,7 @@ func getemaildata(post *model.Post, clicks int) emaildata.EmailData {
 			fmt.Sprintf(
 				"%s://%s/user/blogs/%d/email?token=%s",
 				config.Config.Progstack.Protocol,
-				config.Config.Progstack.ServiceName,
+				config.Config.Progstack.RootDomain,
 				post.Blog,
 				post.EmailToken,
 			),

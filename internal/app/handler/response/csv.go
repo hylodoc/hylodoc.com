@@ -12,12 +12,13 @@ type csvresponse struct {
 
 func NewCsvFile(name string, b []byte) Response { return &csvresponse{name, b} }
 
-func (csv *csvresponse) Respond(w http.ResponseWriter, r *http.Request) {
+func (csv *csvresponse) Respond(w http.ResponseWriter, r *http.Request) error {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set(
 		"Content-Disposition",
 		fmt.Sprintf("attachment; filename=%s", csv.name),
 	)
-	w.Write(csv.b)
+	_, err := w.Write(csv.b)
+	return err
 }

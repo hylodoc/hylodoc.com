@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"text/template"
 
 	"github.com/gorilla/mux"
 	"github.com/xr0-org/progstack/internal/app/handler"
@@ -17,7 +16,6 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/installation"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/metrics"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/routing"
@@ -87,9 +85,16 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 
 	/* middleware */
 	r.Use(session.NewSessionService(store).Middleware)
-	r.Use(logging.Middleware)
 	r.Use(metrics.Middleware)
 	r.Use(routing.NewRoutingService(store).Middleware)
+
+	/* MethodNotAllowed handler ignored for now */
+	notfoundR := mux.NewRouter()
+	notfoundR.Use(session.NewSessionService(store).Middleware)
+	notfoundR.Use(metrics.Middleware)
+	notfoundR.Use(routing.NewRoutingService(store).Middleware)
+	notfoundR.PathPrefix("/").HandlerFunc(handler.NotFound)
+	r.NotFoundHandler = notfoundR
 
 	/* public routes */
 
@@ -101,6 +106,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	metrics.Initialize()
 
 	handler.Handle(r, "/", index)
+
 	authNService := authn.NewAuthNService(httpClient, store)
 	handler.Handle(r, "/register", authNService.Register)
 	handler.Handle(r, "/login", authNService.Login)
@@ -183,9 +189,6 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 		),
 	)
 
-	/* XXX: makes `/user` serve `/user/` */
-	r.PathPrefix("/").Handler(authR)
-
 	m := &autocert.Manager{
 		Cache:  autocert.DirCache(config.Config.Progstack.CertsPath),
 		Prompt: autocert.AcceptTOS,
@@ -212,15 +215,13 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 }
 
 func index(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("Index handler...")
+	sesh := r.Session()
+	sesh.Println("Index handler...")
 
 	r.MixpanelTrack("Index")
 
-	sesh := r.Session()
-
 	if sesh.IsAuthenticated() {
-		logger.Println("Redirecting unauthenticated user")
+		sesh.Println("Redirecting unauthenticated user")
 		return response.NewRedirect(
 			"/user/", http.StatusFound,
 		), nil
@@ -237,7 +238,5 @@ func index(r request.Request) (response.Response, error) {
 				UserInfo: session.ConvertSessionToUserInfo(sesh),
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }

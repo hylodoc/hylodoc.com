@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"html/template"
-	"log"
 	"net/http"
 	"time"
 
@@ -29,14 +27,17 @@ func NewUserService(s *model.Store) *UserService {
 }
 
 func (u *UserService) Home(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("Home handler...")
+	sesh := r.Session()
+	sesh.Println("Home handler...")
 
 	r.MixpanelTrack("Home")
 
 	/* get session */
-	sesh := r.Session()
-	blogs, err := blog.GetBlogsInfo(u.store, sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
+	blogs, err := blog.GetBlogsInfo(u.store, userid)
 	if err != nil {
 		return nil, fmt.Errorf("blogs: %w", err)
 	}
@@ -60,18 +61,15 @@ func (u *UserService) Home(r request.Request) (response.Response, error) {
 				Blogs:               blogs,
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
 func (u *UserService) CreateNewBlog(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("CreateNewBlog handler...")
+	sesh := r.Session()
+	sesh.Println("CreateNewBlog handler...")
 
 	r.MixpanelTrack("CreateNewBlog")
 
-	sesh := r.Session()
 	if err := authz.CanCreateSite(u.store, sesh); err != nil {
 		return nil, fmt.Errorf("CanCreateSite: %w", err)
 	}
@@ -87,14 +85,12 @@ func (u *UserService) CreateNewBlog(r request.Request) (response.Response, error
 				UserInfo: session.ConvertSessionToUserInfo(sesh),
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
 func (u *UserService) FolderFlow(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Printf("FolderFlow handler...")
+	sesh := r.Session()
+	sesh.Printf("FolderFlow handler...")
 
 	r.MixpanelTrack("FolderFlow")
 
@@ -102,34 +98,36 @@ func (u *UserService) FolderFlow(r request.Request) (response.Response, error) {
 		[]string{"blog_folder_flow.html"},
 		util.PageInfo{
 			Data: struct {
-				Title       string
-				UserInfo    *session.UserInfo
-				ServiceName string
-				Themes      []string
+				Title      string
+				UserInfo   *session.UserInfo
+				RootDomain string
+				Themes     []string
 			}{
-				Title:       "Folder Flow",
-				UserInfo:    session.ConvertSessionToUserInfo(r.Session()),
-				ServiceName: config.Config.Progstack.ServiceName,
-				Themes:      blog.BuildThemes(config.Config.ProgstackSsg.Themes),
+				Title:      "Folder Flow",
+				UserInfo:   session.ConvertSessionToUserInfo(r.Session()),
+				RootDomain: config.Config.Progstack.RootDomain,
+				Themes:     blog.BuildThemes(config.Config.ProgstackSsg.Themes),
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
 func (u *UserService) GithubInstallation(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Printf("GithubInstallation handler...")
+	sesh := r.Session()
+	sesh.Printf("GithubInstallation handler...")
 
 	r.MixpanelTrack("GithubInstallation")
 
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
 	if err := u.store.UpdateAwaitingGithubUpdate(
 		context.TODO(),
 		model.UpdateAwaitingGithubUpdateParams{
-			ID:               r.Session().GetUserID(),
+			ID:               userid,
 			GhAwaitingUpdate: true,
 		},
 	); err != nil {
@@ -182,18 +180,21 @@ type Repository struct {
 func (u *UserService) RepositoryFlow(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("RepositoryFlow handler...")
+	sesh := r.Session()
+	sesh.Println("RepositoryFlow handler...")
 
 	r.MixpanelTrack("RepositoryFlow")
 
-	if err := u.awaitupdate(r.Session().GetUserID()); err != nil {
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
+	if err := u.awaitupdate(userid); err != nil {
 		return nil, fmt.Errorf("await update: %w", err)
 	}
 
-	sesh := r.Session()
 	repos, err := u.store.ListOrderedRepositoriesByUserID(
-		context.TODO(), sesh.GetUserID(),
+		context.TODO(), userid,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get repositories: %w", err)
@@ -211,20 +212,18 @@ func (u *UserService) RepositoryFlow(
 				Title          string
 				UserInfo       *session.UserInfo
 				AccountDetails AccountDetails
-				ServiceName    string
+				RootDomain     string
 				Repositories   []Repository
 				Themes         []string
 			}{
 				Title:          "Repository Flow",
 				UserInfo:       session.ConvertSessionToUserInfo(sesh),
 				AccountDetails: details,
-				ServiceName:    config.Config.Progstack.ServiceName,
+				RootDomain:     config.Config.Progstack.RootDomain,
 				Repositories:   buildRepositoriesInfo(repos),
 				Themes:         blog.BuildThemes(config.Config.ProgstackSsg.Themes),
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
@@ -263,12 +262,11 @@ type Subscription struct {
 }
 
 func (u *UserService) Account(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("Account handler...")
+	sesh := r.Session()
+	sesh.Println("Account handler...")
 
 	r.MixpanelTrack("Account")
 
-	sesh := r.Session()
 	accountDetails, err := getAccountDetails(u.store, sesh)
 	if err != nil {
 		return nil, fmt.Errorf("account details: %w", err)
@@ -293,14 +291,16 @@ func (u *UserService) Account(r request.Request) (response.Response, error) {
 				StorageDetails: storageDetails,
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
-func getStorageDetails(s *model.Store, session *session.Session) (StorageDetails, error) {
+func getStorageDetails(s *model.Store, sesh *session.Session) (StorageDetails, error) {
 	/* calculate storage */
-	userBytes, err := authz.UserStorageUsed(s, session.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return StorageDetails{}, fmt.Errorf("get user id: %w", err)
+	}
+	userBytes, err := authz.UserStorageUsed(s, userid)
 	if err != nil {
 		return StorageDetails{}, err
 	}
@@ -313,19 +313,21 @@ func getStorageDetails(s *model.Store, session *session.Session) (StorageDetails
 	}, nil
 }
 
-func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails, error) {
+func getAccountDetails(s *model.Store, sesh *session.Session) (AccountDetails, error) {
 	/* get github info */
 	accountDetails := AccountDetails{
-		Username:        session.GetUsername(),
-		Email:           session.GetEmail(),
+		Username:        sesh.GetUsername(),
+		Email:           sesh.GetEmail(),
 		IsLinked:        false,
 		HasInstallation: false,
 		GithubEmail:     "",
 	}
 	linked := true
-	ghAccount, err := s.GetGithubAccountByUserID(
-		context.TODO(), session.GetUserID(),
-	)
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return AccountDetails{}, fmt.Errorf("get user id: %w", err)
+	}
+	ghAccount, err := s.GetGithubAccountByUserID(context.TODO(), userid)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return AccountDetails{}, fmt.Errorf(
@@ -341,7 +343,7 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 	}
 
 	hasInstallation, err := s.InstallationExistsForUserID(
-		context.TODO(), session.GetUserID(),
+		context.TODO(), userid,
 	)
 	if err != nil {
 		return AccountDetails{}, fmt.Errorf(
@@ -353,16 +355,14 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 	}
 
 	/* get stripe subscription */
-	sub, err := s.GetStripeSubscriptionByUserID(
-		context.TODO(), session.GetUserID(),
-	)
+	sub, err := s.GetStripeSubscriptionByUserID(context.TODO(), userid)
 	if err != nil {
 		return AccountDetails{}, fmt.Errorf(
 			"error getting stripe subscription details: %w",
 			err,
 		)
 	}
-	log.Printf("subName: %s modelName: %s", sub.SubName, model.SubNameScout)
+	sesh.Printf("subName: %s modelName: %s", sub.SubName, model.SubNameScout)
 
 	accountDetails.Subscription = Subscription{
 		Plan: string(sub.SubName),

@@ -1,0 +1,19 @@
+{{ template "header" . }}
+
+<div class="container">
+	<h2>Site not found</h2>
+	<p>Even the very wise cannot see all ends.</p>
+	<p>
+		The domain <b>{{ .Data.RequestedDomain }}</b> is not configured
+		for any site on {{ .Data.Progstack }}.
+	</p>
+	<p>
+		If you're trying to link this domain to a site on
+		{{ .Data.Progstack }},
+		see the guide <a href="{{ .Data.DomainGuideURL }}">here</a> for
+		more information (you have to be logged in), or reach out to us
+		on <a href="{{ .Data.DiscordURL }}">Discord</a>.
+	</p>
+</div>
+
+{{ template "footer" . }}

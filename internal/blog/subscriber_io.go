@@ -6,8 +6,6 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
-	"html/template"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -39,8 +37,8 @@ func (sr *SubscribeRequest) validate() error {
 func (b *BlogService) SubscribeToBlog(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("SubscribeToBlog handler...")
+	sesh := r.Session()
+	sesh.Println("SubscribeToBlog handler...")
 
 	r.MixpanelTrack("SubscribeToBlog")
 
@@ -52,7 +50,7 @@ func (b *BlogService) SubscribeToBlog(
 
 	blogIDRaw, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	blogID, err := strconv.ParseInt(blogIDRaw, 10, 32)
 	if err != nil {
@@ -63,7 +61,7 @@ func (b *BlogService) SubscribeToBlog(
 		return nil, fmt.Errorf("get blog: %w", err)
 	}
 
-	unsubtoken, err := b.createsubscriber(e, blog.ID, logger)
+	unsubtoken, err := b.createsubscriber(e, blog.ID, sesh)
 	if err != nil {
 		return nil, fmt.Errorf("create subscriber: %w", err)
 	}
@@ -85,7 +83,7 @@ func (b *BlogService) SubscribeToBlog(
 		fmt.Sprintf(
 			"%s://%s/blogs/unsubscribe?token=%s",
 			config.Config.Progstack.Protocol,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 			unsubtoken,
 		),
 	); err != nil {
@@ -97,7 +95,7 @@ func (b *BlogService) SubscribeToBlog(
 			"%s://%s.%s/subscribed",
 			config.Config.Progstack.Protocol,
 			blog.Subdomain,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 		),
 		http.StatusTemporaryRedirect,
 	), nil
@@ -111,10 +109,10 @@ func getsitename(blog *model.Blog) string {
 }
 
 func (b *BlogService) createsubscriber(
-	email string, blog int32, logger *log.Logger,
+	email string, blog int32, sesh *session.Session,
 ) (string, error) {
-	logger.Printf("subscribing email `%s' to blog %d\n", email, blog)
-	tk, err := b.createorgetsubscriber(email, blog, logger)
+	sesh.Printf("subscribing email `%s' to blog %d\n", email, blog)
+	tk, err := b.createorgetsubscriber(email, blog, sesh)
 	if err != nil {
 		return "", fmt.Errorf("cannot create or get subscriber: %w", err)
 	}
@@ -122,7 +120,7 @@ func (b *BlogService) createsubscriber(
 }
 
 func (b *BlogService) createorgetsubscriber(
-	email string, blog int32, logger *log.Logger,
+	email string, blog int32, sesh *session.Session,
 ) (*uuid.UUID, error) {
 	tk, err := b.store.CreateSubscriber(
 		context.TODO(),
@@ -133,7 +131,7 @@ func (b *BlogService) createorgetsubscriber(
 	)
 	if err != nil {
 		if isUniqueActiveSubscriberPerBlogViolation(err) {
-			logger.Println("duplicate subscription")
+			sesh.Println("duplicate subscription")
 			sub, err := b.store.GetSubscriberForBlog(
 				context.TODO(),
 				model.GetSubscriberForBlogParams{
@@ -163,8 +161,8 @@ func isUniqueActiveSubscriberPerBlogViolation(err error) bool {
 func (b *BlogService) UnsubscribeFromBlog(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("UnsubscribeFromBlog handler...")
+	sesh := r.Session()
+	sesh.Println("UnsubscribeFromBlog handler...")
 	r.MixpanelTrack("UnsubscribeFromBlog")
 
 	token, err := uuid.Parse(r.GetURLQueryValue("token"))
@@ -187,7 +185,7 @@ func (b *BlogService) UnsubscribeFromBlog(
 			"%s://%s.%s/unsubscribed",
 			config.Config.Progstack.Protocol,
 			blog.Subdomain,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 		),
 		http.StatusTemporaryRedirect,
 	), nil
@@ -196,8 +194,8 @@ func (b *BlogService) UnsubscribeFromBlog(
 func (b *BlogService) EditSubscriber(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("edit subscriber handler...")
+	sesh := r.Session()
+	sesh.Println("edit subscriber handler...")
 
 	r.MixpanelTrack("EditSubscribers")
 
@@ -205,7 +203,7 @@ func (b *BlogService) EditSubscriber(
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -232,8 +230,6 @@ func (b *BlogService) EditSubscriber(
 				),
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
@@ -241,7 +237,7 @@ func buildRemoveSubscriberUrl(blogID int32, email string) string {
 	return fmt.Sprintf(
 		"%s://%s/user/blogs/%d/subscriber/delete?email=%s",
 		config.Config.Progstack.Protocol,
-		config.Config.Progstack.ServiceName,
+		config.Config.Progstack.RootDomain,
 		blogID,
 		email,
 	)
@@ -250,15 +246,15 @@ func buildRemoveSubscriberUrl(blogID int32, email string) string {
 func (b *BlogService) DeleteSubscriber(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("DeleteSubscriber handler...")
+	sesh := r.Session()
+	sesh.Println("DeleteSubscriber handler...")
 
 	r.MixpanelTrack("DeleteSubscriber")
 	email := r.GetURLQueryValue("email")
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -283,14 +279,14 @@ func (b *BlogService) DeleteSubscriber(
 func (b *BlogService) ExportSubscribers(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("ExportSubscribers handler...")
+	sesh := r.Session()
+	sesh.Println("ExportSubscribers handler...")
 
 	r.MixpanelTrack("ExportSubscribers")
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {

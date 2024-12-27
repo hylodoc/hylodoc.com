@@ -1,27 +1,30 @@
 package response
 
 import (
-	"log"
+	"fmt"
 	"net/http"
-	"text/template"
 
+	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
 type tmpl struct {
-	names   []string
-	info    util.PageInfo
-	funcMap template.FuncMap
-	logger  *log.Logger
+	names []string
+	info  util.PageInfo
 }
 
-func NewTemplate(
-	names []string, info util.PageInfo,
-	funcMap template.FuncMap, logger *log.Logger,
-) Response {
-	return &tmpl{names, info, funcMap, logger}
+func NewTemplate(names []string, info util.PageInfo) Response {
+	return &tmpl{names, info}
 }
 
-func (t *tmpl) Respond(w http.ResponseWriter, _ *http.Request) {
-	util.ExecTemplate(w, t.names, t.info, t.funcMap, t.logger)
+func (t *tmpl) Respond(w http.ResponseWriter, _ *http.Request) error {
+	return util.ExecTemplate(
+		w, t.names, t.info,
+		fmt.Sprintf(
+			"%s://%s",
+			config.Config.Progstack.Protocol,
+			config.Config.Progstack.RootDomain,
+		),
+		config.Config.Progstack.CDN,
+	)
 }

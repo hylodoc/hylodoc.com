@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,7 +22,7 @@ import (
 	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/xr0-org/progstack/internal/session"
 )
 
 type CreateBlogResponse struct {
@@ -34,8 +33,8 @@ type CreateBlogResponse struct {
 func (b *BlogService) CreateRepositoryBlog(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("CreateRepositoryBlog handler...")
+	sesh := r.Session()
+	sesh.Println("CreateRepositoryBlog handler...")
 
 	r.MixpanelTrack("CreateRepositoryBlog")
 
@@ -52,7 +51,7 @@ func (b *BlogService) CreateRepositoryBlog(
 		return nil, fmt.Errorf("read body: %w", err)
 	}
 	if err := json.Unmarshal(body, &req); err != nil {
-		return nil, util.CreateCustomError(
+		return nil, createCustomError(
 			"error decoding request body",
 			http.StatusBadRequest,
 		)
@@ -76,9 +75,12 @@ func (b *BlogService) CreateRepositoryBlog(
 		return nil, fmt.Errorf("parse subdomain: %w", err)
 	}
 
-	sesh := r.Session()
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
-		UserID: sesh.GetUserID(),
+		UserID: userid,
 		GhRepositoryID: sql.NullInt64{
 			Valid: true,
 			Int64: intRepoID,
@@ -105,7 +107,7 @@ func (b *BlogService) CreateRepositoryBlog(
 	}
 
 	if err := UpdateRepositoryOnDisk(
-		b.client, b.store, &blog, logger,
+		b.client, b.store, &blog, sesh,
 	); err != nil {
 		return nil, fmt.Errorf("update repo on disk: %w", err)
 	}
@@ -125,7 +127,7 @@ func (b *BlogService) CreateRepositoryBlog(
 		return nil, fmt.Errorf("invalid blog repositoryID")
 	}
 
-	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
+	if _, err := setBlogToLive(&blog, b.store, sesh); err != nil {
 		return nil, fmt.Errorf("set blog to live: %w", err)
 	}
 	return response.NewJson(
@@ -156,7 +158,7 @@ func validateTheme(theme string) (model.BlogTheme, error) {
 
 func UpdateRepositoryOnDisk(
 	c *httpclient.Client, s *model.Store, blog *model.Blog,
-	logger *log.Logger,
+	sesh *session.Session,
 ) error {
 	assert.Assert(blog.GhRepositoryID.Valid)
 	repo, err := s.GetRepositoryByGhRepositoryID(
@@ -202,17 +204,17 @@ func UpdateRepositoryOnDisk(
 func (b *BlogService) CreateFolderBlog(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("CreateFolderBlog handler...")
+	sesh := r.Session()
+	sesh.Println("CreateFolderBlog handler...")
 
 	subdomain, err := r.GetFormValue("subdomain")
 	if err != nil {
-		return nil, util.CreateCustomError(
+		return nil, createCustomError(
 			"Invalid subdomain", http.StatusBadRequest,
 		)
 	}
 	if subdomain == "" {
-		return nil, util.CreateCustomError(
+		return nil, createCustomError(
 			"Subdomain is required", http.StatusBadRequest,
 		)
 	}
@@ -222,7 +224,7 @@ func (b *BlogService) CreateFolderBlog(
 	}
 	theme, err := validateTheme(rawtheme)
 	if err != nil {
-		return nil, util.CreateCustomError(
+		return nil, createCustomError(
 			"Invalid theme",
 			http.StatusBadRequest,
 		)
@@ -233,9 +235,13 @@ func (b *BlogService) CreateFolderBlog(
 		return nil, fmt.Errorf("get uploaded folder path: %w", err)
 	}
 
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
 	dst := filepath.Join(
 		config.Config.Progstack.FoldersPath,
-		strconv.FormatInt(int64(r.Session().GetUserID()), 10),
+		strconv.FormatInt(int64(userid), 10),
 		uuid.New().String(),
 	)
 
@@ -254,9 +260,8 @@ func (b *BlogService) CreateFolderBlog(
 		return nil, fmt.Errorf("parse subdomain: %w", err)
 	}
 
-	sesh := r.Session()
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
-		UserID: sesh.GetUserID(),
+		UserID: userid,
 		GhRepositoryID: sql.NullInt64{
 			Valid: false,
 		},
@@ -285,7 +290,7 @@ func (b *BlogService) CreateFolderBlog(
 	); err != nil {
 		return nil, fmt.Errorf("error subscribing owner: %w", err)
 	}
-	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
+	if _, err := setBlogToLive(&blog, b.store, sesh); err != nil {
 		return nil, fmt.Errorf("error setting blog to live: %w", err)
 	}
 	return response.NewJson(

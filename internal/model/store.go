@@ -4,11 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/http"
 	"path/filepath"
-
-	"github.com/xr0-org/progstack/internal/dns"
-	"github.com/xr0-org/progstack/internal/util"
 )
 
 type Store struct {
@@ -124,36 +120,6 @@ func (s *Store) CreateInstallationTx(ctx context.Context, arg InstallationTxPara
 			if err != nil {
 				return err
 			}
-		}
-		return nil
-	})
-}
-
-type UpdateSubdomainTxParams struct {
-	BlogID    int32
-	Subdomain *dns.Subdomain
-}
-
-func (s *Store) UpdateSubdomainTx(ctx context.Context, arg UpdateSubdomainTxParams) error {
-	return s.ExecTx(ctx, func(q *Queries) error {
-		exists, err := s.SubdomainExists(ctx, arg.Subdomain)
-		if err != nil {
-			return fmt.Errorf("error checking if subdomain exists")
-		}
-		if exists {
-			return util.CreateCustomError(
-				"subdomain already exists",
-				http.StatusBadRequest,
-			)
-		}
-
-		/* write new subdomain */
-		err = s.UpdateSubdomainByID(ctx, UpdateSubdomainByIDParams{
-			ID:        arg.BlogID,
-			Subdomain: arg.Subdomain,
-		})
-		if err != nil {
-			return fmt.Errorf("error creating subdomain `%s' for blog `%d': %w", arg.Subdomain, arg.BlogID, err)
 		}
 		return nil
 	})
