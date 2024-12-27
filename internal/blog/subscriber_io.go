@@ -13,14 +13,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/mux"
 	"github.com/lib/pq"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/email/emailaddr"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
@@ -54,7 +52,7 @@ func (b *BlogService) SubscribeToBlog(
 
 	blogIDRaw, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, fmt.Errorf("no blogID")
+		return nil, util.CreateCustomError("", http.StatusNotFound)
 	}
 	blogID, err := strconv.ParseInt(blogIDRaw, 10, 32)
 	if err != nil {
@@ -195,50 +193,48 @@ func (b *BlogService) UnsubscribeFromBlog(
 	), nil
 }
 
-func (b *BlogService) EditSubscriber() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("edit subscriber handler...")
+func (b *BlogService) EditSubscriber(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("edit subscriber handler...")
 
-		email := r.URL.Query().Get("email")
+	r.MixpanelTrack("EditSubscribers")
 
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Println("No auth session")
-			http.Error(w, "", http.StatusNotFound)
-			return
-		}
+	email := r.GetURLQueryValue("email")
 
-		blogID := mux.Vars(r)["blogID"]
-		intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-		if err != nil {
-			logger.Printf("could not parse blogID: %v", err)
-			http.Error(w, "", http.StatusBadRequest)
-			return
-		}
-
-		logger.Printf("blogID: %s, mail: %s\n", email, blogID)
-
-		util.ExecTemplate(w, []string{"subscriber_edit.html"},
-			util.PageInfo{
-				Data: struct {
-					Title    string
-					UserInfo *session.UserInfo
-
-					Email               string
-					RemoveSubscriberUrl string
-				}{
-					Title:    "Edit Subscriber",
-					UserInfo: session.ConvertSessionToUserInfo(sesh),
-
-					Email:               email,
-					RemoveSubscriberUrl: buildRemoveSubscriberUrl(int32(intBlogID), email),
-				},
-			},
-			template.FuncMap{},
-			logger,
-		)
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, util.CreateCustomError("", http.StatusNotFound)
 	}
+	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("parse int: %w", err)
+	}
+
+	return response.NewTemplate(
+		[]string{"subscriber_edit.html"},
+		util.PageInfo{
+			Data: struct {
+				Title    string
+				UserInfo *session.UserInfo
+
+				Email               string
+				RemoveSubscriberUrl string
+			}{
+				Title: "Edit Subscriber",
+				UserInfo: session.ConvertSessionToUserInfo(
+					r.Session(),
+				),
+				Email: email,
+				RemoveSubscriberUrl: buildRemoveSubscriberUrl(
+					int32(intBlogID), email,
+				),
+			},
+		},
+		template.FuncMap{},
+		logger,
+	), nil
 }
 
 func buildRemoveSubscriberUrl(blogID int32, email string) string {
@@ -251,81 +247,68 @@ func buildRemoveSubscriberUrl(blogID int32, email string) string {
 	)
 }
 
-func (b *BlogService) DeleteSubscriber() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("DeleteSubscriber handler...")
+func (b *BlogService) DeleteSubscriber(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("DeleteSubscriber handler...")
 
-		b.mixpanel.Track("DeleteSubscriber", r)
+	r.MixpanelTrack("DeleteSubscriber")
+	email := r.GetURLQueryValue("email")
 
-		url, err := b.deleteSubscriber(w, r)
-		if err != nil {
-			logger.Printf("Error deleting subscriber: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-		http.Redirect(w, r, url, http.StatusSeeOther)
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, util.CreateCustomError("", http.StatusNotFound)
 	}
-}
-
-func (b *BlogService) deleteSubscriber(w http.ResponseWriter, r *http.Request) (string, error) {
-	logger := logging.Logger(r)
-
-	email := r.URL.Query().Get("email")
-
-	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
-		return "", fmt.Errorf("error converting string path var to blogID: %w", err)
+		return nil, fmt.Errorf("parse int: %w", err)
+	}
+	if err := b.store.DeleteSubscriberByEmail(
+		context.TODO(),
+		model.DeleteSubscriberByEmailParams{
+			BlogID: int32(intBlogID),
+			Email:  email,
+		},
+	); err != nil {
+		return nil, fmt.Errorf("delete subscriber by email: %w", err)
 	}
 
-	logger.Printf("deleting subscriber `%s' for blogID `%s'\n", email, blogID)
-	if err := b.store.DeleteSubscriberByEmail(context.TODO(), model.DeleteSubscriberByEmailParams{
-		BlogID: int32(intBlogID),
-		Email:  email,
-	}); err != nil {
-		return "", fmt.Errorf("error deleting subscriber `%s' for blog `%s': %w", email, blogID, err)
-	}
-	return buildSubscriberMetricsUrl(int32(intBlogID)), nil
+	return response.NewRedirect(
+		buildSubscriberMetricsUrl(int32(intBlogID)),
+		http.StatusSeeOther,
+	), nil
 }
 
-func (b *BlogService) ExportSubscribers() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("ExportSubscribers handler...")
+func (b *BlogService) ExportSubscribers(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("ExportSubscribers handler...")
 
-		b.mixpanel.Track("ExportSubscribers", r)
+	r.MixpanelTrack("ExportSubscribers")
 
-		csvData, err := b.exportSubscribers(w, r)
-		if err != nil {
-			logger.Printf("Error exporting subsribers: %v", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "text/csv")
-		w.Header().Set("Content-Disposition", "attachment; filename=subscribers.csv")
-		w.Write(csvData)
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, util.CreateCustomError("", http.StatusNotFound)
 	}
-}
-
-func (b *BlogService) exportSubscribers(w http.ResponseWriter, r *http.Request) ([]byte, error) {
-	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("error converting string path var to blogID: %w", err)
+		return nil, fmt.Errorf("parse int: %w", err)
 	}
 
-	subs, err := b.store.ListActiveSubscribersByBlogID(context.TODO(), int32(intBlogID))
+	subs, err := b.store.ListActiveSubscribersByBlogID(
+		context.TODO(), int32(intBlogID),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("error listing subscribers: %w", err)
+		return nil, fmt.Errorf("list subscribers: %w", err)
 	}
 
 	csv, err := buildSubscriberCSV(subs)
 	if err != nil {
-		return nil, fmt.Errorf("error building csv: %w", err)
+		return nil, fmt.Errorf("build csv: %w", err)
 	}
-
-	return csv, nil
+	return response.NewCsvFile("subscribers.csv", csv), nil
 }
 
 func buildSubscriberCSV(subs []model.Subscriber) ([]byte, error) {

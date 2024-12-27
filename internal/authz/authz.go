@@ -33,14 +33,17 @@ func CanCreateSite(s *model.Store, sesh *session.Session) error {
 	return nil
 }
 
-func CanConfigureCustomDomain(s *model.Store, sesh *session.Session) (bool, error) {
+func CanConfigureCustomDomain(s *model.Store, sesh *session.Session) error {
 	/* get user's tier features */
 	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
 	if err != nil {
-		return false, fmt.Errorf("error getting user subscription: %w", err)
+		return fmt.Errorf("get user subscription: %w", err)
 	}
 	tier := SubscriptionTiers[string(plan)]
-	return tier.CustomDomain, nil
+	if !tier.CustomDomain {
+		return newSubErr(fmt.Errorf("can't configure custom domain"))
+	}
+	return nil
 }
 
 func CanViewAnalytics(s *model.Store, sesh *session.Session) (bool, error) {

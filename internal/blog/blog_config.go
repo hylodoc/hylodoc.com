@@ -13,14 +13,12 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/gorilla/mux"
 	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
@@ -44,55 +42,50 @@ func NewBlogService(
 }
 
 /* Blog configuration page */
-func (b *BlogService) Config() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("Blog Config handler...")
+func (b *BlogService) Config(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("Blog Config handler...")
 
-		b.mixpanel.Track("Config", r)
+	r.MixpanelTrack("Config")
 
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			http.Error(w, "User not found", http.StatusUnauthorized)
-			return
-		}
-		blogID := mux.Vars(r)["blogID"]
-		intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-		if err != nil {
-			logging.Logger(r).Printf("error converting string path var to blogID: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-
-		blogInfo, err := getBlogInfo(b.store, int32(intBlogID))
-		if err != nil {
-			logging.Logger(r).Printf("error getting blog for user `%d': %v\n", sesh.GetUserID(), err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-
-		util.ExecTemplate(w, []string{"blog_config.html"},
-			util.PageInfo{
-				Data: struct {
-					Title        string
-					UserInfo     *session.UserInfo
-					ID           int32
-					Blog         BlogInfo
-					Themes       []string
-					CurrentTheme string
-				}{
-					Title:        "Blog Setup",
-					UserInfo:     session.ConvertSessionToUserInfo(sesh),
-					ID:           int32(intBlogID),
-					Blog:         blogInfo,
-					Themes:       BuildThemes(config.Config.ProgstackSsg.Themes),
-					CurrentTheme: string(blogInfo.Theme),
-				},
-			},
-			template.FuncMap{},
-			logger,
-		)
+	sesh := r.Session()
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, util.CreateCustomError("", http.StatusNotFound)
 	}
+	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("parse int: %w", err)
+	}
+	blogInfo, err := getBlogInfo(b.store, int32(intBlogID))
+	if err != nil {
+		return nil, fmt.Errorf("get blog info: %w", err)
+	}
+
+	return response.NewTemplate(
+		[]string{"blog_config.html"},
+		util.PageInfo{
+			Data: struct {
+				Title        string
+				UserInfo     *session.UserInfo
+				ID           int32
+				Blog         BlogInfo
+				Themes       []string
+				CurrentTheme string
+			}{
+				Title:        "Blog Setup",
+				UserInfo:     session.ConvertSessionToUserInfo(sesh),
+				ID:           int32(intBlogID),
+				Blog:         blogInfo,
+				Themes:       BuildThemes(config.Config.ProgstackSsg.Themes),
+				CurrentTheme: string(blogInfo.Theme),
+			},
+		},
+		template.FuncMap{},
+		logger,
+	), nil
 }
 
 func BuildThemes(themes map[string]config.Theme) []string {
@@ -110,161 +103,149 @@ func ConvertCentsToDollars(cents int64) string {
 
 /* Theme */
 
-func (b *BlogService) ThemeSubmit() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("ThemeSubmit handler...")
+func (b *BlogService) ThemeSubmit(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("ThemeSubmit handler...")
 
-		b.mixpanel.Track("ThemeSubmit", r)
+	r.MixpanelTrack("ThemeSubmit")
 
-		if err := b.themeSubmit(w, r); err != nil {
-			logger.Printf("error updating theme: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			response := map[string]string{"message": "An unexpected error occured"}
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		response := map[string]string{"message": "Theme changed successsfully!"}
-		json.NewEncoder(w).Encode(response)
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, util.CreateCustomError("", http.StatusNotFound)
 	}
-}
-
-type ThemeRequest struct {
-	Theme string `json:"theme"`
-}
-
-func (b *BlogService) themeSubmit(w http.ResponseWriter, r *http.Request) error {
-	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("parse blogID: %w", err)
 	}
 
-	var req ThemeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return fmt.Errorf("error decoding body: %w", err)
+	var req struct {
+		Theme string `json:"theme"`
+	}
+	body, err := r.ReadBody()
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("decode body: %w", err)
 	}
 
 	theme, err := validateTheme(req.Theme)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("validate theme: %w", err)
 	}
 
-	if err := b.store.SetBlogThemeByID(context.TODO(), model.SetBlogThemeByIDParams{
-		ID:    int32(intBlogID),
-		Theme: theme,
-	}); err != nil {
-		return fmt.Errorf("error setting blog theme: %w", err)
+	if err := b.store.SetBlogThemeByID(
+		context.TODO(),
+		model.SetBlogThemeByIDParams{
+			ID:    int32(intBlogID),
+			Theme: theme,
+		},
+	); err != nil {
+		return nil, fmt.Errorf("set blog theme: %w", err)
 	}
 
-	return nil
+	return response.NewJson(struct {
+		Message string `json:"message"`
+	}{"Theme changed successsfully!"})
 }
 
 /* Git branch info */
 
-func (b *BlogService) TestBranchSubmit() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("TestBranchSubmit handler...")
+func (b *BlogService) TestBranchSubmit(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("TestBranchSubmit handler...")
 
-		b.mixpanel.Track("TestBranchSubmit", r)
+	r.MixpanelTrack("TestBranchSubmit")
 
-		if err := b.testBranchSubmit(w, r); err != nil {
-			logger.Printf("error updating test branch: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			response := map[string]string{"message": "An unexpected error occurred"}
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		response := map[string]string{"message": "Test branch submitted successsfully!"}
-		json.NewEncoder(w).Encode(response)
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, util.CreateCustomError("", http.StatusNotFound)
 	}
-}
-
-type TestBranchRequest struct {
-	Branch string `json:"branch"`
-}
-
-func (b *BlogService) testBranchSubmit(w http.ResponseWriter, r *http.Request) error {
-	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("parse blogID: %w", err)
 	}
 
-	var req TestBranchRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return fmt.Errorf("error decoding body: %w", err)
+	var req struct {
+		Branch string `json:"branch"`
 	}
-	logging.Logger(r).Printf("test branch: %s\n", req.Branch)
+	body, err := r.ReadBody()
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("decode body: %w", err)
+	}
 
 	/* XXX: validate input before writing to db */
-	if err := b.store.SetTestBranchByID(context.TODO(), model.SetTestBranchByIDParams{
-		ID: int32(intBlogID),
-		TestBranch: sql.NullString{
-			Valid:  true,
-			String: req.Branch,
-		},
-	}); err != nil {
-		return fmt.Errorf("error updating branch info: %w", err)
+	if err := b.store.SetTestBranchByID(
+		context.TODO(),
+		model.SetTestBranchByIDParams{
+			ID: int32(intBlogID),
+			TestBranch: sql.NullString{
+				Valid:  true,
+				String: req.Branch,
+			},
+		}); err != nil {
+		return nil, fmt.Errorf("error updating branch info: %w", err)
 	}
-	return nil
+
+	return response.NewJson(struct {
+		Message string `json:"message"`
+	}{"Test branch submitted successfully!"})
 }
 
-func (b *BlogService) LiveBranchSubmit() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("LiveBranchSubmit handler...")
+func (b *BlogService) LiveBranchSubmit(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("LiveBranchSubmit handler...")
 
-		b.mixpanel.Track("LiveBranchSubmit", r)
+	r.MixpanelTrack("LiveBranchSubmit")
 
-		if err := b.liveBranchSubmit(w, r); err != nil {
-			logger.Printf("Error updating live branch: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			response := map[string]string{"message": "An unexpected error occurred"}
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		response := map[string]string{"message": "Live branch submitted successsfully!"}
-		json.NewEncoder(w).Encode(response)
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, util.CreateCustomError("", http.StatusNotFound)
 	}
-}
-
-type LiveBranchRequest struct {
-	Branch string `json:"branch"`
-}
-
-func (b *BlogService) liveBranchSubmit(w http.ResponseWriter, r *http.Request) error {
-	logger := logging.Logger(r)
-
-	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("parse blogID: %w", err)
 	}
 
 	/* submitted with form and no javascript */
-	var req LiveBranchRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return fmt.Errorf("error decoding body: %w", err)
+	var req struct {
+		Branch string `json:"branch"`
 	}
-	logger.Printf("live branch: %s\n", req.Branch)
+	body, err := r.ReadBody()
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("decode body: %w", err)
+	}
 
 	/* XXX: validate input before wrinting to db */
-	err = b.store.SetLiveBranchByID(context.TODO(), model.SetLiveBranchByIDParams{
-		ID: int32(intBlogID),
-		LiveBranch: sql.NullString{
-			Valid:  true,
-			String: req.Branch,
+	if err := b.store.SetLiveBranchByID(
+		context.TODO(),
+		model.SetLiveBranchByIDParams{
+			ID: int32(intBlogID),
+			LiveBranch: sql.NullString{
+				Valid:  true,
+				String: req.Branch,
+			},
 		},
-	})
-	if err != nil {
-		return fmt.Errorf("error updating branch info: %w", err)
+	); err != nil {
+		return nil, fmt.Errorf("set live branch: %w", err)
 	}
-	return nil
+
+	return response.NewJson(struct {
+		Message string `json:"message"`
+	}{"Live branch submitted successsfully!"})
+
 }
 
 func (b *BlogService) FolderSubmit(
@@ -294,7 +275,7 @@ func (b *BlogService) folderSubmit(r request.Request) error {
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return fmt.Errorf("no blogID")
+		return util.CreateCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -363,93 +344,75 @@ func getUploadedFolderPath(r request.Request) (string, error) {
 	return tmpFile.Name(), nil
 }
 
-type MessageResponse struct {
-	Message string `json:"message"`
-}
+func (b *BlogService) SetStatusSubmit(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("SetStatusSubmit handler...")
 
-func (b *BlogService) SetStatusSubmit() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("SetStatusSubmit handler...")
+	r.MixpanelTrack("SetStatusSubmit")
 
-		b.mixpanel.Track("SetStatusSubmit", r)
+	type resp struct {
+		Message string `json:"message"`
+	}
 
-		w.Header().Set("Content-Type", "application/json")
-
-		change, err := b.setStatusSubmit(r)
-		if err != nil {
-			var customErr *util.CustomError
-			if errors.As(err, &customErr) {
-				logger.Printf("Client Error: %v\n", customErr)
-				w.WriteHeader(http.StatusBadRequest)
-				if err := json.NewEncoder(w).Encode(util.ErrorResponse{
-					Message: customErr.Error(),
-				}); err != nil {
-					logging.Logger(r).Printf("Failed to encode response: %v\n", err)
-					http.Error(w, "", http.StatusInternalServerError)
-					return
-				}
-			} else {
-				logger.Printf("Internal Server Error: %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				http.Error(w, "", http.StatusInternalServerError)
-				return
-			}
-		}
-
-		w.WriteHeader(http.StatusOK)
-		message := ""
-		if change.IsLive {
-			message = fmt.Sprintf("%s is live!", change.Domain)
+	change, err := b.setStatusSubmit(r)
+	if err != nil {
+		var customErr *util.CustomError
+		if errors.As(err, &customErr) {
+			return response.NewJson(&resp{customErr.Error()})
 		} else {
-			message = fmt.Sprintf("%s was taken offline successfully.", change.Domain)
-		}
-		if err = json.NewEncoder(w).Encode(MessageResponse{
-			Message: message,
-		}); err != nil {
-			logger.Printf("Failed to encode response: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
+			return nil, fmt.Errorf("set status submit: %w", err)
 		}
 	}
-}
 
-type SetStatusRequest struct {
-	IsLive bool `json:"is_live"`
+	return response.NewJson(&resp{change.message()})
 }
 
 func (b *BlogService) setStatusSubmit(
-	r *http.Request,
+	r request.Request,
 ) (*statusChangeResponse, error) {
-	logger := logging.Logger(r)
+	logger := r.Logger()
 
-	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, fmt.Errorf("no user found")
+		return nil, util.CreateCustomError("", http.StatusNotFound)
 	}
-	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse blog id: %w", err)
+		return nil, fmt.Errorf("parse int: %w", err)
 	}
 
-	var req SetStatusRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return nil, fmt.Errorf("error decoding body: %w", err)
+	var req struct {
+		IsLive bool `json:"is_live"`
+	}
+	body, err := r.ReadBody()
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("decode body: %w", err)
 	}
 
 	change, err := handleStatusChange(
-		int32(intBlogID), req.IsLive, sesh.GetEmail(), b.store, logger,
+		int32(intBlogID),
+		req.IsLive, r.Session().GetEmail(), b.store, logger,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error handling status change: %w", err)
+		return nil, fmt.Errorf("handle status change: %w", err)
 	}
 	return change, nil
 }
 
 type statusChangeResponse struct {
-	Domain string
-	IsLive bool
+	_islive bool
+}
+
+func (resp *statusChangeResponse) message() string {
+	if resp._islive {
+		return "Site is live!"
+	}
+	return "Site has been taken offline successfully."
 }
 
 func handleStatusChange(
@@ -483,117 +446,96 @@ func validateStatusChange(blogID int32, islive bool, s *model.Store) error {
 	return nil
 }
 
-func setBlogToLive(b *model.Blog, s *model.Store, logger *log.Logger) (*statusChangeResponse, error) {
+func setBlogToLive(
+	b *model.Blog, s *model.Store, logger *log.Logger,
+) (*statusChangeResponse, error) {
 	if err := s.SetBlogToLive(context.TODO(), b.ID); err != nil {
 		return nil, err
 	}
 	if _, err := GetFreshGeneration(b.ID, s); err != nil {
 		return nil, fmt.Errorf("cannot generate: %w", err)
 	}
-	return &statusChangeResponse{
-		Domain: b.Subdomain.String(),
-		IsLive: true,
-	}, nil
+	return &statusChangeResponse{true}, nil
 }
 
-func setBlogToOffline(b *model.Blog, s *model.Store) (*statusChangeResponse, error) {
+func setBlogToOffline(
+	b *model.Blog, s *model.Store,
+) (*statusChangeResponse, error) {
 	if err := s.SetBlogToOffline(context.TODO(), b.ID); err != nil {
 		return nil, fmt.Errorf("cannot set offline: %w", err)
 	}
-	return &statusChangeResponse{
-		Domain: b.Subdomain.String(),
-		IsLive: false,
-	}, nil
+	return &statusChangeResponse{false}, nil
 }
 
-func (b *BlogService) ConfigDomain() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("ConfigDomain handler...")
+func (b *BlogService) ConfigDomain(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("ConfigDomain handler...")
 
-		b.mixpanel.Track("ConfigDomain", r)
+	r.MixpanelTrack("ConfigDomain")
 
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			http.Error(w, "User not found", http.StatusUnauthorized)
-			return
-		}
-		blogID := mux.Vars(r)["blogID"]
-		intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-		if err != nil {
-			logging.Logger(r).Printf("error converting string path var to blogID: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-
-		blogInfo, err := getBlogInfo(b.store, int32(intBlogID))
-		if err != nil {
-			logging.Logger(r).Printf("error getting blog for user `%d': %v\n", sesh.GetUserID(), err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-
-		util.ExecTemplate(w, []string{"blog_custom_domain.html"},
-			util.PageInfo{
-				Data: struct {
-					Title    string
-					UserInfo *session.UserInfo
-					ID       int32
-					Blog     BlogInfo
-				}{
-					Title:    "Custom domain configuration",
-					UserInfo: session.ConvertSessionToUserInfo(sesh),
-					ID:       int32(intBlogID),
-					Blog:     blogInfo,
-				},
-			},
-			template.FuncMap{},
-			logger,
-		)
+	sesh := r.Session()
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, fmt.Errorf("no blogID")
 	}
-}
-
-func (b *BlogService) SyncRepository() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("SyncRepository handler...")
-
-		b.mixpanel.Track("SyncRepository", r)
-
-		if err := b.syncRepository(w, r); err != nil {
-			var customErr *util.CustomError
-			if errors.As(err, &customErr) {
-				logger.Printf("Client Error: %v\n", customErr)
-				http.Error(w, customErr.Error(), http.StatusBadRequest)
-				return
-			} else {
-				logger.Printf("Internal Server Error: %v\n", err)
-				http.Error(w, "", http.StatusInternalServerError)
-				return
-			}
-		}
-	}
-}
-
-func (b *BlogService) syncRepository(w http.ResponseWriter, r *http.Request) error {
-	logger := logging.Logger(r)
-
-	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("parse blogID: %w", err)
 	}
+	blogInfo, err := getBlogInfo(b.store, int32(intBlogID))
+	if err != nil {
+		return nil, fmt.Errorf("blog info: %w", err)
+	}
+	return response.NewTemplate(
+		[]string{"blog_custom_domain.html"},
+		util.PageInfo{
+			Data: struct {
+				Title    string
+				UserInfo *session.UserInfo
+				ID       int32
+				Blog     BlogInfo
+			}{
+				Title:    "Custom domain configuration",
+				UserInfo: session.ConvertSessionToUserInfo(sesh),
+				ID:       int32(intBlogID),
+				Blog:     blogInfo,
+			},
+		},
+		template.FuncMap{},
+		logger,
+	), nil
+}
+
+func (b *BlogService) SyncRepository(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("SyncRepository handler...")
+
+	r.MixpanelTrack("SyncRepository")
+
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, util.CreateCustomError("", http.StatusNotFound)
+	}
+	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("parse int: %w", err)
+	}
+
 	blog, err := b.store.GetBlogByID(context.TODO(), int32(intBlogID))
 	if err != nil {
-		return fmt.Errorf("error getting blog `%d': %w", intBlogID, err)
+		return nil, fmt.Errorf("error getting blog `%d': %w", intBlogID, err)
 	}
 	if err := UpdateRepositoryOnDisk(
 		b.client, b.store, &blog, logger,
 	); err != nil {
-		return fmt.Errorf("update error: %w", err)
+		return nil, fmt.Errorf("update error: %w", err)
 	}
-	http.Redirect(
-		w, r,
+
+	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s/user/blogs/%d/config",
 			config.Config.Progstack.Protocol,
@@ -601,6 +543,5 @@ func (b *BlogService) syncRepository(w http.ResponseWriter, r *http.Request) err
 			blog.ID,
 		),
 		http.StatusTemporaryRedirect,
-	)
-	return nil
+	), nil
 }

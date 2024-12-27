@@ -47,7 +47,11 @@ func (b *BlogService) CreateRepositoryBlog(
 		LiveBranch   string `json:"live_branch"`
 		Flow         string `json:"flow"`
 	}
-	if err := json.NewDecoder(r.Body()).Decode(&req); err != nil {
+	body, err := r.ReadBody()
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, util.CreateCustomError(
 			"error decoding request body",
 			http.StatusBadRequest,

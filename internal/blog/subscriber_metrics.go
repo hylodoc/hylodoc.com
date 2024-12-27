@@ -2,7 +2,6 @@ package blog
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -10,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gorilla/mux"
-	"github.com/xr0-org/progstack/internal/logging"
+	"github.com/xr0-org/progstack/internal/app/handler/request"
+	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
@@ -34,67 +33,66 @@ type Subscriber struct {
 	Status       string
 }
 
-func (b *BlogService) SubscriberMetrics() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-		logger.Println("SubscriberMetrics handler...")
+func (b *BlogService) SubscriberMetrics(
+	r request.Request,
+) (response.Response, error) {
+	logger := r.Logger()
+	logger.Println("SubscriberMetrics handler...")
 
-		b.mixpanel.Track("SubscriberMetrics", r)
+	r.MixpanelTrack("SubscriberMetrics")
 
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok {
-			logger.Println("No auth session")
-			http.Error(w, "", http.StatusNotFound)
-			return
-		}
-
-		data, err := b.subscriberMetrics(w, r)
-		if err != nil {
-			logger.Printf("Error getting subscriber metrics: %v", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-		logger.Printf("subscribers: %v\n", data)
-
-		util.ExecTemplate(w, []string{"subscriber_metrics.html", "subscribers.html"},
-			util.PageInfo{
-				Data: struct {
-					Title          string
-					UserInfo       *session.UserInfo
-					SubscriberData SubscriberData
-				}{
-					Title:          "Dashboard",
-					UserInfo:       session.ConvertSessionToUserInfo(sesh),
-					SubscriberData: data,
-				},
-			},
-			template.FuncMap{},
-			logger,
-		)
+	sesh := r.Session()
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, util.CreateCustomError("", http.StatusNotFound)
 	}
-}
-
-func (b *BlogService) subscriberMetrics(w http.ResponseWriter, r *http.Request) (SubscriberData, error) {
-	blogID := mux.Vars(r)["blogID"]
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
-		return SubscriberData{}, fmt.Errorf("error converting string path var to blogID: %w", err)
+		return nil, fmt.Errorf("parse int: %w", err)
 	}
-	subs, err := b.store.ListActiveSubscribersByBlogID(context.TODO(), int32(intBlogID))
+	data, err := b.subscriberMetrics(int32(intBlogID))
 	if err != nil {
-		if err != sql.ErrNoRows {
-			return SubscriberData{}, fmt.Errorf("error listing subscriber counts: %w", err)
-		}
+		return nil, fmt.Errorf("subscriber metrics: %w", err)
+	}
+	return response.NewTemplate(
+		[]string{"subscriber_metrics.html", "subscribers.html"},
+		util.PageInfo{
+			Data: struct {
+				Title          string
+				UserInfo       *session.UserInfo
+				SubscriberData SubscriberData
+			}{
+				Title:          "Dashboard",
+				UserInfo:       session.ConvertSessionToUserInfo(sesh),
+				SubscriberData: data,
+			},
+		},
+		template.FuncMap{},
+		logger,
+	), nil
+}
+
+func (b *BlogService) subscriberMetrics(intBlogID int32) (SubscriberData, error) {
+	subs, err := b.store.ListActiveSubscribersByBlogID(
+		context.TODO(), intBlogID,
+	)
+	if err != nil {
+		return SubscriberData{}, fmt.Errorf(
+			"list active subscriber: %w", err,
+		)
 	}
 
-	subscriberData := buildSubscriberCumulativeCounts(subs)
-	jsonSubscriberData, err := json.Marshal(subscriberData)
+	jsonSubscriberData, err := json.Marshal(
+		buildSubscriberCumulativeCounts(subs),
+	)
 	if err != nil {
-		return SubscriberData{}, fmt.Errorf("error marshaling subscriber data: %w", err)
+		return SubscriberData{}, fmt.Errorf(
+			"json marshall: %w", err,
+		)
 	}
 	return SubscriberData{
 		Count:            len(subs),
-		CumulativeCounts: template.JS(string(jsonSubscriberData)),
+		CumulativeCounts: template.JS(jsonSubscriberData),
 		Subscribers:      convertSubscribers(subs),
 	}, nil
 }

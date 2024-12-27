@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authz"
@@ -13,15 +14,18 @@ import (
 	"github.com/xr0-org/progstack/internal/util"
 )
 
-type HandlerFunc func(request.Request) (response.Response, error)
-
-func AsHttp(h HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if err := execute(h, w, r); err != nil {
-			handleError(err, w, logging.Logger(r))
-		}
-	}
+func Handle(r *mux.Router, pattern string, h handlerfunc) *mux.Route {
+	return r.HandleFunc(
+		pattern,
+		func(w http.ResponseWriter, r *http.Request) {
+			if err := execute(h, w, r); err != nil {
+				handleError(err, w, logging.Logger(r))
+			}
+		},
+	)
 }
+
+type handlerfunc func(request.Request) (response.Response, error)
 
 func handleError(err error, w http.ResponseWriter, logger *log.Logger) {
 	/* TODO: error page */
@@ -43,7 +47,7 @@ func asCustomError(err error) (*util.CustomError, bool) {
 }
 
 func execute(
-	h HandlerFunc, w http.ResponseWriter, httpReq *http.Request,
+	h handlerfunc, w http.ResponseWriter, httpReq *http.Request,
 ) error {
 	req, err := request.NewRequest(httpReq, w)
 	if err != nil {

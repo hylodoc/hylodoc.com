@@ -2,7 +2,7 @@ package request
 
 import (
 	"fmt"
-	"io"
+	"io/ioutil"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -20,7 +20,7 @@ type Request interface {
 
 	/* TODO: refactor authn session handling to remove this */
 	ResponseWriter() http.ResponseWriter
-	Body() io.Reader
+	ReadBody() ([]byte, error)
 
 	MixpanelTrack(event string) error
 
@@ -29,10 +29,14 @@ type Request interface {
 	GetPostFormValue(name string) (string, error)
 	GetFormFile(name string) (multipart.File, *multipart.FileHeader, error)
 	GetRouteVar(key string) (string, bool)
+	GetHeader(name string) string
 }
 
 type request struct {
-	r *http.Request
+	r         *http.Request
+	_readbody bool
+	_body     []byte
+
 	w http.ResponseWriter
 
 	logger   *log.Logger
@@ -46,7 +50,7 @@ func NewRequest(r *http.Request, w http.ResponseWriter) (Request, error) {
 		return nil, fmt.Errorf("no session")
 	}
 	return &request{
-		r,
+		r, false, nil,
 		w,
 		logging.Logger(r),
 		sesh,
@@ -57,7 +61,19 @@ func NewRequest(r *http.Request, w http.ResponseWriter) (Request, error) {
 func (r *request) Logger() *log.Logger                 { return r.logger }
 func (r *request) Session() *session.Session           { return r.sesh }
 func (r *request) ResponseWriter() http.ResponseWriter { return r.w }
-func (r *request) Body() io.Reader                     { return r.r.Body }
+
+func (r *request) ReadBody() ([]byte, error) {
+	if !r._readbody {
+		body, err := ioutil.ReadAll(r.r.Body)
+		if err != nil {
+			return nil, err
+		}
+		defer r.r.Body.Close()
+		r._body = body
+		r._readbody = true
+	}
+	return r._body, nil
+}
 
 func (r *request) MixpanelTrack(event string) error {
 	return r.mixpanel.Track(event, r.r)
@@ -96,4 +112,8 @@ func (r *request) GetFormFile(
 func (r *request) GetRouteVar(key string) (string, bool) {
 	v, ok := mux.Vars(r.r)[key]
 	return v, ok
+}
+
+func (r *request) GetHeader(name string) string {
+	return r.r.Header.Get(name)
 }
