@@ -17,7 +17,6 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/installation"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/metrics"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/routing"
@@ -86,8 +85,6 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	r := mux.NewRouter()
 
 	/* middleware */
-	r.Use(session.NewSessionService(store).Middleware)
-	r.Use(logging.Middleware)
 	r.Use(metrics.Middleware)
 	r.Use(routing.NewRoutingService(store).Middleware)
 
@@ -100,68 +97,70 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	/* init metrics */
 	metrics.Initialize()
 
-	handler.Handle(r, "/", index)
+	h := handler.NewHandler(store)
+
+	h.Handle(r, "/", index)
 	authNService := authn.NewAuthNService(httpClient, store)
-	handler.Handle(r, "/register", authNService.Register)
-	handler.Handle(r, "/login", authNService.Login)
-	handler.Handle(r, "/gh/login", authNService.GithubLogin)
-	handler.Handle(r, "/gh/oauthcallback", authNService.GithubOAuthCallback)
-	handler.Handle(r, "/gh/linkcallback", authNService.GithubLinkCallback)
-	handler.Handle(r, "/magic/register", authNService.MagicRegister)
-	handler.Handle(r, "/magic/registercallback", authNService.MagicRegisterCallback)
-	handler.Handle(r, "/magic/login", authNService.MagicLogin)
-	handler.Handle(r, "/magic/logincallback", authNService.MagicLoginCallback)
-	handler.Handle(
+	h.Handle(r, "/register", authNService.Register)
+	h.Handle(r, "/login", authNService.Login)
+	h.Handle(r, "/gh/login", authNService.GithubLogin)
+	h.Handle(r, "/gh/oauthcallback", authNService.GithubOAuthCallback)
+	h.Handle(r, "/gh/linkcallback", authNService.GithubLinkCallback)
+	h.Handle(r, "/magic/register", authNService.MagicRegister)
+	h.Handle(r, "/magic/registercallback", authNService.MagicRegisterCallback)
+	h.Handle(r, "/magic/login", authNService.MagicLogin)
+	h.Handle(r, "/magic/logincallback", authNService.MagicLoginCallback)
+	h.Handle(
 		r,
 		"/gh/installcallback",
 		installation.NewInstallationService(
 			httpClient, store,
 		).InstallationCallback,
 	)
-	handler.Handle(r, "/stripe/webhook", billingService.StripeWebhook)
-	handler.Handle(r, "/pricing", billingService.Pricing)
+	h.Handle(r, "/stripe/webhook", billingService.StripeWebhook)
+	h.Handle(r, "/pricing", billingService.Pricing)
 
-	handler.Handle(r, "/blogs/{blogID}/subscribe", blogService.SubscribeToBlog).Methods("POST")
-	handler.Handle(r, "/blogs/unsubscribe", blogService.UnsubscribeFromBlog)
+	h.Handle(r, "/blogs/{blogID}/subscribe", blogService.SubscribeToBlog).Methods("POST")
+	h.Handle(r, "/blogs/unsubscribe", blogService.UnsubscribeFromBlog)
 
 	/* authenticated routes */
 	authR := r.PathPrefix("/user").Subrouter()
 	authR.Use(authn.Middleware)
 	userService := user.NewUserService(store)
-	handler.Handle(authR, "/", userService.Home)
-	handler.Handle(authR, "/auth/logout", authNService.Logout)
-	handler.Handle(authR, "/gh/linkgithub", authNService.LinkGithubAccount)
-	handler.Handle(authR, "/account", userService.Account)
-	handler.Handle(authR, "/subdomain-check", blogService.SubdomainCheck)
-	handler.Handle(authR, "/create-new-blog", userService.CreateNewBlog)
-	handler.Handle(authR, "/repository-flow", userService.RepositoryFlow)
-	handler.Handle(authR, "/github-installation", userService.GithubInstallation)
-	handler.Handle(authR, "/folder-flow", userService.FolderFlow)
-	handler.Handle(authR, "/create-repository-blog", blogService.CreateRepositoryBlog)
-	handler.Handle(authR, "/create-folder-blog", blogService.CreateFolderBlog)
+	h.Handle(authR, "/", userService.Home)
+	h.Handle(authR, "/auth/logout", authNService.Logout)
+	h.Handle(authR, "/gh/linkgithub", authNService.LinkGithubAccount)
+	h.Handle(authR, "/account", userService.Account)
+	h.Handle(authR, "/subdomain-check", blogService.SubdomainCheck)
+	h.Handle(authR, "/create-new-blog", userService.CreateNewBlog)
+	h.Handle(authR, "/repository-flow", userService.RepositoryFlow)
+	h.Handle(authR, "/github-installation", userService.GithubInstallation)
+	h.Handle(authR, "/folder-flow", userService.FolderFlow)
+	h.Handle(authR, "/create-repository-blog", blogService.CreateRepositoryBlog)
+	h.Handle(authR, "/create-folder-blog", blogService.CreateFolderBlog)
 
 	/* billing */
-	handler.Handle(authR, "/stripe/billing-portal", billingService.BillingPortal)
+	h.Handle(authR, "/stripe/billing-portal", billingService.BillingPortal)
 
 	blogR := authR.PathPrefix("/blogs/{blogID}").Subrouter()
 	blogR.Use(blogService.Middleware)
-	handler.Handle(blogR, "/config", blogService.Config)
-	handler.Handle(blogR, "/set-subdomain", blogService.SubdomainSubmit)
-	handler.Handle(blogR, "/config-domain", blogService.ConfigDomain)
-	handler.Handle(blogR, "/set-domain", blogService.DomainSubmit)
-	handler.Handle(blogR, "/set-theme", blogService.ThemeSubmit)
-	handler.Handle(blogR, "/set-test-branch", blogService.TestBranchSubmit)
-	handler.Handle(blogR, "/set-live-branch", blogService.LiveBranchSubmit)
-	handler.Handle(blogR, "/set-folder", blogService.FolderSubmit)
-	handler.Handle(blogR, "/set-status", blogService.SetStatusSubmit)
-	handler.Handle(blogR, "/sync", blogService.SyncRepository)
-	handler.Handle(blogR, "/email", blogService.SendPostEmail)
+	h.Handle(blogR, "/config", blogService.Config)
+	h.Handle(blogR, "/set-subdomain", blogService.SubdomainSubmit)
+	h.Handle(blogR, "/config-domain", blogService.ConfigDomain)
+	h.Handle(blogR, "/set-domain", blogService.DomainSubmit)
+	h.Handle(blogR, "/set-theme", blogService.ThemeSubmit)
+	h.Handle(blogR, "/set-test-branch", blogService.TestBranchSubmit)
+	h.Handle(blogR, "/set-live-branch", blogService.LiveBranchSubmit)
+	h.Handle(blogR, "/set-folder", blogService.FolderSubmit)
+	h.Handle(blogR, "/set-status", blogService.SetStatusSubmit)
+	h.Handle(blogR, "/sync", blogService.SyncRepository)
+	h.Handle(blogR, "/email", blogService.SendPostEmail)
 
-	handler.Handle(blogR, "/metrics", blogService.SiteMetrics)
-	handler.Handle(blogR, "/subscriber/metrics", blogService.SubscriberMetrics)
-	handler.Handle(blogR, "/subscriber/export", blogService.ExportSubscribers)
-	handler.Handle(blogR, "/subscriber/edit", blogService.EditSubscriber)
-	handler.Handle(blogR, "/subscriber/delete", blogService.DeleteSubscriber)
+	h.Handle(blogR, "/metrics", blogService.SiteMetrics)
+	h.Handle(blogR, "/subscriber/metrics", blogService.SubscriberMetrics)
+	h.Handle(blogR, "/subscriber/export", blogService.ExportSubscribers)
+	h.Handle(blogR, "/subscriber/edit", blogService.EditSubscriber)
+	h.Handle(blogR, "/subscriber/delete", blogService.DeleteSubscriber)
 
 	/* serve static content */
 	r.PathPrefix("/static/css").Handler(

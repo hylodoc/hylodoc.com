@@ -10,17 +10,21 @@ import (
 
 func CanCreateSite(s *model.Store, sesh *session.Session) error {
 	/* get user's storage footprint */
-	storageUsed, err := UserStorageUsed(s, sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return fmt.Errorf("get user id: %w", err)
+	}
+	storageUsed, err := UserStorageUsed(s, userid)
 	if err != nil {
 		return fmt.Errorf("calculate user storage used: %w", err)
 	}
 	/* get user's site count */
-	blogCount, err := s.CountLiveBlogsByUserID(context.TODO(), sesh.GetUserID())
+	blogCount, err := s.CountLiveBlogsByUserID(context.TODO(), userid)
 	if err != nil {
 		return fmt.Errorf("get user project count: %w", err)
 	}
 	/* get user's tier features */
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return fmt.Errorf("get user subscription: %w", err)
 	}
@@ -35,7 +39,11 @@ func CanCreateSite(s *model.Store, sesh *session.Session) error {
 
 func CanConfigureCustomDomain(s *model.Store, sesh *session.Session) error {
 	/* get user's tier features */
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return fmt.Errorf("get user id: %w", err)
+	}
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return fmt.Errorf("get user subscription: %w", err)
 	}
@@ -48,7 +56,11 @@ func CanConfigureCustomDomain(s *model.Store, sesh *session.Session) error {
 
 func CanViewAnalytics(s *model.Store, sesh *session.Session) (bool, error) {
 	/* get user's tier features */
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return false, fmt.Errorf("get user id: %w", err)
+	}
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
@@ -57,7 +69,11 @@ func CanViewAnalytics(s *model.Store, sesh *session.Session) (bool, error) {
 }
 
 func CanUploadImages(s *model.Store, sesh *session.Session) (bool, error) {
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return false, fmt.Errorf("get user id: %w", err)
+	}
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
@@ -66,7 +82,11 @@ func CanUploadImages(s *model.Store, sesh *session.Session) (bool, error) {
 }
 
 func CanUseTheme(s *model.Store, theme string, sesh *session.Session) (bool, error) {
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return false, fmt.Errorf("get user id: %w", err)
+	}
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
@@ -75,7 +95,11 @@ func CanUseTheme(s *model.Store, theme string, sesh *session.Session) (bool, err
 }
 
 func CanHaveEmailSubscribers(s *model.Store, sesh *session.Session) (bool, error) {
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return false, fmt.Errorf("get user id: %w", err)
+	}
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
@@ -84,7 +108,11 @@ func CanHaveEmailSubscribers(s *model.Store, sesh *session.Session) (bool, error
 }
 
 func CanHaveLikes(s *model.Store, sesh *session.Session) (bool, error) {
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return false, fmt.Errorf("get user id: %w", err)
+	}
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
@@ -93,7 +121,11 @@ func CanHaveLikes(s *model.Store, sesh *session.Session) (bool, error) {
 }
 
 func CanHaveComments(s *model.Store, sesh *session.Session) (bool, error) {
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return false, fmt.Errorf("get user id: %w", err)
+	}
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
@@ -102,7 +134,11 @@ func CanHaveComments(s *model.Store, sesh *session.Session) (bool, error) {
 }
 
 func CanHaveTeamMembers(s *model.Store, sesh *session.Session) (bool, error) {
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return false, fmt.Errorf("get user id: %w", err)
+	}
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
@@ -111,7 +147,11 @@ func CanHaveTeamMembers(s *model.Store, sesh *session.Session) (bool, error) {
 }
 
 func CanHavePasswordProtectedPages(s *model.Store, sesh *session.Session) (bool, error) {
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return false, fmt.Errorf("get user id: %w", err)
+	}
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
@@ -120,7 +160,11 @@ func CanHavePasswordProtectedPages(s *model.Store, sesh *session.Session) (bool,
 }
 
 func CanHaveDownloadablePdfPages(s *model.Store, sesh *session.Session) (bool, error) {
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return false, fmt.Errorf("get user id: %w", err)
+	}
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
@@ -129,7 +173,11 @@ func CanHaveDownloadablePdfPages(s *model.Store, sesh *session.Session) (bool, e
 }
 
 func CanHavePaidSubscribers(s *model.Store, sesh *session.Session) (bool, error) {
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return false, fmt.Errorf("get user id: %w", err)
+	}
+	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}

@@ -11,10 +11,10 @@ type UserInfo struct {
 
 func ConvertSessionToUserInfo(sesh *Session) *UserInfo {
 	return &UserInfo{
-		UserID:       sesh.userID,
-		Email:        sesh.email,
-		Username:     sesh.username,
+		UserID:       &sesh.userID,
+		Email:        &sesh.email,
+		Username:     &sesh.username,
 		GithubLinked: sesh.githubLinked,
-		GithubEmail:  sesh.githubEmail,
+		GithubEmail:  &sesh.githubEmail,
 	}
 }

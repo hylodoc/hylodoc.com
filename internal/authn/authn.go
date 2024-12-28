@@ -198,7 +198,11 @@ func (a *AuthNService) LinkGithubAccount(
 	logger.Println("LinkGithubAccount handler...")
 
 	r.MixpanelTrack("LinkGithubAccount")
-	linkUrl, err := buildGithubLinkUrl(r.Session().GetUserID())
+	userid, err := r.Session().GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
+	linkUrl, err := buildGithubLinkUrl(userid)
 	if err != nil {
 		return nil, fmt.Errorf("GithubLinkUrl: %w", err)
 	}

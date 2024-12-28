@@ -3,13 +3,14 @@ package analytics
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/mixpanel/mixpanel-go"
-	"github.com/xr0-org/progstack/internal/logging"
+	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/session"
 )
 
@@ -23,21 +24,19 @@ func NewMixpanelClientWrapper(token string) *MixpanelClientWrapper {
 	}
 }
 
-func (m *MixpanelClientWrapper) Track(event string, r *http.Request) {
-	logger := logging.Logger(r)
+func (m *MixpanelClientWrapper) Track(
+	event string, r *http.Request, sesh *session.Session, logger *log.Logger,
+) {
 	go func() {
-		if err := m.track(r, event); err != nil {
+		if err := m.track(event, r, sesh, logger); err != nil {
 			logger.Printf("Error emitting analytics: %v", err)
 		}
 	}()
 }
 
-func (m *MixpanelClientWrapper) track(r *http.Request, event string) error {
-	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-	if !ok {
-		return fmt.Errorf("No session for tracking")
-	}
-
+func (m *MixpanelClientWrapper) track(
+	event string, r *http.Request, sesh *session.Session, logger *log.Logger,
+) error {
 	ip := r.Header.Get("X-Forwarded-For")
 	identifiers := getIndentifiers(sesh)
 	props := map[string]interface{}{
@@ -68,15 +67,16 @@ type identifiers struct {
 }
 
 func getIndentifiers(sesh *session.Session) identifiers {
-	if sesh.IsAuthenticated() {
-		return identifiers{
-			distinctId: fmt.Sprintf("%d", sesh.GetUserID()),
-			status:     "auth",
-		}
-	} else {
+	if sesh.IsUnauth() {
 		return identifiers{
 			distinctId: sesh.GetSessionID(),
 			status:     "unauth",
 		}
+	}
+	userid, err := sesh.GetUserID()
+	assert.Assert(err == nil)
+	return identifiers{
+		distinctId: fmt.Sprintf("%d", userid),
+		status:     "auth",
 	}
 }

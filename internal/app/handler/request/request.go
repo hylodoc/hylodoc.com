@@ -10,7 +10,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/session"
 )
 
@@ -44,18 +43,18 @@ type request struct {
 	mixpanel *analytics.MixpanelClientWrapper
 }
 
-func NewRequest(r *http.Request, w http.ResponseWriter) (Request, error) {
-	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-	if !ok {
-		return nil, fmt.Errorf("no session")
-	}
+func NewRequest(
+	r *http.Request, w http.ResponseWriter,
+	sesh *session.Session,
+	logger *log.Logger,
+) Request {
 	return &request{
 		r, false, nil,
 		w,
-		logging.Logger(r),
+		logger,
 		sesh,
 		analytics.NewMixpanelClientWrapper(config.Config.Mixpanel.Token),
-	}, nil
+	}
 }
 
 func (r *request) Logger() *log.Logger                 { return r.logger }
@@ -77,7 +76,7 @@ func (r *request) ReadBody() ([]byte, error) {
 }
 
 func (r *request) MixpanelTrack(event string) {
-	r.mixpanel.Track(event, r.r)
+	r.mixpanel.Track(event, r.r, r.sesh, r.logger)
 }
 
 func (r *request) GetURLQueryValue(key string) string {

@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -10,15 +11,25 @@ import (
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/logging"
+	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
-func Handle(r *mux.Router, pattern string, h handlerfunc) *mux.Route {
+type Handler struct {
+	s *model.Store
+}
+
+func NewHandler(s *model.Store) *Handler { return &Handler{s} }
+
+func (h *Handler) Handle(
+	r *mux.Router, pattern string, f handlerfunc,
+) *mux.Route {
 	return r.HandleFunc(
 		pattern,
 		func(w http.ResponseWriter, r *http.Request) {
-			if err := execute(h, w, r); err != nil {
-				logger := logging.Logger(r)
+			logger := logging.NewLogger()
+			if err := execute(f, w, r, logger, h.s); err != nil {
 				/* TODO: error pages */
 				if errors.Is(err, authz.SubscriptionError) {
 					logger.Println("authz error:", err)
@@ -51,16 +62,19 @@ func asCustomError(err error) (*util.CustomError, bool) {
 type handlerfunc func(request.Request) (response.Response, error)
 
 func execute(
-	h handlerfunc, w http.ResponseWriter, httpReq *http.Request,
+	f handlerfunc,
+	w http.ResponseWriter, r *http.Request,
+	logger *log.Logger,
+	s *model.Store,
 ) error {
-	req, err := request.NewRequest(httpReq, w)
+	sesh, err := session.NewSession(w, r, logger, s)
 	if err != nil {
-		return fmt.Errorf("request: %w", err)
+		return fmt.Errorf("session: %w", err)
 	}
-	resp, err := h(req)
+	resp, err := f(request.NewRequest(r, w, sesh, logger))
 	if err != nil {
-		return fmt.Errorf("handler: %w", err)
+		return fmt.Errorf("handler func: %w", err)
 	}
-	resp.Respond(w, httpReq)
+	resp.Respond(w, r)
 	return nil
 }

@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -22,23 +23,25 @@ var (
 )
 
 type Session struct {
-	id              uuid.UUID
-	userID          *int32
-	email           *string
-	username        *string
-	githubLinked    bool
-	githubEmail     *string
-	expiresAt       time.Time
-	isAuthenticated bool
+	id           uuid.UUID
+	userID       int32
+	email        string
+	username     string
+	githubLinked bool
+	githubEmail  string
+	expiresAt    time.Time
+	isUnauth     bool
 }
 
-func CreateUnauthSession(
-	s *model.Store, w http.ResponseWriter, expiresAt time.Time,
+func createUnauthSession(
+	s *model.Store, w http.ResponseWriter,
 	logger *log.Logger,
 ) (*Session, error) {
 	logger.Println("Creating unauth session...")
 
-	unauthSession, err := s.CreateUnauthSession(context.TODO(), expiresAt)
+	unauthSession, err := s.CreateUnauthSession(
+		context.TODO(), unauthSessionDuration,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -53,9 +56,9 @@ func CreateUnauthSession(
 	})
 
 	return &Session{
-		id:              unauthSession.ID,
-		expiresAt:       unauthSession.ExpiresAt,
-		isAuthenticated: false,
+		id:        unauthSession.ID,
+		expiresAt: unauthSession.ExpiresAt,
+		isUnauth:  true,
 	}, nil
 }
 
@@ -91,21 +94,15 @@ func CreateAuthSession(
 }
 
 func convertRowToSession(row model.GetAuthSessionRow) *Session {
-	ghLinked := false
-	ghEmail := ""
-	if row.GhEmail.Valid {
-		ghLinked = true
-		ghEmail = row.GhEmail.String
-	}
 	return &Session{
-		id:              row.ID,
-		userID:          &row.UserID,
-		email:           &row.Email,
-		username:        &row.Username,
-		githubLinked:    ghLinked,
-		githubEmail:     &ghEmail,
-		expiresAt:       row.ExpiresAt,
-		isAuthenticated: true,
+		id:           row.ID,
+		userID:       row.UserID,
+		email:        row.Email,
+		username:     row.Username,
+		githubLinked: row.GhEmail.Valid,
+		githubEmail:  row.GhEmail.String,
+		expiresAt:    row.ExpiresAt,
+		isUnauth:     false,
 	}
 }
 
@@ -115,12 +112,11 @@ func (sesh *Session) End(s *model.Store, logger *log.Logger) error {
 	return s.EndAuthSession(context.TODO(), sesh.id)
 }
 
-func GetSession(
-	s *model.Store, w http.ResponseWriter, sessionID string,
-	logger *log.Logger,
+func getSession(
+	s *model.Store, id string, logger *log.Logger,
 ) (*Session, error) {
 	/* parse sessionID from cookie */
-	uuid, err := uuid.Parse(sessionID)
+	uuid, err := uuid.Parse(id)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing sessionID: %w", err)
 	}
@@ -128,23 +124,23 @@ func GetSession(
 	/* try get auth session */
 	auth, err := s.GetAuthSession(context.TODO(), uuid)
 	if err == nil {
-		logger.Printf("Found auth session\n")
+		logger.Printf("found auth session\n")
 		return convertRowToSession(auth), nil
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("error checking for auth session: %w", err)
 	}
 
 	/* try get unauth session */
 	unauth, err := s.GetUnauthSession(context.TODO(), uuid)
 	if err == nil {
-		logger.Printf("Found unauth session\n")
+		logger.Printf("found unauth session\n")
 		return &Session{
 			id:        unauth.ID,
 			expiresAt: unauth.ExpiresAt,
 		}, nil
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("error checking for unauth session: %w", err)
 	}
 	return nil, fmt.Errorf("no unauth session: %w", err)
@@ -155,8 +151,8 @@ func (s *Session) GetSessionID() string {
 	return s.id.String()
 }
 
-func (s *Session) IsAuthenticated() bool {
-	return s.isAuthenticated
+func (s *Session) IsUnauth() bool {
+	return s.isUnauth
 }
 
 func (s *Session) GetExpiresAt() time.Time {
@@ -168,30 +164,30 @@ func (s *Session) IsGithubLinked() bool {
 }
 
 /* auth session */
-func (s *Session) GetEmail() string {
-	if s.IsAuthenticated() {
-		return *s.email
+func (s *Session) GetEmail() (string, error) {
+	if s.IsUnauth() {
+		return "", fmt.Errorf("unauth")
 	}
-	return ""
+	return s.email, nil
 }
 
-func (s *Session) GetUserID() int32 {
-	if s.IsAuthenticated() {
-		return *s.userID
+func (s *Session) GetUserID() (int32, error) {
+	if s.IsUnauth() {
+		return -1, fmt.Errorf("unauth")
 	}
-	return -1
+	return s.userID, nil
 }
 
-func (s *Session) GetUsername() string {
-	if s.IsAuthenticated() {
-		return *s.username
+func (s *Session) GetUsername() (string, error) {
+	if s.IsUnauth() {
+		return "", fmt.Errorf("unauth")
 	}
-	return ""
+	return s.username, nil
 }
 
-func (s *Session) GetGithubEmail() string {
-	if s.IsAuthenticated() {
-		return *s.githubEmail
+func (s *Session) GetGithubEmail() (string, error) {
+	if s.IsUnauth() {
+		return "", fmt.Errorf("unauth")
 	}
-	return ""
+	return s.githubEmail, nil
 }

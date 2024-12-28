@@ -41,6 +41,14 @@ func Middleware(next http.Handler) http.Handler {
 	})
 }
 
+func NewLogger() *log.Logger {
+	return log.New(
+		log.Writer(),
+		fmt.Sprintf("[%s] ", uuid.New().String()),
+		log.LstdFlags,
+	)
+}
+
 func Logger(r *http.Request) *log.Logger {
 	logger, ok := r.Context().Value(loggerKey).(*log.Logger)
 	if !ok {
