@@ -81,7 +81,7 @@ func buildUrl(subdomain string) string {
 		"%s://%s.%s",
 		config.Config.Progstack.Protocol,
 		subdomain,
-		config.Config.Progstack.ServiceName,
+		config.Config.Progstack.RootDomain,
 	)
 }
 

@@ -96,12 +96,12 @@ func (u *UserService) FolderFlow(r request.Request) (response.Response, error) {
 			Data: struct {
 				Title       string
 				UserInfo    *session.UserInfo
-				ServiceName string
+				RootDomain string
 				Themes      []string
 			}{
 				Title:       "Folder Flow",
 				UserInfo:    session.ConvertSessionToUserInfo(r.Session()),
-				ServiceName: config.Config.Progstack.ServiceName,
+				RootDomain: config.Config.Progstack.RootDomain,
 				Themes:      blog.BuildThemes(config.Config.ProgstackSsg.Themes),
 			},
 		},
@@ -200,14 +200,14 @@ func (u *UserService) RepositoryFlow(
 				Title          string
 				UserInfo       *session.UserInfo
 				AccountDetails AccountDetails
-				ServiceName    string
+				RootDomain    string
 				Repositories   []Repository
 				Themes         []string
 			}{
 				Title:          "Repository Flow",
 				UserInfo:       session.ConvertSessionToUserInfo(sesh),
 				AccountDetails: details,
-				ServiceName:    config.Config.Progstack.ServiceName,
+				RootDomain:    config.Config.Progstack.RootDomain,
 				Repositories:   buildRepositoriesInfo(repos),
 				Themes:         blog.BuildThemes(config.Config.ProgstackSsg.Themes),
 			},

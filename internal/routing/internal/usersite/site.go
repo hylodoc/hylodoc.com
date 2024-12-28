@@ -2,6 +2,7 @@ package usersite
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -24,7 +25,7 @@ var ErrIsService = errors.New("host is service name")
 var ErrUnknownSubdomain = errors.New("unknown subdomain")
 
 func GetSite(host string, s *model.Store) (*Site, error) {
-	if host == config.Config.Progstack.ServiceName {
+	if host == config.Config.Progstack.RootDomain {
 		return nil, ErrIsService
 	}
 	blog, err := getBlog(host, s)
@@ -58,7 +59,7 @@ func getBlogBySubdomain(host string, s *model.Store) (int32, error) {
 	/* `.hylodoc.com' (dot followed by service name) must follow host */
 	subdomain, found := strings.CutSuffix(
 		host,
-		fmt.Sprintf(".%s", config.Config.Progstack.ServiceName),
+		fmt.Sprintf(".%s", config.Config.Progstack.RootDomain),
 	)
 	if !found {
 		return -1, errNotSubdomainForm
@@ -69,6 +70,9 @@ func getBlogBySubdomain(host string, s *model.Store) (int32, error) {
 	}
 	blog, err := s.GetBlogBySubdomain(context.TODO(), sub)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return -1, ErrUnknownSubdomain
+		}
 		return -1, fmt.Errorf("query error: %w", err)
 	}
 	return blog.ID, nil

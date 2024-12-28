@@ -79,14 +79,14 @@ func (b *BlogService) SendPostEmail(
 				"%s://%s.%s%s?subscriber=%s",
 				config.Config.Progstack.Protocol,
 				blog.Subdomain,
-				config.Config.Progstack.ServiceName,
+				config.Config.Progstack.RootDomain,
 				post.Url,
 				token,
 			),
 			fmt.Sprintf(
 				"%s://%s/blogs/unsubscribe?token=%s",
 				config.Config.Progstack.Protocol,
-				config.Config.Progstack.ServiceName,
+				config.Config.Progstack.RootDomain,
 				sub.UnsubscribeToken,
 			),
 			postbody.NewPostBody(
@@ -112,7 +112,7 @@ func (b *BlogService) SendPostEmail(
 		fmt.Sprintf(
 			"%s://%s/user/blogs/%d/metrics",
 			config.Config.Progstack.Protocol,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 			blog.ID,
 		),
 		http.StatusTemporaryRedirect,

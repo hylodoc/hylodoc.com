@@ -232,7 +232,7 @@ func (b *BlogService) DomainSubmit(
 		fmt.Sprintf(
 			"%s://%s/user/blogs/%d/config",
 			config.Config.Progstack.Protocol,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 			blogID,
 		),
 		http.StatusTemporaryRedirect,

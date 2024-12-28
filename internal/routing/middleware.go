@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/xr0-org/progstack/internal/app/handler"
 	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/routing/internal/usersite"
@@ -32,14 +33,10 @@ func (s *RoutingService) Middleware(next http.Handler) http.Handler {
 				assert.Assert(ok)
 				assert.Assert(sesh != nil)
 				sesh.Println("unknown host error:", err)
-				/* TODO: unknown host pages */
 				if errors.Is(err, usersite.ErrUnknownSubdomain) {
-					http.Error(
-						w,
-						"unclaimed subdomain",
-						http.StatusNotFound,
-					)
+					handler.NotFoundSubdomain(w, r)
 				} else {
+					/* TODO: unknown domain error */
 					http.Error(
 						w,
 						"unknown domain",

@@ -175,7 +175,7 @@ func (b *BillingService) billingPortal(r request.Request) (string, error) {
 		ReturnURL: stripe.String(fmt.Sprintf(
 			"%s://%s/user/account",
 			config.Config.Progstack.Protocol,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 		)),
 	}
 

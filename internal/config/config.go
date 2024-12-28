@@ -42,6 +42,7 @@ type ProgstackParams struct {
 	CustomDomainIP    string `mapstructure:"custom_domain_ip"`
 	DiscordURL        string `mapstructure:"discord_url"`
 	OpenIssueURL      string `mapstructure:"open_issue_url"`
+	CDN               string `mapstructure:"cdn"`
 }
 
 type ProgstackSsgParams struct {

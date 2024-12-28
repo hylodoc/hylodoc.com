@@ -93,7 +93,7 @@ func (b *BlogService) getSiteMetrics(blogid int32) ([]postdata, error) {
 				"%s://%s.%s",
 				config.Config.Progstack.Protocol,
 				blog.Subdomain,
-				config.Config.Progstack.ServiceName,
+				config.Config.Progstack.RootDomain,
 			),
 			p.Url,
 		)
@@ -140,7 +140,7 @@ func getemaildata(post *model.Post, clicks int) emaildata.EmailData {
 			fmt.Sprintf(
 				"%s://%s/user/blogs/%d/email?token=%s",
 				config.Config.Progstack.Protocol,
-				config.Config.Progstack.ServiceName,
+				config.Config.Progstack.RootDomain,
 				post.Blog,
 				post.EmailToken,
 			),

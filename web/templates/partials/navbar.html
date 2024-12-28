@@ -6,7 +6,7 @@
 			<!-- Logo/Brand -->
 			<div class="eight columns u-pull-left">
 				<h1>
-					<a href="/">Progstack</a>
+					<a href="{{ .ProgstackURL }}">Progstack</a>
 					<small style="font-size: 0.5em;">
 						blogging for devs
 					</small>
@@ -15,17 +15,17 @@
 
 			<!-- Navigation Links -->
 			<div class="four columns u-pull-right">
-				<a href="/pricing">pricing</a>
+				<a href="{{ .ProgstackURL }}/pricing">pricing</a>
 				{{ if .Data.UserInfo.UserID }}
-					<a href="/user/account">{{ .Data.UserInfo.Username }}</a>
+					<a href="{{ .ProgstackURL }}/user/account">{{ .Data.UserInfo.Username }}</a>
 					<span class="separator">~</span>
-					<a href="/user/auth/logout">Logout</a>
+					<a href="{{ .ProgstackURL }}/user/auth/logout">Logout</a>
 				{{ else }}
-					<a href="/login">Log in</a>
-					<a href="/register">Register</a>
+					<a href="{{ .ProgstackURL }}/login">Log in</a>
+					<a href="{{ .ProgstackURL }}/register">Register</a>
 				{{ end }}
 				<a href="https://discord.gg/yfx69tbhxQ">
-					<img src="/static/img/discord.svg" alt="Discord">
+					<img src="{{ .CDN }}/img/discord.svg" alt="Discord">
 				</a>
 			</div>
 		</div>

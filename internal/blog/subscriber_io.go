@@ -83,7 +83,7 @@ func (b *BlogService) SubscribeToBlog(
 		fmt.Sprintf(
 			"%s://%s/blogs/unsubscribe?token=%s",
 			config.Config.Progstack.Protocol,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 			unsubtoken,
 		),
 	); err != nil {
@@ -95,7 +95,7 @@ func (b *BlogService) SubscribeToBlog(
 			"%s://%s.%s/subscribed",
 			config.Config.Progstack.Protocol,
 			blog.Subdomain,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 		),
 		http.StatusTemporaryRedirect,
 	), nil
@@ -185,7 +185,7 @@ func (b *BlogService) UnsubscribeFromBlog(
 			"%s://%s.%s/unsubscribed",
 			config.Config.Progstack.Protocol,
 			blog.Subdomain,
-			config.Config.Progstack.ServiceName,
+			config.Config.Progstack.RootDomain,
 		),
 		http.StatusTemporaryRedirect,
 	), nil
@@ -237,7 +237,7 @@ func buildRemoveSubscriberUrl(blogID int32, email string) string {
 	return fmt.Sprintf(
 		"%s://%s/user/blogs/%d/subscriber/delete?email=%s",
 		config.Config.Progstack.Protocol,
-		config.Config.Progstack.ServiceName,
+		config.Config.Progstack.RootDomain,
 		blogID,
 		email,
 	)

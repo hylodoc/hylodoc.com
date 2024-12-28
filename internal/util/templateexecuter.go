@@ -34,6 +34,7 @@ type PageInfo struct {
 
 func ExecTemplate(
 	w http.ResponseWriter, names []string, info PageInfo,
+	progstackurl, cdnurl string,
 ) error {
 	tmpl, err := template.New(names[0]).Funcs(
 		template.FuncMap{
@@ -48,7 +49,11 @@ func ExecTemplate(
 	if err != nil {
 		return fmt.Errorf("load: %w", err)
 	}
-	if err := tmpl.Execute(w, info); err != nil {
+	if err := tmpl.Execute(w, struct {
+		PageInfo
+		ProgstackURL string
+		CDN          string
+	}{info, progstackurl, cdnurl}); err != nil {
 		return fmt.Errorf("execute: %w", err)
 	}
 	return nil

@@ -62,15 +62,13 @@ func NotFound(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func NotFoundSubdomain(
-	w http.ResponseWriter, r *http.Request, subdomain string,
-) {
+func NotFoundSubdomain(w http.ResponseWriter, r *http.Request) {
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	assert.Assert(ok)
-	sesh.Println("404 (subdomain)", subdomain, r.URL)
+	sesh.Println("404 (subdomain)", r.Host, r.URL)
 	w.WriteHeader(http.StatusNotFound)
 	if err := response.NewTemplate(
-		[]string{"404.html"},
+		[]string{"404_subdomain.html"},
 		util.PageInfo{
 			Data: struct {
 				Title              string
@@ -82,11 +80,11 @@ func NotFoundSubdomain(
 				Title:              "Progstack – Site not found",
 				UserInfo:           session.ConvertSessionToUserInfo(sesh),
 				Progstack:          config.Config.Progstack.Progstack,
-				RequestedSubdomain: subdomain,
+				RequestedSubdomain: r.Host,
 				StartURL: fmt.Sprintf(
 					"%s://%s/register",
 					config.Config.Progstack.Protocol,
-					config.Config.Progstack.ServiceName,
+					config.Config.Progstack.RootDomain,
 				),
 			},
 		},
