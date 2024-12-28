@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
 
@@ -46,8 +46,8 @@ func NewInstallationService(
 func (i *InstallationService) InstallationCallback(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("InstallationCallback handler...")
+	sesh := r.Session()
+	sesh.Println("InstallationCallback handler...")
 	if err := i.installationcallback(r); err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (i *InstallationService) InstallationCallback(
 func (i *InstallationService) installationcallback(
 	r request.Request,
 ) error {
-	logger := r.Logger()
+	sesh := r.Session()
 
 	/* validate authenticity using Github webhook secret */
 	if err := validateSignature(
@@ -72,15 +72,15 @@ func (i *InstallationService) installationcallback(
 	}
 	switch eventType := r.GetHeader("X-GitHub-Event"); eventType {
 	case "installation":
-		return handleInstallation(i.client, i.store, body, logger)
+		return handleInstallation(i.client, i.store, body, sesh)
 	case "installation_repositories":
 		return handleInstallationRepositories(
-			i.client, i.store, body, logger,
+			i.client, i.store, body, sesh,
 		)
 	case "push":
-		return handlePush(i.client, i.store, body, logger)
+		return handlePush(i.client, i.store, body, sesh)
 	default:
-		logger.Printf(
+		sesh.Printf(
 			"unhandled event type %q: %s\n",
 			eventType, string(body),
 		)
@@ -89,18 +89,18 @@ func (i *InstallationService) installationcallback(
 }
 
 func handleInstallation(
-	c *httpclient.Client, s *model.Store, body []byte, logger *log.Logger,
+	c *httpclient.Client, s *model.Store, body []byte, sesh *session.Session,
 ) error {
-	logger.Println("handling installation event...")
+	sesh.Println("handling installation event...")
 
 	var event InstallationEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		return err
 	}
 	str, _ := eventToJSON(event)
-	logger.Printf("installation event: %s\n", str)
+	sesh.Printf("installation event: %s\n", str)
 
-	if err := handleInstallationAction(c, s, event, logger); err != nil {
+	if err := handleInstallationAction(c, s, event, sesh); err != nil {
 		return fmt.Errorf("error handling installation action: %w", err)
 	}
 
@@ -126,7 +126,7 @@ func handleInstallation(
 
 func handleInstallationAction(
 	c *httpclient.Client, s *model.Store, event InstallationEvent,
-	logger *log.Logger,
+	sesh *session.Session,
 ) error {
 	account, err := s.GetGithubAccountByGhUserID(context.TODO(), event.Sender.ID)
 	if err != nil {
@@ -139,23 +139,23 @@ func handleInstallationAction(
 	case "created":
 		return handleInstallationCreated(
 			c, s, event.Installation.ID, account.UserID, account.GhEmail,
-			logger,
+			sesh,
 		)
 	case "deleted":
 		return handleInstallationDeleted(
-			c, s, event.Installation.ID, account.UserID, logger,
+			c, s, event.Installation.ID, account.UserID, sesh,
 		)
 	default:
-		logger.Printf("unhandled event action: %s\n", event.Action)
+		sesh.Printf("unhandled event action: %s\n", event.Action)
 		return nil
 	}
 }
 
 func handleInstallationCreated(
 	c *httpclient.Client, s *model.Store, ghInstallationID int64,
-	userID int32, ghEmail string, logger *log.Logger,
+	userID int32, ghEmail string, sesh *session.Session,
 ) error {
-	logger.Println("handling installation created event...")
+	sesh.Println("handling installation created event...")
 	/* get access token */
 	accessToken, err := authn.GetInstallationAccessToken(
 		c,
@@ -168,12 +168,12 @@ func handleInstallationCreated(
 	}
 
 	/* get repositories from Github */
-	repos, err := getReposDetails(c, accessToken, logger)
+	repos, err := getReposDetails(c, accessToken, sesh)
 	if err != nil {
 		return fmt.Errorf("error getting repositories: %w", err)
 	}
 	str, _ := eventToJSON(repos)
-	logger.Printf("repos: %s\n", str)
+	sesh.Printf("repos: %s\n", str)
 
 	/* write installation and repos to db Tx */
 	createInstallationTxParams := buildCreateInstallationTxParams(ghInstallationID, userID, ghEmail, repos)
@@ -209,9 +209,9 @@ type InstallationRepositoriesResponse struct {
 }
 
 func getReposDetails(
-	c *httpclient.Client, accessToken string, logger *log.Logger,
+	c *httpclient.Client, accessToken string, sesh *session.Session,
 ) ([]Repository, error) {
-	logger.Println("getting repositories details...")
+	sesh.Println("getting repositories details...")
 	req, err := util.NewRequestBuilder("GET", ghInstallationRepositoriesUrl).
 		WithHeader("Authorization", fmt.Sprintf("Bearer %s", accessToken)).
 		WithHeader("Accept", "application/vnd.github+json").
@@ -228,7 +228,7 @@ func getReposDetails(
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logger.Printf("error unpacking body: %v\n", err)
+		sesh.Printf("error unpacking body: %v\n", err)
 		return []Repository{}, err
 	}
 
@@ -241,36 +241,36 @@ func getReposDetails(
 
 func handleInstallationDeleted(
 	c *httpclient.Client, s *model.Store, ghInstallationID int64,
-	userID int32, logger *log.Logger,
+	userID int32, sesh *session.Session,
 ) error {
-	logger.Println("handling installation deleted event...")
+	sesh.Println("handling installation deleted event...")
 
 	/* fetch repos associated with installation */
-	logger.Printf("deleting installation %d for user %d...", ghInstallationID, userID)
+	sesh.Printf("deleting installation %d for user %d...", ghInstallationID, userID)
 	repos, err := s.ListBlogsForInstallationByGhInstallationID(context.TODO(), ghInstallationID)
 	if err != nil {
 		return fmt.Errorf("error getting repositories for installation %d: %w", ghInstallationID, err)
 	}
 	/* delete the repos on disk */
-	logger.Println("deleting repos from disk...")
+	sesh.Println("deleting repos from disk...")
 	for _, repo := range repos {
 		path := fmt.Sprintf("%s/%d/%s", config.Config.Progstack.RepositoriesPath, userID, repo.FullName)
-		logger.Printf("deleting repo at `%s' from disk...\n", path)
+		sesh.Printf("deleting repo at `%s' from disk...\n", path)
 		if err := os.RemoveAll(path); err != nil {
 			return fmt.Errorf("error deleting repo `%d' from disk: %w", repo.ID, err)
 		}
 	}
 	/* delete generated websites */
-	logger.Println("deleting generated websites from disk...")
+	sesh.Println("deleting generated websites from disk...")
 	for _, repo := range repos {
 		path := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, repo.Subdomain)
-		logger.Printf("deleting website at `%s' from disk...\n", path)
+		sesh.Printf("deleting website at `%s' from disk...\n", path)
 		if err := os.RemoveAll(path); err != nil {
 			return fmt.Errorf("error deleting website `%s' from disk: %w", repo.Subdomain, err)
 		}
 	}
 	/* cascade delete the installation and associated repos */
-	logger.Printf("deleting installation with ghInstallationID `%d'...\n", ghInstallationID)
+	sesh.Printf("deleting installation with ghInstallationID `%d'...\n", ghInstallationID)
 	if err = s.DeleteInstallationWithGithubInstallationID(context.TODO(), ghInstallationID); err != nil {
 		return fmt.Errorf("error deleting installation: %w", err)
 	}
@@ -278,16 +278,16 @@ func handleInstallationDeleted(
 }
 
 func handleInstallationRepositories(
-	c *httpclient.Client, s *model.Store, body []byte, logger *log.Logger,
+	c *httpclient.Client, s *model.Store, body []byte, sesh *session.Session,
 ) error {
-	logger.Println("handling installation repositories event...")
+	sesh.Println("handling installation repositories event...")
 
 	var event InstallationRepositoriesEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		return fmt.Errorf("error unmarshaling InstallationRepositoriesEvent: %w", err)
 	}
 	str, _ := eventToJSON(event)
-	logger.Printf("installationRepositoriesEvent: %s\n", str)
+	sesh.Printf("installationRepositoriesEvent: %s\n", str)
 
 	/* check that installation exists */
 	_, err := s.GetInstallationByGithubInstallationID(
@@ -300,7 +300,7 @@ func handleInstallationRepositories(
 		)
 	}
 
-	if err := handleInstallationRepositoriesAction(c, s, event, logger); err != nil {
+	if err := handleInstallationRepositoriesAction(c, s, event, sesh); err != nil {
 		return fmt.Errorf(
 			"error handling installation repositories action: %w",
 			err,
@@ -329,7 +329,7 @@ func handleInstallationRepositories(
 
 func handleInstallationRepositoriesAction(
 	c *httpclient.Client, s *model.Store, event InstallationRepositoriesEvent,
-	logger *log.Logger,
+	sesh *session.Session,
 ) error {
 	account, err := s.GetGithubAccountByGhUserID(context.TODO(), event.Sender.ID)
 	if err != nil {
@@ -347,7 +347,7 @@ func handleInstallationRepositoriesAction(
 			event.RepositoriesAdded,
 			account.UserID,
 			account.GhEmail,
-			logger,
+			sesh,
 		)
 	case "removed":
 		return handleInstallationRepositoriesRemoved(
@@ -355,19 +355,19 @@ func handleInstallationRepositoriesAction(
 			s,
 			event.Installation.ID,
 			event.RepositoriesRemoved,
-			logger,
+			sesh,
 		)
 	default:
-		logger.Printf("unhandled event action: %s\n", event.Action)
+		sesh.Printf("unhandled event action: %s\n", event.Action)
 		return nil
 	}
 }
 
 func handleInstallationRepositoriesAdded(
 	c *httpclient.Client, s *model.Store, ghInstallationID int64,
-	repos []Repository, userID int32, email string, logger *log.Logger,
+	repos []Repository, userID int32, email string, sesh *session.Session,
 ) error {
-	logger.Println("handling repositories added event...")
+	sesh.Println("handling repositories added event...")
 
 	for _, repo := range repos {
 		_, err := s.CreateRepository(context.TODO(), model.CreateRepositoryParams{
@@ -391,12 +391,12 @@ func handleInstallationRepositoriesAdded(
 
 func handleInstallationRepositoriesRemoved(
 	c *httpclient.Client, s *model.Store, ghInstallationID int64,
-	repos []Repository, logger *log.Logger,
+	repos []Repository, sesh *session.Session,
 ) error {
-	logger.Println("handling repositories removed event...")
+	sesh.Println("handling repositories removed event...")
 
 	/* delete generated sites from disk, generated sites need subdomain */
-	logger.Println("deleting websites from disk...")
+	sesh.Println("deleting websites from disk...")
 	for _, repo := range repos {
 		path := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, repo.FullName)
 		if err := os.RemoveAll(path); err != nil {
@@ -404,7 +404,7 @@ func handleInstallationRepositoriesRemoved(
 		}
 	}
 	/* delete repostories removed from disk */
-	logger.Println("deleting repositories from disk...")
+	sesh.Println("deleting repositories from disk...")
 	for _, repo := range repos {
 		path := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, repo.FullName)
 		if err := os.RemoveAll(path); err != nil {
@@ -412,7 +412,7 @@ func handleInstallationRepositoriesRemoved(
 		}
 	}
 	/* delete blogs removed from db */
-	logger.Println("deleting blogs from db...")
+	sesh.Println("deleting blogs from db...")
 	for _, repo := range repos {
 		if err := s.DeleteRepositoryWithGhRepositoryID(context.TODO(), repo.ID); err != nil {
 			return fmt.Errorf("error deleting repository with ghRepositoryID `%d': %w", repo.ID, err)
@@ -423,16 +423,16 @@ func handleInstallationRepositoriesRemoved(
 
 func handlePush(
 	c *httpclient.Client, s *model.Store,
-	body []byte, logger *log.Logger,
+	body []byte, sesh *session.Session,
 ) error {
-	logger.Println("handling push event...")
+	sesh.Println("handling push event...")
 
 	var event PushEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		return fmt.Errorf("error unmarshaling push event: %w", err)
 	}
 	str, _ := eventToJSON(event)
-	logger.Printf("push event: %s\n", str)
+	sesh.Printf("push event: %s\n", str)
 
 	/* validate that blog exists for repository */
 	b, err := s.GetBlogByGhRepositoryID(context.TODO(), sql.NullInt64{
@@ -448,7 +448,7 @@ func handlePush(
 		}
 		/* this can happen if user pushes to repo after installing
 		* application without having created an associated blog*/
-		logger.Printf(
+		sesh.Printf(
 			"no associated blog with repositoryID `%d'\n",
 			event.Repository.ID,
 		)
@@ -465,15 +465,15 @@ func handlePush(
 		return fmt.Errorf("blog has no live branch configured")
 	}
 
-	logger.Printf("event branch: `%s'\n", branchName)
-	logger.Printf("live branch: `%s'\n", b.LiveBranch.String)
+	sesh.Printf("event branch: `%s'\n", branchName)
+	sesh.Printf("live branch: `%s'\n", b.LiveBranch.String)
 
 	if branchName != b.LiveBranch.String {
 		/* event does not match live branch */
 		return nil
 	}
 
-	if err := blog.UpdateRepositoryOnDisk(c, s, &b, logger); err != nil {
+	if err := blog.UpdateRepositoryOnDisk(c, s, &b, sesh); err != nil {
 		return fmt.Errorf("error pulling latest changes: %w", err)
 	}
 	return nil

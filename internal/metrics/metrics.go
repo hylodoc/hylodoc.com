@@ -2,14 +2,14 @@ package metrics
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/xr0-org/progstack/internal/logging"
+	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 )
 
 var (
@@ -158,7 +158,8 @@ func (rw *responseWriterWithStatus) Write(b []byte) (int, error) {
 
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+		assert.Assert(ok)
 
 		start := time.Now()
 
@@ -187,7 +188,7 @@ func Middleware(next http.Handler) http.Handler {
 				"none",
 			).Inc()
 		} else {
-			errorType := classifyError(rec.statusCode, logger)
+			errorType := classifyError(rec.statusCode, sesh)
 			httpRequestErrors.WithLabelValues(
 				r.Method,
 				r.URL.Path,
@@ -205,7 +206,7 @@ func Middleware(next http.Handler) http.Handler {
 	})
 }
 
-func classifyError(statusCode int, logger *log.Logger) string {
+func classifyError(statusCode int, sesh *session.Session) string {
 	switch {
 	case statusCode == http.StatusNotFound:
 		return "not_found"
@@ -214,7 +215,7 @@ func classifyError(statusCode int, logger *log.Logger) string {
 	case statusCode >= 500:
 		return "internal"
 	default:
-		logger.Printf("unknown error type: %d", statusCode)
+		sesh.Printf("unknown error type: %d", statusCode)
 		return "unknown"
 	}
 }

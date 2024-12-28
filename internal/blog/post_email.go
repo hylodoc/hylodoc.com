@@ -18,8 +18,8 @@ import (
 func (b *BlogService) SendPostEmail(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("SendPostEmail handler...")
+	sesh := r.Session()
+	sesh.Println("SendPostEmail handler...")
 
 	r.MixpanelTrack("SendPostEmail")
 

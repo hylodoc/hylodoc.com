@@ -3,19 +3,16 @@ package request
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"mime/multipart"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/xr0-org/progstack/internal/analytics"
 	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/session"
 )
 
 type Request interface {
-	Logger() *log.Logger
 	Session() *session.Session
 
 	/* TODO: refactor authn session handling to remove this */
@@ -39,7 +36,6 @@ type request struct {
 
 	w http.ResponseWriter
 
-	logger   *log.Logger
 	sesh     *session.Session
 	mixpanel *analytics.MixpanelClientWrapper
 }
@@ -50,13 +46,11 @@ func NewRequest(
 	return &request{
 		r, false, nil,
 		w,
-		logging.Logger(r),
 		sesh,
 		analytics.NewMixpanelClientWrapper(config.Config.Mixpanel.Token),
 	}
 }
 
-func (r *request) Logger() *log.Logger                 { return r.logger }
 func (r *request) Session() *session.Session           { return r.sesh }
 func (r *request) ResponseWriter() http.ResponseWriter { return r.w }
 
@@ -66,7 +60,7 @@ func (r *request) ReadBody() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		r.Logger().Printf("request body: %s\n", string(body))
+		r.Session().Printf("request body: %s\n", string(body))
 		defer r.r.Body.Close()
 		r._body = body
 		r._readbody = true
@@ -115,6 +109,6 @@ func (r *request) GetRouteVar(key string) (string, bool) {
 
 func (r *request) GetHeader(name string) string {
 	v := r.r.Header.Get(name)
-	r.Logger().Printf("%s: %s\n", name, v)
+	r.Session().Printf("%s: %s\n", name, v)
 	return v
 }

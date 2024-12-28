@@ -3,9 +3,9 @@ package util
 import (
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"path"
+	"strings"
 )
 
 const (
@@ -34,9 +34,12 @@ type PageInfo struct {
 
 func ExecTemplate(
 	w http.ResponseWriter, names []string, info PageInfo,
-	funcMap template.FuncMap, logger *log.Logger,
 ) error {
-	tmpl, err := template.New(names[0]).Funcs(funcMap).ParseFiles(
+	tmpl, err := template.New(names[0]).Funcs(
+		template.FuncMap{
+			"join": strings.Join,
+		},
+	).ParseFiles(
 		append(
 			prependDir(names, "pages"),
 			prependDir(pageTemplates, "partials")...,

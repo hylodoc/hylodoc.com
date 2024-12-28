@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/mixpanel/mixpanel-go"
-	"github.com/xr0-org/progstack/internal/logging"
+	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/session"
 )
 
@@ -24,10 +24,11 @@ func NewMixpanelClientWrapper(token string) *MixpanelClientWrapper {
 }
 
 func (m *MixpanelClientWrapper) Track(event string, r *http.Request) {
-	logger := logging.Logger(r)
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	assert.Assert(ok)
 	go func() {
 		if err := m.track(r, event); err != nil {
-			logger.Printf("Error emitting analytics: %v", err)
+			sesh.Printf("Error emitting analytics: %v", err)
 		}
 	}()
 }

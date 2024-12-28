@@ -27,8 +27,8 @@ type SubdomainRequest struct {
 func (b *BlogService) SubdomainCheck(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("SubdomainCheck handler...")
+	sesh := r.Session()
+	sesh.Println("SubdomainCheck handler...")
 
 	r.MixpanelTrack("SubdomainCheck")
 
@@ -126,8 +126,8 @@ func validateSubdomain(subdomain string) error {
 func (b *BlogService) SubdomainSubmit(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("SubdomainSubmit handler...")
+	sesh := r.Session()
+	sesh.Println("SubdomainSubmit handler...")
 
 	r.MixpanelTrack("SubdomainSubmit")
 
@@ -135,7 +135,7 @@ func (b *BlogService) SubdomainSubmit(
 		Message string `json:"message"`
 	}
 	if err := b.subdomainSubmit(r); err != nil {
-		logger.Println("Error submiting subdomain")
+		sesh.Println("Error submiting subdomain")
 		var customErr *util.CustomError
 		if errors.As(err, &customErr) {
 			return response.NewJson(&submitresp{customErr.Error()})
@@ -190,8 +190,8 @@ func (b *BlogService) subdomainSubmit(r request.Request) error {
 func (b *BlogService) DomainSubmit(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("DomainSubmit handler...")
+	sesh := r.Session()
+	sesh.Println("DomainSubmit handler...")
 
 	r.MixpanelTrack("DomainSubmit")
 
@@ -212,7 +212,7 @@ func (b *BlogService) DomainSubmit(
 
 	domain, err := r.GetPostFormValue("domain")
 	if err != nil {
-		r.Logger().Printf("cannot get post form value: %v\n", err)
+		r.Session().Printf("cannot get post form value: %v\n", err)
 		return nil, util.CreateCustomError(
 			"Error parsing form", http.StatusBadRequest,
 		)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"time"
@@ -29,13 +28,12 @@ func NewUserService(s *model.Store) *UserService {
 }
 
 func (u *UserService) Home(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("Home handler...")
+	sesh := r.Session()
+	sesh.Println("Home handler...")
 
 	r.MixpanelTrack("Home")
 
 	/* get session */
-	sesh := r.Session()
 	blogs, err := blog.GetBlogsInfo(u.store, sesh.GetUserID())
 	if err != nil {
 		return nil, fmt.Errorf("blogs: %w", err)
@@ -60,18 +58,15 @@ func (u *UserService) Home(r request.Request) (response.Response, error) {
 				Blogs:               blogs,
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
 func (u *UserService) CreateNewBlog(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("CreateNewBlog handler...")
+	sesh := r.Session()
+	sesh.Println("CreateNewBlog handler...")
 
 	r.MixpanelTrack("CreateNewBlog")
 
-	sesh := r.Session()
 	if err := authz.CanCreateSite(u.store, sesh); err != nil {
 		return nil, fmt.Errorf("CanCreateSite: %w", err)
 	}
@@ -87,14 +82,12 @@ func (u *UserService) CreateNewBlog(r request.Request) (response.Response, error
 				UserInfo: session.ConvertSessionToUserInfo(sesh),
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
 func (u *UserService) FolderFlow(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Printf("FolderFlow handler...")
+	sesh := r.Session()
+	sesh.Printf("FolderFlow handler...")
 
 	r.MixpanelTrack("FolderFlow")
 
@@ -113,16 +106,14 @@ func (u *UserService) FolderFlow(r request.Request) (response.Response, error) {
 				Themes:      blog.BuildThemes(config.Config.ProgstackSsg.Themes),
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
 func (u *UserService) GithubInstallation(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Printf("GithubInstallation handler...")
+	sesh := r.Session()
+	sesh.Printf("GithubInstallation handler...")
 
 	r.MixpanelTrack("GithubInstallation")
 
@@ -182,8 +173,8 @@ type Repository struct {
 func (u *UserService) RepositoryFlow(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("RepositoryFlow handler...")
+	sesh := r.Session()
+	sesh.Println("RepositoryFlow handler...")
 
 	r.MixpanelTrack("RepositoryFlow")
 
@@ -191,7 +182,6 @@ func (u *UserService) RepositoryFlow(
 		return nil, fmt.Errorf("await update: %w", err)
 	}
 
-	sesh := r.Session()
 	repos, err := u.store.ListOrderedRepositoriesByUserID(
 		context.TODO(), sesh.GetUserID(),
 	)
@@ -223,8 +213,6 @@ func (u *UserService) RepositoryFlow(
 				Themes:         blog.BuildThemes(config.Config.ProgstackSsg.Themes),
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
@@ -263,12 +251,11 @@ type Subscription struct {
 }
 
 func (u *UserService) Account(r request.Request) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("Account handler...")
+	sesh := r.Session()
+	sesh.Println("Account handler...")
 
 	r.MixpanelTrack("Account")
 
-	sesh := r.Session()
 	accountDetails, err := getAccountDetails(u.store, sesh)
 	if err != nil {
 		return nil, fmt.Errorf("account details: %w", err)
@@ -293,8 +280,6 @@ func (u *UserService) Account(r request.Request) (response.Response, error) {
 				StorageDetails: storageDetails,
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 

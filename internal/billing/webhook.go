@@ -15,13 +15,13 @@ import (
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/model"
+	"github.com/xr0-org/progstack/internal/session"
 )
 
 func (b *BillingService) StripeWebhook(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("Stripe webhook...")
+	r.Session().Println("Stripe webhook...")
 	if err := b.stripeWebhook(r); err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func (b *BillingService) StripeWebhook(
 }
 
 func (b *BillingService) stripeWebhook(r request.Request) error {
-	logger := r.Logger()
+	sesh := r.Session()
 
 	payload, err := r.ReadBody()
 	if err != nil {
@@ -42,7 +42,7 @@ func (b *BillingService) stripeWebhook(r request.Request) error {
 		config.Config.Stripe.WebhookSigningSecret,
 	); err != nil {
 		/* TODO: verify */
-		logger.Printf("invalid webhook signature: %s\n", err)
+		sesh.Printf("invalid webhook signature: %s\n", err)
 	}
 
 	event, err := parseEvent(payload)
@@ -52,18 +52,18 @@ func (b *BillingService) stripeWebhook(r request.Request) error {
 	switch event.Type {
 	case "customer.subscription.created":
 		return handleCustomerSubscriptionCreated(
-			b.store, event, logger,
+			b.store, event, sesh,
 		)
 	case "customer.subscription.deleted":
 		return handleCustomerSubscriptionDeleted(
-			b.store, event, logger,
+			b.store, event, sesh,
 		)
 	case "customer.subscription.updated":
 		return handleCustomerSubscriptionUpdated(
-			b.store, event, logger,
+			b.store, event, sesh,
 		)
 	default:
-		logger.Printf(
+		sesh.Printf(
 			"unhandled event type %q: %s\n",
 			event.Type, string(payload),
 		)
@@ -77,23 +77,23 @@ func parseEvent(payload []byte) (*stripe.Event, error) {
 }
 
 func handleCustomerSubscriptionCreated(
-	s *model.Store, e *stripe.Event, logger *log.Logger,
+	s *model.Store, e *stripe.Event, sesh *session.Session,
 ) error {
-	logger.Println("customer.subscription.created event...")
+	sesh.Println("customer.subscription.created event...")
 
 	var sub stripe.Subscription
 	if err := json.Unmarshal(e.Data.Raw, &sub); err != nil {
 		return fmt.Errorf("error unmarshalling: %w", err)
 	}
-	logger.Printf("customer.subscription.created event: %v", sub)
+	sesh.Printf("customer.subscription.created event: %v", sub)
 
 	return nil
 }
 
 func handleCustomerSubscriptionDeleted(
-	s *model.Store, e *stripe.Event, logger *log.Logger,
+	s *model.Store, e *stripe.Event, sesh *session.Session,
 ) error {
-	logger.Println("customer.subscription.deleted event...")
+	sesh.Println("customer.subscription.deleted event...")
 
 	/* handle subscription deleted */
 
@@ -101,15 +101,15 @@ func handleCustomerSubscriptionDeleted(
 }
 
 func handleCustomerSubscriptionUpdated(
-	s *model.Store, e *stripe.Event, logger *log.Logger,
+	s *model.Store, e *stripe.Event, sesh *session.Session,
 ) error {
-	logger.Println("customer.subscription.updated event...")
+	sesh.Println("customer.subscription.updated event...")
 
 	var sub stripe.Subscription
 	if err := json.Unmarshal(e.Data.Raw, &sub); err != nil {
 		return fmt.Errorf("error unmarshalling: %w", err)
 	}
-	logger.Printf("customer.subscription.updated event: %v", sub)
+	sesh.Printf("customer.subscription.updated event: %v", sub)
 
 	expSub, err := fetchExpandedSubscription(sub.ID)
 	if err != nil {
@@ -117,15 +117,15 @@ func handleCustomerSubscriptionUpdated(
 			"error fetching expanded subscription: %w", err,
 		)
 	}
-	logger.Printf("customer.subscription.updated expanded sub: %v\n", expSub)
+	sesh.Printf("customer.subscription.updated expanded sub: %v\n", expSub)
 
-	logger.Printf("data: %v\n", expSub.Items.Data)
+	sesh.Printf("data: %v\n", expSub.Items.Data)
 
 	planName, err := getCustomerProductName(sub.Customer.ID)
 	if err != nil {
 		return fmt.Errorf("Error getting plan name: %w", err)
 	}
-	logger.Printf("Plan name: %s\n", planName)
+	sesh.Printf("Plan name: %s\n", planName)
 
 	/* update subscription */
 	if err := s.UpdateStripeSubscription(

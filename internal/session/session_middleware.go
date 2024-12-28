@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xr0-org/progstack/internal/logging"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
@@ -25,7 +24,7 @@ func NewSessionService(s *model.Store) *SessionService {
 
 func (s *SessionService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
+		logger := newAnonymousLoggerFromRequest(r)
 
 		cookie, err := r.Cookie(CookieName)
 		if err != nil {

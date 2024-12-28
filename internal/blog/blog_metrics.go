@@ -26,12 +26,11 @@ type SiteData struct {
 func (b *BlogService) SiteMetrics(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("SiteMetrics handler...")
+	sesh := r.Session()
+	sesh.Println("SiteMetrics handler...")
 
 	r.MixpanelTrack("SiteMetrics")
 
-	sesh := r.Session()
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
 		return nil, util.CreateCustomError("", http.StatusNotFound)
@@ -66,8 +65,6 @@ func (b *BlogService) SiteMetrics(
 				PostData: data,
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 

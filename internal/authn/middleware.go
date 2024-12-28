@@ -3,24 +3,18 @@ package authn
 import (
 	"net/http"
 
-	"github.com/xr0-org/progstack/internal/logging"
+	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/session"
 )
 
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := logging.Logger(r)
-
 		/* get session from context */
-		session, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		if !ok || session == nil {
-			logger.Println("no session")
-			http.Error(w, "", http.StatusNotFound)
-			return
-		}
+		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+		assert.Assert(ok)
 		/* check if the session is authenticated (i.e., UserID is not * nil) */
-		if session.GetUserID() == -1 {
-			logger.Printf("not authorized")
+		if sesh.GetUserID() == -1 {
+			sesh.Printf("not authorized")
 			http.Error(w, "", http.StatusNotFound)
 			return
 		}

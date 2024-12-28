@@ -6,9 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -38,12 +36,11 @@ func NewBlogService(
 func (b *BlogService) Config(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("Blog Config handler...")
+	sesh := r.Session()
+	sesh.Println("Blog Config handler...")
 
 	r.MixpanelTrack("Config")
 
-	sesh := r.Session()
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
 		return nil, util.CreateCustomError("", http.StatusNotFound)
@@ -76,8 +73,6 @@ func (b *BlogService) Config(
 				CurrentTheme: string(blogInfo.Theme),
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
@@ -99,8 +94,8 @@ func ConvertCentsToDollars(cents int64) string {
 func (b *BlogService) ThemeSubmit(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("ThemeSubmit handler...")
+	sesh := r.Session()
+	sesh.Println("ThemeSubmit handler...")
 
 	r.MixpanelTrack("ThemeSubmit")
 
@@ -149,8 +144,8 @@ func (b *BlogService) ThemeSubmit(
 func (b *BlogService) TestBranchSubmit(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("TestBranchSubmit handler...")
+	sesh := r.Session()
+	sesh.Println("TestBranchSubmit handler...")
 
 	r.MixpanelTrack("TestBranchSubmit")
 
@@ -195,8 +190,8 @@ func (b *BlogService) TestBranchSubmit(
 func (b *BlogService) LiveBranchSubmit(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("LiveBranchSubmit handler...")
+	sesh := r.Session()
+	sesh.Println("LiveBranchSubmit handler...")
 
 	r.MixpanelTrack("LiveBranchSubmit")
 
@@ -244,8 +239,8 @@ func (b *BlogService) LiveBranchSubmit(
 func (b *BlogService) FolderSubmit(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("FolderSubmit handler...")
+	sesh := r.Session()
+	sesh.Println("FolderSubmit handler...")
 
 	r.MixpanelTrack("FolderSubmit")
 
@@ -259,7 +254,7 @@ func (b *BlogService) FolderSubmit(
 }
 
 func (b *BlogService) folderSubmit(r request.Request) error {
-	logger := r.Logger()
+	sesh := r.Session()
 
 	src, err := getUploadedFolderPath(r)
 	if err != nil {
@@ -285,7 +280,7 @@ func (b *BlogService) folderSubmit(r request.Request) error {
 		return fmt.Errorf("clear and extract: %w", err)
 	}
 
-	if _, err := setBlogToLive(&blog, b.store, logger); err != nil {
+	if _, err := setBlogToLive(&blog, b.store, sesh); err != nil {
 		return fmt.Errorf("set blog to live: %w", err)
 	}
 	return nil
@@ -305,10 +300,10 @@ func clearAndExtract(src, dst string) error {
 }
 
 func getUploadedFolderPath(r request.Request) (string, error) {
-	logger := r.Logger()
+	sesh := r.Session()
 	file, header, err := r.GetFormFile("folder")
 	if err != nil {
-		logger.Printf("error reading file: %v\n", err)
+		sesh.Printf("error reading file: %v\n", err)
 		return "", util.CreateCustomError(
 			"Invalid file",
 			http.StatusBadRequest,
@@ -317,7 +312,7 @@ func getUploadedFolderPath(r request.Request) (string, error) {
 	defer file.Close()
 
 	if !isValidFileType(header.Filename) {
-		logger.Printf(
+		sesh.Printf(
 			"invalid file extension for `%s'\n", header.Filename,
 		)
 		return "", util.CreateCustomError(
@@ -340,8 +335,8 @@ func getUploadedFolderPath(r request.Request) (string, error) {
 func (b *BlogService) SetStatusSubmit(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("SetStatusSubmit handler...")
+	sesh := r.Session()
+	sesh.Println("SetStatusSubmit handler...")
 
 	r.MixpanelTrack("SetStatusSubmit")
 
@@ -365,7 +360,7 @@ func (b *BlogService) SetStatusSubmit(
 func (b *BlogService) setStatusSubmit(
 	r request.Request,
 ) (*statusChangeResponse, error) {
-	logger := r.Logger()
+	sesh := r.Session()
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
@@ -389,7 +384,7 @@ func (b *BlogService) setStatusSubmit(
 
 	change, err := handleStatusChange(
 		int32(intBlogID),
-		req.IsLive, r.Session().GetEmail(), b.store, logger,
+		req.IsLive, r.Session().GetEmail(), b.store, sesh,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("handle status change: %w", err)
@@ -409,7 +404,7 @@ func (resp *statusChangeResponse) message() string {
 }
 
 func handleStatusChange(
-	blogID int32, islive bool, email string, s *model.Store, logger *log.Logger,
+	blogID int32, islive bool, email string, s *model.Store, sesh *session.Session,
 ) (*statusChangeResponse, error) {
 	blog, err := s.GetBlogByID(context.TODO(), blogID)
 	if err != nil {
@@ -419,7 +414,7 @@ func handleStatusChange(
 		return nil, fmt.Errorf("invalid status change: %w", err)
 	}
 	if islive {
-		return setBlogToLive(&blog, s, logger)
+		return setBlogToLive(&blog, s, sesh)
 	} else {
 		return setBlogToOffline(&blog, s)
 	}
@@ -440,7 +435,7 @@ func validateStatusChange(blogID int32, islive bool, s *model.Store) error {
 }
 
 func setBlogToLive(
-	b *model.Blog, s *model.Store, logger *log.Logger,
+	b *model.Blog, s *model.Store, sesh *session.Session,
 ) (*statusChangeResponse, error) {
 	if err := s.SetBlogToLive(context.TODO(), b.ID); err != nil {
 		return nil, err
@@ -463,12 +458,11 @@ func setBlogToOffline(
 func (b *BlogService) ConfigDomain(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("ConfigDomain handler...")
+	sesh := r.Session()
+	sesh.Println("ConfigDomain handler...")
 
 	r.MixpanelTrack("ConfigDomain")
 
-	sesh := r.Session()
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
 		return nil, fmt.Errorf("no blogID")
@@ -496,16 +490,14 @@ func (b *BlogService) ConfigDomain(
 				Blog:     blogInfo,
 			},
 		},
-		template.FuncMap{},
-		logger,
 	), nil
 }
 
 func (b *BlogService) SyncRepository(
 	r request.Request,
 ) (response.Response, error) {
-	logger := r.Logger()
-	logger.Println("SyncRepository handler...")
+	sesh := r.Session()
+	sesh.Println("SyncRepository handler...")
 
 	r.MixpanelTrack("SyncRepository")
 
@@ -523,7 +515,7 @@ func (b *BlogService) SyncRepository(
 		return nil, fmt.Errorf("error getting blog `%d': %w", intBlogID, err)
 	}
 	if err := UpdateRepositoryOnDisk(
-		b.client, b.store, &blog, logger,
+		b.client, b.store, &blog, sesh,
 	); err != nil {
 		return nil, fmt.Errorf("update error: %w", err)
 	}
