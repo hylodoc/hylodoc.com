@@ -83,12 +83,17 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 
 	r := mux.NewRouter()
 
-	r.NotFoundHandler = http.HandlerFunc(handler.NotFound)
-
 	/* middleware */
 	r.Use(session.NewSessionService(store).Middleware)
 	r.Use(metrics.Middleware)
 	r.Use(routing.NewRoutingService(store).Middleware)
+
+	notfoundR := mux.NewRouter()
+	notfoundR.Use(session.NewSessionService(store).Middleware)
+	notfoundR.Use(metrics.Middleware)
+	notfoundR.Use(routing.NewRoutingService(store).Middleware)
+	notfoundR.PathPrefix("/").HandlerFunc(handler.NotFound)
+	r.NotFoundHandler = notfoundR
 
 	/* public routes */
 
@@ -100,6 +105,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	metrics.Initialize()
 
 	handler.Handle(r, "/", index)
+
 	authNService := authn.NewAuthNService(httpClient, store)
 	handler.Handle(r, "/register", authNService.Register)
 	handler.Handle(r, "/login", authNService.Login)

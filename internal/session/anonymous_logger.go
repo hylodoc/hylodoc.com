@@ -13,13 +13,15 @@ type anonymousLogger struct {
 }
 
 func newAnonymousLogger(id string) *anonymousLogger {
-	return &anonymousLogger{
-		log.New(
-			log.Writer(),
-			fmt.Sprintf("[%s] ", id),
-			log.LstdFlags,
-		),
-	}
+	return &anonymousLogger{prefixedLogger(id)}
+}
+
+func prefixedLogger(prefix string) *log.Logger {
+	return log.New(
+		log.Writer(),
+		fmt.Sprintf("[%s] ", prefix),
+		log.LstdFlags|log.Lmsgprefix,
+	)
 }
 
 func newAnonymousLoggerFromRequest(r *http.Request) *anonymousLogger {
@@ -32,9 +34,5 @@ func newAnonymousLoggerFromRequest(r *http.Request) *anonymousLogger {
 
 func (logger *anonymousLogger) toSessionLogger(sessionid string) *log.Logger {
 	logger.Printf("Session: %s\n", sessionid)
-	return log.New(
-		log.Writer(),
-		fmt.Sprintf("[%s] ", sessionid),
-		log.LstdFlags,
-	)
+	return prefixedLogger(sessionid)
 }

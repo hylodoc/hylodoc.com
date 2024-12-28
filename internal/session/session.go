@@ -155,8 +155,13 @@ func GetSession(
 	if err == nil {
 		logger.Printf("Found unauth session\n")
 		return &Session{
-			id:        unauth.ID,
-			expiresAt: unauth.ExpiresAt,
+			unauth.ID,
+			nil, nil, nil,
+			false,
+			nil,
+			unauth.ExpiresAt,
+			false,
+			logger.toSessionLogger(unauth.ID.String()),
 		}, nil
 	}
 	if err != sql.ErrNoRows {

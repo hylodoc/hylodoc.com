@@ -22,7 +22,7 @@ func Handle(r *mux.Router, pattern string, h handlerfunc) *mux.Route {
 				sesh, ok := r.Context().Value(
 					session.CtxSessionKey,
 				).(*session.Session)
-				assert.Printf(ok, "no session")
+				assert.Assert(ok)
 
 				/* TODO: error pages */
 				if errors.Is(err, authz.SubscriptionError) {
@@ -57,7 +57,7 @@ func execute(h handlerfunc, w http.ResponseWriter, r *http.Request) error {
 	sesh, ok := r.Context().Value(
 		session.CtxSessionKey,
 	).(*session.Session)
-	assert.Printf(ok, "no session")
+	assert.Assert(ok)
 
 	resp, err := h(request.NewRequest(r, w, sesh))
 	if err != nil {

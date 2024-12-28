@@ -22,12 +22,15 @@ func NewRoutingService(s *model.Store) *RoutingService {
 
 func (s *RoutingService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		assert.Assert(ok)
 		if err := s.tryRenderUsersite(w, r); err != nil {
 			if errors.Is(err, usersite.ErrIsService) {
 				next.ServeHTTP(w, r)
 			} else {
+				sesh, ok := r.Context().Value(
+					session.CtxSessionKey,
+				).(*session.Session)
+				assert.Assert(ok)
+				assert.Assert(sesh != nil)
 				sesh.Println("unknown host error:", err)
 				/* TODO: unknown host pages */
 				if errors.Is(err, usersite.ErrUnknownSubdomain) {

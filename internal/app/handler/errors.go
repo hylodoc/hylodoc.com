@@ -12,7 +12,7 @@ import (
 
 func internalServerError(w http.ResponseWriter, r *http.Request) {
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-	assert.Printf(ok, "no session")
+	assert.Assert(ok)
 	w.WriteHeader(http.StatusInternalServerError)
 	if err := response.NewTemplate(
 		[]string{"500.html"},
@@ -39,7 +39,8 @@ func internalServerError(w http.ResponseWriter, r *http.Request) {
 
 func NotFound(w http.ResponseWriter, r *http.Request) {
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-	assert.Printf(ok, "no session")
+	assert.Assert(ok)
+	sesh.Println("404", r.URL)
 	w.WriteHeader(http.StatusNotFound)
 	if err := response.NewTemplate(
 		[]string{"404.html"},

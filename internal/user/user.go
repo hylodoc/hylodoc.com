@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -298,18 +297,18 @@ func getStorageDetails(s *model.Store, session *session.Session) (StorageDetails
 	}, nil
 }
 
-func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails, error) {
+func getAccountDetails(s *model.Store, sesh *session.Session) (AccountDetails, error) {
 	/* get github info */
 	accountDetails := AccountDetails{
-		Username:        session.GetUsername(),
-		Email:           session.GetEmail(),
+		Username:        sesh.GetUsername(),
+		Email:           sesh.GetEmail(),
 		IsLinked:        false,
 		HasInstallation: false,
 		GithubEmail:     "",
 	}
 	linked := true
 	ghAccount, err := s.GetGithubAccountByUserID(
-		context.TODO(), session.GetUserID(),
+		context.TODO(), sesh.GetUserID(),
 	)
 	if err != nil {
 		if err != sql.ErrNoRows {
@@ -326,7 +325,7 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 	}
 
 	hasInstallation, err := s.InstallationExistsForUserID(
-		context.TODO(), session.GetUserID(),
+		context.TODO(), sesh.GetUserID(),
 	)
 	if err != nil {
 		return AccountDetails{}, fmt.Errorf(
@@ -339,7 +338,7 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 
 	/* get stripe subscription */
 	sub, err := s.GetStripeSubscriptionByUserID(
-		context.TODO(), session.GetUserID(),
+		context.TODO(), sesh.GetUserID(),
 	)
 	if err != nil {
 		return AccountDetails{}, fmt.Errorf(
@@ -347,7 +346,7 @@ func getAccountDetails(s *model.Store, session *session.Session) (AccountDetails
 			err,
 		)
 	}
-	log.Printf("subName: %s modelName: %s", sub.SubName, model.SubNameScout)
+	sesh.Printf("subName: %s modelName: %s", sub.SubName, model.SubNameScout)
 
 	accountDetails.Subscription = Subscription{
 		Plan: string(sub.SubName),
