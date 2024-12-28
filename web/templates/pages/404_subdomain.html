@@ -1,0 +1,15 @@
+{{ template "header" . }}
+
+<div class="container">
+	<h2>Site not found</h2>
+	<p>{{ .Data.RequestedSubdomain }} does not exist.</p>
+	<p>
+		But not all who wander are lost.
+		Start a {{ .Data.Progstack }} and claim this URL today
+	</p>
+	<a class="button" href="{{ .Data.StartURL }}">
+		Start a {{ .Data.Progstack }}
+	</a>
+</div>
+
+{{ template "footer" . }}

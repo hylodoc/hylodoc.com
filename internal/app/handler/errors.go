@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/xr0-org/progstack/internal/app/handler/response"
@@ -51,6 +52,42 @@ func NotFound(w http.ResponseWriter, r *http.Request) {
 			}{
 				Title:    "Progstack – Page not found",
 				UserInfo: session.ConvertSessionToUserInfo(sesh),
+			},
+		},
+	).Respond(w, r); err != nil {
+		sesh.Println(
+			"pathological error:",
+			err,
+		)
+	}
+}
+
+func NotFoundSubdomain(
+	w http.ResponseWriter, r *http.Request, subdomain string,
+) {
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	assert.Assert(ok)
+	sesh.Println("404 (subdomain)", subdomain, r.URL)
+	w.WriteHeader(http.StatusNotFound)
+	if err := response.NewTemplate(
+		[]string{"404.html"},
+		util.PageInfo{
+			Data: struct {
+				Title              string
+				UserInfo           *session.UserInfo
+				Progstack          string
+				RequestedSubdomain string
+				StartURL           string
+			}{
+				Title:              "Progstack – Site not found",
+				UserInfo:           session.ConvertSessionToUserInfo(sesh),
+				Progstack:          config.Config.Progstack.Progstack,
+				RequestedSubdomain: subdomain,
+				StartURL: fmt.Sprintf(
+					"%s://%s/register",
+					config.Config.Progstack.Protocol,
+					config.Config.Progstack.ServiceName,
+				),
 			},
 		},
 	).Respond(w, r); err != nil {

@@ -29,8 +29,9 @@ type Configuration struct {
 }
 
 type ProgstackParams struct {
+	Progstack         string `mapstructure:"progstack"`
 	Protocol          string `mapstructure:"protocol"`
-	ServiceName       string `mapstructure:"service_name"`
+	RootDomain        string `mapstructure:"root_domain"`
 	RepositoriesPath  string `mapstructure:"repositories_path"`
 	FoldersPath       string `mapstructure:"folders_path"`
 	CertsPath         string `mapstructure:"certs_path"`
