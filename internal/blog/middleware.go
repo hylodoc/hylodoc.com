@@ -2,56 +2,58 @@ package blog
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/xr0-org/progstack/internal/app/handler"
 	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
+	"github.com/xr0-org/progstack/internal/util"
 )
 
 func (b *BlogService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		/* authorise blog */
-		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
-		assert.Assert(ok)
-
-		sesh.Println("Running blog authorisation middleware...")
-
-		/* blogID and userID */
-		blogID := mux.Vars(r)["blogID"]
-		userID := sesh.GetUserID()
-
-		intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-		if err != nil {
-			sesh.Printf("Error converting string path var to blogID: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-		userOwnsBlog, err := b.store.CheckBlogOwnership(
-			context.TODO(), model.CheckBlogOwnershipParams{
-				ID:     int32(intBlogID),
-				UserID: userID,
-			})
-		if err != nil {
-			sesh.Printf("Error checking blog ownership: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-		if !userOwnsBlog {
-			sesh.Printf("User `%d' does not own blog `%d'\n", userID, intBlogID)
-			http.Error(w, "", http.StatusNotFound)
-			return
-		}
-
-		if _, err := GetFreshGeneration(
-			int32(intBlogID), b.store,
-		); err != nil {
-			sesh.Printf("Error getting fresh generation: %v\n", err)
-			http.Error(w, "", http.StatusInternalServerError)
+		if err := b.middleware(w, r); err != nil {
+			handler.HandleError(w, r, err)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (b *BlogService) middleware(w http.ResponseWriter, r *http.Request) error {
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	assert.Assert(ok)
+
+	sesh.Println("Running blog authorisation middleware...")
+
+	userID := sesh.GetUserID()
+
+	intBlogID, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
+	if err != nil {
+		return fmt.Errorf("parse blogID: %w", err)
+	}
+	blogID := int32(intBlogID)
+
+	userOwnsBlog, err := b.store.CheckBlogOwnership(
+		context.TODO(), model.CheckBlogOwnershipParams{
+			ID:     blogID,
+			UserID: userID,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("check user owns blog: %w", err)
+	}
+	if !userOwnsBlog {
+		sesh.Printf("user `%d' does not own blog `%d'\n", userID, blogID)
+		return util.CreateCustomError("", http.StatusNotFound)
+	}
+
+	if _, err := GetFreshGeneration(blogID, b.store); err != nil {
+		return fmt.Errorf("get fresh generation: %w", err)
+	}
+	return nil
 }

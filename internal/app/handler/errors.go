@@ -1,15 +1,45 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/assert"
+	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 )
+
+func HandleError(w http.ResponseWriter, r *http.Request, err error) {
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	assert.Assert(ok)
+
+	/* TODO: error pages */
+	if errors.Is(err, authz.SubscriptionError) {
+		sesh.Println("authz error:", err)
+		http.Error(
+			w, "", http.StatusUnauthorized,
+		)
+		return
+	}
+
+	if err, ok := asCustomError(err); ok {
+		sesh.Println("custom error:", err)
+		http.Error(w, err.Error(), err.Code)
+		return
+	}
+
+	sesh.Println("internal server error:", err)
+	internalServerError(w, r)
+}
+
+func asCustomError(err error) (*util.CustomError, bool) {
+	var customErr *util.CustomError
+	return customErr, errors.As(err, &customErr)
+}
 
 func internalServerError(w http.ResponseWriter, r *http.Request) {
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)

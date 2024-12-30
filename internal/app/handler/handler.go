@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -9,9 +8,7 @@ import (
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/assert"
-	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
 )
 
 func Handle(r *mux.Router, pattern string, h handlerfunc) *mux.Route {
@@ -19,36 +16,10 @@ func Handle(r *mux.Router, pattern string, h handlerfunc) *mux.Route {
 		pattern,
 		func(w http.ResponseWriter, r *http.Request) {
 			if err := execute(h, w, r); err != nil {
-				sesh, ok := r.Context().Value(
-					session.CtxSessionKey,
-				).(*session.Session)
-				assert.Assert(ok)
-
-				/* TODO: error pages */
-				if errors.Is(err, authz.SubscriptionError) {
-					sesh.Println("authz error:", err)
-					http.Error(
-						w, "", http.StatusUnauthorized,
-					)
-					return
-				}
-
-				if err, ok := asCustomError(err); ok {
-					sesh.Println("custom error:", err)
-					http.Error(w, err.Error(), err.Code)
-					return
-				}
-
-				sesh.Println("internal server error:", err)
-				internalServerError(w, r)
+				HandleError(w, r, err)
 			}
 		},
 	)
-}
-
-func asCustomError(err error) (*util.CustomError, bool) {
-	var customErr *util.CustomError
-	return customErr, errors.As(err, &customErr)
 }
 
 type handlerfunc func(request.Request) (response.Response, error)
