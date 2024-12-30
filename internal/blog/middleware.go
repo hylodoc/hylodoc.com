@@ -11,7 +11,6 @@ import (
 	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
 )
 
 func (b *BlogService) Middleware(next http.Handler) http.Handler {
@@ -52,7 +51,7 @@ func (b *BlogService) middleware(w http.ResponseWriter, r *http.Request) error {
 	}
 	if !userOwnsBlog {
 		sesh.Printf("user `%d' does not own blog `%d'\n", userID, blogID)
-		return util.CreateCustomError("", http.StatusNotFound)
+		return createCustomError("", http.StatusNotFound)
 	}
 
 	if _, err := GetFreshGeneration(blogID, b.store); err != nil {

@@ -43,7 +43,7 @@ func (b *BlogService) SubscriberMetrics(
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {

@@ -43,7 +43,7 @@ func (b *BlogService) Config(
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -101,7 +101,7 @@ func (b *BlogService) ThemeSubmit(
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -151,7 +151,7 @@ func (b *BlogService) TestBranchSubmit(
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -197,7 +197,7 @@ func (b *BlogService) LiveBranchSubmit(
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -263,7 +263,7 @@ func (b *BlogService) folderSubmit(r request.Request) error {
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return util.CreateCustomError("", http.StatusNotFound)
+		return createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -304,7 +304,7 @@ func getUploadedFolderPath(r request.Request) (string, error) {
 	file, header, err := r.GetFormFile("folder")
 	if err != nil {
 		sesh.Printf("error reading file: %v\n", err)
-		return "", util.CreateCustomError(
+		return "", createCustomError(
 			"Invalid file",
 			http.StatusBadRequest,
 		)
@@ -315,7 +315,7 @@ func getUploadedFolderPath(r request.Request) (string, error) {
 		sesh.Printf(
 			"invalid file extension for `%s'\n", header.Filename,
 		)
-		return "", util.CreateCustomError(
+		return "", createCustomError(
 			"Must upload a .zip file",
 			http.StatusBadRequest,
 		)
@@ -346,7 +346,7 @@ func (b *BlogService) SetStatusSubmit(
 
 	change, err := b.setStatusSubmit(r)
 	if err != nil {
-		var customErr *util.CustomError
+		var customErr *customError
 		if errors.As(err, &customErr) {
 			return response.NewJson(&resp{customErr.Error()})
 		} else {
@@ -364,7 +364,7 @@ func (b *BlogService) setStatusSubmit(
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {
@@ -426,7 +426,7 @@ func validateStatusChange(blogID int32, islive bool, s *model.Store) error {
 		return fmt.Errorf("islive error: %w", err)
 	}
 	if islive == blogIsLive {
-		return util.CreateCustomError(
+		return createCustomError(
 			"cannot update to same state",
 			http.StatusBadRequest,
 		)
@@ -503,7 +503,7 @@ func (b *BlogService) SyncRepository(
 
 	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
 	if err != nil {

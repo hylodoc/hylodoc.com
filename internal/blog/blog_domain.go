@@ -18,7 +18,6 @@ import (
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/util"
 )
 
 type SubdomainRequest struct {
@@ -38,7 +37,7 @@ func (b *BlogService) SubdomainCheck(
 		Message   string `json:"message"`
 	}
 	if err := b.subdomainCheck(r); err != nil {
-		var customErr *util.CustomError
+		var customErr *customError
 		if errors.As(err, &customErr) {
 			return response.NewJson(
 				checkresp{false, customErr.Error()},
@@ -62,7 +61,7 @@ func (b *BlogService) subdomainCheck(r request.Request) error {
 	if err != nil {
 		var parseErr dns.ParseUserError
 		if errors.As(err, &parseErr) {
-			return util.CreateCustomError(
+			return createCustomError(
 				parseErr.Error(),
 				http.StatusBadRequest,
 			)
@@ -74,7 +73,7 @@ func (b *BlogService) subdomainCheck(r request.Request) error {
 		return fmt.Errorf("error checking for subdomain in db: %w", err)
 	}
 	if exists {
-		return util.CreateCustomError(
+		return createCustomError(
 			"subdomain already exists",
 			http.StatusBadRequest,
 		)
@@ -84,14 +83,14 @@ func (b *BlogService) subdomainCheck(r request.Request) error {
 
 func validateSubdomain(subdomain string) error {
 	if len(subdomain) < 1 || len(subdomain) > 63 {
-		return util.CreateCustomError(
+		return createCustomError(
 			"Subdomain must be between 1 and 63 characters long",
 			http.StatusBadRequest,
 		)
 	}
 	for _, r := range subdomain {
 		if unicode.IsSpace(r) {
-			return util.CreateCustomError(
+			return createCustomError(
 				"Subdomain cannot contain spaces.",
 				http.StatusBadRequest,
 			)
@@ -100,14 +99,14 @@ func validateSubdomain(subdomain string) error {
 	previousChar := ' ' /* start with a space to avoid consecutive check on the first character */
 	for _, r := range subdomain {
 		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-') {
-			return util.CreateCustomError(
+			return createCustomError(
 				"Subdomain can only contain letters, numbers, and hyphens.",
 				http.StatusBadRequest,
 			)
 		}
 		/* check for consecutive hyphens */
 		if r == '-' && previousChar == '-' {
-			return util.CreateCustomError(
+			return createCustomError(
 				"Subdomain cannot contain consecutive hyphens.",
 				http.StatusBadRequest,
 			)
@@ -116,7 +115,7 @@ func validateSubdomain(subdomain string) error {
 	}
 	/* check that it does not start or end with a hyphen */
 	if subdomain[0] == '-' || subdomain[len(subdomain)-1] == '-' {
-		return util.CreateCustomError(
+		return createCustomError(
 			"Subdomain cannot start or end with a hyphen.",
 			http.StatusBadRequest,
 		)
@@ -137,7 +136,7 @@ func (b *BlogService) SubdomainSubmit(
 	}
 	if err := b.subdomainSubmit(r); err != nil {
 		sesh.Println("Error submiting subdomain")
-		var customErr *util.CustomError
+		var customErr *customError
 		if errors.As(err, &customErr) {
 			return response.NewJson(&submitresp{customErr.Error()})
 		} else {
@@ -161,7 +160,7 @@ func (b *BlogService) subdomainSubmit(r request.Request) error {
 	if err != nil {
 		var parseErr dns.ParseUserError
 		if errors.As(err, &parseErr) {
-			return util.CreateCustomError(
+			return createCustomError(
 				parseErr.Error(),
 				http.StatusBadRequest,
 			)
@@ -184,7 +183,7 @@ func (b *BlogService) subdomainSubmit(r request.Request) error {
 		},
 	); err != nil {
 		if isUniqueSubdomainViolation(err) {
-			return util.CreateCustomError(
+			return createCustomError(
 				"subdomain already exists",
 				http.StatusBadRequest,
 			)
@@ -217,7 +216,7 @@ func (b *BlogService) DomainSubmit(
 
 	blogIDRaw, ok := r.GetRouteVar("blogID")
 	if !ok {
-		return nil, util.CreateCustomError("", http.StatusNotFound)
+		return nil, createCustomError("", http.StatusNotFound)
 	}
 	blogID, err := strconv.ParseInt(blogIDRaw, 10, 32)
 	if err != nil {
@@ -227,7 +226,7 @@ func (b *BlogService) DomainSubmit(
 	domain, err := r.GetPostFormValue("domain")
 	if err != nil {
 		r.Session().Printf("cannot get post form value: %v\n", err)
-		return nil, util.CreateCustomError(
+		return nil, createCustomError(
 			"Error parsing form", http.StatusBadRequest,
 		)
 	}

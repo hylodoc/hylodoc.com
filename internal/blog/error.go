@@ -1,18 +1,18 @@
-package util
+package blog
 
-type CustomError struct {
+type customError struct {
 	Message string /* Message for user */
 	Code    int    /* HTTP status Code (optional) */
 }
 
-func CreateCustomError(Message string, Code int) *CustomError {
-	return &CustomError{
+func createCustomError(Message string, Code int) *customError {
+	return &customError{
 		Message: Message,
 		Code:    Code,
 	}
 }
 
 /* implements the error interface */
-func (e *CustomError) Error() string {
+func (e *customError) Error() string {
 	return e.Message
 }

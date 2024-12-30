@@ -23,7 +23,6 @@ import (
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
 )
 
 type CreateBlogResponse struct {
@@ -52,7 +51,7 @@ func (b *BlogService) CreateRepositoryBlog(
 		return nil, fmt.Errorf("read body: %w", err)
 	}
 	if err := json.Unmarshal(body, &req); err != nil {
-		return nil, util.CreateCustomError(
+		return nil, createCustomError(
 			"error decoding request body",
 			http.StatusBadRequest,
 		)
@@ -210,12 +209,12 @@ func (b *BlogService) CreateFolderBlog(
 
 	subdomain, err := r.GetFormValue("subdomain")
 	if err != nil {
-		return nil, util.CreateCustomError(
+		return nil, createCustomError(
 			"Invalid subdomain", http.StatusBadRequest,
 		)
 	}
 	if subdomain == "" {
-		return nil, util.CreateCustomError(
+		return nil, createCustomError(
 			"Subdomain is required", http.StatusBadRequest,
 		)
 	}
@@ -225,7 +224,7 @@ func (b *BlogService) CreateFolderBlog(
 	}
 	theme, err := validateTheme(rawtheme)
 	if err != nil {
-		return nil, util.CreateCustomError(
+		return nil, createCustomError(
 			"Invalid theme",
 			http.StatusBadRequest,
 		)
