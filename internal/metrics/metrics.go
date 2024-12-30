@@ -158,6 +158,13 @@ func (rw *responseWriterWithStatus) Write(b []byte) (int, error) {
 
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		/*
+		 * XXX: Do not introduce errors into this middleware until it is
+		 * absorbed into something consistent with our handler package,
+		 * because doing so would lead to those errors showing to the
+		 * user.
+		 */
+
 		sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 		assert.Assert(ok)
 

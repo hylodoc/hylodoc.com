@@ -32,16 +32,17 @@ func (s *RoutingService) Middleware(next http.Handler) http.Handler {
 				).(*session.Session)
 				assert.Assert(ok)
 				assert.Assert(sesh != nil)
-				sesh.Println("unknown host error:", err)
-				if errors.Is(err, usersite.ErrUnknownSubdomain) {
+				switch {
+				case errors.Is(err, usersite.ErrUnknownSubdomain):
 					handler.NotFoundSubdomain(w, r)
-				} else {
-					/* TODO: unknown domain error */
-					http.Error(
-						w,
-						"unknown domain",
-						http.StatusNotFound,
-					)
+					break
+				case errors.Is(err, usersite.ErrUnknownDomain):
+					handler.NotFoundDomain(w, r)
+					break
+				default:
+					sesh.Println("unknown host error:", err)
+					handler.HandleError(w, r, err)
+					break
 				}
 			}
 		}

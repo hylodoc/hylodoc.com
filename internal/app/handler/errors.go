@@ -134,3 +134,35 @@ func NotFoundSubdomain(w http.ResponseWriter, r *http.Request) {
 		)
 	}
 }
+
+func NotFoundDomain(w http.ResponseWriter, r *http.Request) {
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	assert.Assert(ok)
+	sesh.Println("404 (domain)", r.Host, r.URL)
+	w.WriteHeader(http.StatusNotFound)
+	if err := response.NewTemplate(
+		[]string{"404_domain.html"},
+		util.PageInfo{
+			Data: struct {
+				Title           string
+				UserInfo        *session.UserInfo
+				Progstack       string
+				RequestedDomain string
+				DiscordURL      string
+				DomainGuideURL  string
+			}{
+				Title:           "Progstack – Site not found",
+				UserInfo:        session.ConvertSessionToUserInfo(sesh),
+				Progstack:       config.Config.Progstack.Progstack,
+				RequestedDomain: r.Host,
+				DomainGuideURL:  config.Config.Progstack.CustomDomainGuideURL,
+				DiscordURL:      config.Config.Progstack.DiscordURL,
+			},
+		},
+	).Respond(w, r); err != nil {
+		sesh.Println(
+			"pathological error:",
+			err,
+		)
+	}
+}

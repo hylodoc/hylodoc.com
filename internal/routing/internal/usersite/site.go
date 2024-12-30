@@ -23,6 +23,7 @@ type Site struct {
 
 var ErrIsService = errors.New("host is service name")
 var ErrUnknownSubdomain = errors.New("unknown subdomain")
+var ErrUnknownDomain = errors.New("unknown domain")
 
 func GetSite(host string, s *model.Store) (*Site, error) {
 	if host == config.Config.Progstack.RootDomain {
@@ -48,6 +49,9 @@ func getBlog(host string, s *model.Store) (int32, error) {
 
 	blog, err := s.GetBlogByDomain(context.TODO(), host)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return -1, ErrUnknownDomain
+		}
 		return -1, fmt.Errorf("domain: %w", err)
 	}
 	return blog.ID, nil

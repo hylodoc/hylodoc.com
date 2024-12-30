@@ -88,6 +88,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	r.Use(metrics.Middleware)
 	r.Use(routing.NewRoutingService(store).Middleware)
 
+	/* MethodNotAllowed handler ignored for now */
 	notfoundR := mux.NewRouter()
 	notfoundR.Use(session.NewSessionService(store).Middleware)
 	notfoundR.Use(metrics.Middleware)
