@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/lib/pq"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authz"
@@ -176,15 +177,28 @@ func (b *BlogService) subdomainSubmit(r request.Request) error {
 	if err != nil {
 		return fmt.Errorf("parse blogID: %w", err)
 	}
-	if err := b.store.UpdateSubdomainTx(
-		context.TODO(), model.UpdateSubdomainTxParams{
-			BlogID:    int32(intBlogID),
+	if err := b.store.UpdateSubdomainByID(
+		context.TODO(), model.UpdateSubdomainByIDParams{
+			ID:        int32(intBlogID),
 			Subdomain: sub,
 		},
 	); err != nil {
+		if isUniqueSubdomainViolation(err) {
+			return util.CreateCustomError(
+				"subdomain already exists",
+				http.StatusBadRequest,
+			)
+		}
 		return err
 	}
 	return nil
+}
+
+func isUniqueSubdomainViolation(err error) bool {
+	var pqerr *pq.Error
+	return errors.As(err, &pqerr) &&
+		pqerr.Code.Name() == "unique_violation" &&
+		pqerr.Constraint == "unique_blog_subdomain"
 }
 
 func (b *BlogService) DomainSubmit(

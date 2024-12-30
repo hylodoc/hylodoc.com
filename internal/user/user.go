@@ -33,7 +33,11 @@ func (u *UserService) Home(r request.Request) (response.Response, error) {
 	r.MixpanelTrack("Home")
 
 	/* get session */
-	blogs, err := blog.GetBlogsInfo(u.store, sesh.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
+	blogs, err := blog.GetBlogsInfo(u.store, userid)
 	if err != nil {
 		return nil, fmt.Errorf("blogs: %w", err)
 	}
@@ -94,15 +98,15 @@ func (u *UserService) FolderFlow(r request.Request) (response.Response, error) {
 		[]string{"blog_folder_flow.html"},
 		util.PageInfo{
 			Data: struct {
-				Title       string
-				UserInfo    *session.UserInfo
+				Title      string
+				UserInfo   *session.UserInfo
 				RootDomain string
-				Themes      []string
+				Themes     []string
 			}{
-				Title:       "Folder Flow",
-				UserInfo:    session.ConvertSessionToUserInfo(r.Session()),
+				Title:      "Folder Flow",
+				UserInfo:   session.ConvertSessionToUserInfo(r.Session()),
 				RootDomain: config.Config.Progstack.RootDomain,
-				Themes:      blog.BuildThemes(config.Config.ProgstackSsg.Themes),
+				Themes:     blog.BuildThemes(config.Config.ProgstackSsg.Themes),
 			},
 		},
 	), nil
@@ -116,10 +120,14 @@ func (u *UserService) GithubInstallation(
 
 	r.MixpanelTrack("GithubInstallation")
 
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
 	if err := u.store.UpdateAwaitingGithubUpdate(
 		context.TODO(),
 		model.UpdateAwaitingGithubUpdateParams{
-			ID:               r.Session().GetUserID(),
+			ID:               userid,
 			GhAwaitingUpdate: true,
 		},
 	); err != nil {
@@ -177,12 +185,16 @@ func (u *UserService) RepositoryFlow(
 
 	r.MixpanelTrack("RepositoryFlow")
 
-	if err := u.awaitupdate(r.Session().GetUserID()); err != nil {
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
+	if err := u.awaitupdate(userid); err != nil {
 		return nil, fmt.Errorf("await update: %w", err)
 	}
 
 	repos, err := u.store.ListOrderedRepositoriesByUserID(
-		context.TODO(), sesh.GetUserID(),
+		context.TODO(), userid,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get repositories: %w", err)
@@ -200,14 +212,14 @@ func (u *UserService) RepositoryFlow(
 				Title          string
 				UserInfo       *session.UserInfo
 				AccountDetails AccountDetails
-				RootDomain    string
+				RootDomain     string
 				Repositories   []Repository
 				Themes         []string
 			}{
 				Title:          "Repository Flow",
 				UserInfo:       session.ConvertSessionToUserInfo(sesh),
 				AccountDetails: details,
-				RootDomain:    config.Config.Progstack.RootDomain,
+				RootDomain:     config.Config.Progstack.RootDomain,
 				Repositories:   buildRepositoriesInfo(repos),
 				Themes:         blog.BuildThemes(config.Config.ProgstackSsg.Themes),
 			},
@@ -282,9 +294,13 @@ func (u *UserService) Account(r request.Request) (response.Response, error) {
 	), nil
 }
 
-func getStorageDetails(s *model.Store, session *session.Session) (StorageDetails, error) {
+func getStorageDetails(s *model.Store, sesh *session.Session) (StorageDetails, error) {
 	/* calculate storage */
-	userBytes, err := authz.UserStorageUsed(s, session.GetUserID())
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return StorageDetails{}, fmt.Errorf("get user id: %w", err)
+	}
+	userBytes, err := authz.UserStorageUsed(s, userid)
 	if err != nil {
 		return StorageDetails{}, err
 	}
@@ -307,9 +323,11 @@ func getAccountDetails(s *model.Store, sesh *session.Session) (AccountDetails, e
 		GithubEmail:     "",
 	}
 	linked := true
-	ghAccount, err := s.GetGithubAccountByUserID(
-		context.TODO(), sesh.GetUserID(),
-	)
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return AccountDetails{}, fmt.Errorf("get user id: %w", err)
+	}
+	ghAccount, err := s.GetGithubAccountByUserID(context.TODO(), userid)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return AccountDetails{}, fmt.Errorf(
@@ -325,7 +343,7 @@ func getAccountDetails(s *model.Store, sesh *session.Session) (AccountDetails, e
 	}
 
 	hasInstallation, err := s.InstallationExistsForUserID(
-		context.TODO(), sesh.GetUserID(),
+		context.TODO(), userid,
 	)
 	if err != nil {
 		return AccountDetails{}, fmt.Errorf(
@@ -337,9 +355,7 @@ func getAccountDetails(s *model.Store, sesh *session.Session) (AccountDetails, e
 	}
 
 	/* get stripe subscription */
-	sub, err := s.GetStripeSubscriptionByUserID(
-		context.TODO(), sesh.GetUserID(),
-	)
+	sub, err := s.GetStripeSubscriptionByUserID(context.TODO(), userid)
 	if err != nil {
 		return AccountDetails{}, fmt.Errorf(
 			"error getting stripe subscription details: %w",

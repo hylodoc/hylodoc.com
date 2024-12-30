@@ -70,8 +70,10 @@ type identifiers struct {
 
 func getIndentifiers(sesh *session.Session) identifiers {
 	if sesh.IsAuthenticated() {
+		userid, err := sesh.GetUserID()
+		assert.Assert(err == nil)
 		return identifiers{
-			distinctId: fmt.Sprintf("%d", sesh.GetUserID()),
+			distinctId: fmt.Sprintf("%d", userid),
 			status:     "auth",
 		}
 	} else {

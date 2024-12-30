@@ -1,30 +1,31 @@
 package authn
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/xr0-org/progstack/internal/app/handler"
 	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
 )
 
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := middleware(r); err != nil {
-			handler.HandleError(w, r, err)
+		if err := checkuserid(r); err != nil {
+			handler.NotFound(w, r)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
-func middleware(r *http.Request) error {
+func checkuserid(r *http.Request) error {
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	assert.Assert(ok)
-	if sesh.GetUserID() == -1 {
-		sesh.Printf("not authorized\n")
-		return util.CreateCustomError("", http.StatusNotFound)
+	/* XXX: enforce user is authenticated */
+	if _, err := sesh.GetUserID(); err != nil {
+		sesh.Printf("unauth user accessing `/user': %v\n", err)
+		return fmt.Errorf("get user id: %w", err)
 	}
 	return nil
 }

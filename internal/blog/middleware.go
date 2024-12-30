@@ -30,7 +30,10 @@ func (b *BlogService) middleware(w http.ResponseWriter, r *http.Request) error {
 
 	sesh.Println("Running blog authorisation middleware...")
 
-	userID := sesh.GetUserID()
+	userID, err := sesh.GetUserID()
+	if err != nil {
+		return fmt.Errorf("get user id: %w", err)
+	}
 
 	intBlogID, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
 	if err != nil {

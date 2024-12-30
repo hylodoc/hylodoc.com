@@ -195,11 +195,11 @@ func (s *Session) GetEmail() string {
 	return ""
 }
 
-func (s *Session) GetUserID() int32 {
+func (s *Session) GetUserID() (int32, error) {
 	if s.IsAuthenticated() {
-		return *s.userID
+		return *s.userID, nil
 	}
-	return -1
+	return -1, fmt.Errorf("unauthenticated")
 }
 
 func (s *Session) GetUsername() string {

@@ -17,28 +17,14 @@ func HandleError(w http.ResponseWriter, r *http.Request, err error) {
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	assert.Assert(ok)
 
-	/* TODO: error pages */
 	if errors.Is(err, authz.SubscriptionError) {
 		sesh.Println("authz error:", err)
-		http.Error(
-			w, "", http.StatusUnauthorized,
-		)
-		return
-	}
-
-	if err, ok := asCustomError(err); ok {
-		sesh.Println("custom error:", err)
-		http.Error(w, err.Error(), err.Code)
+		unauthorised(w, r)
 		return
 	}
 
 	sesh.Println("internal server error:", err)
 	internalServerError(w, r)
-}
-
-func asCustomError(err error) (*util.CustomError, bool) {
-	var customErr *util.CustomError
-	return customErr, errors.As(err, &customErr)
 }
 
 func internalServerError(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +44,29 @@ func internalServerError(w http.ResponseWriter, r *http.Request) {
 				UserInfo:     session.ConvertSessionToUserInfo(sesh),
 				DiscordURL:   config.Config.Progstack.DiscordURL,
 				OpenIssueURL: config.Config.Progstack.OpenIssueURL,
+			},
+		},
+	).Respond(w, r); err != nil {
+		sesh.Println(
+			"pathological error:",
+			err,
+		)
+	}
+}
+
+func unauthorised(w http.ResponseWriter, r *http.Request) {
+	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
+	assert.Assert(ok)
+	w.WriteHeader(http.StatusInternalServerError)
+	if err := response.NewTemplate(
+		[]string{"401.html"},
+		util.PageInfo{
+			Data: struct {
+				Title    string
+				UserInfo *session.UserInfo
+			}{
+				Title:    "Progstack – Unauthorised",
+				UserInfo: session.ConvertSessionToUserInfo(sesh),
 			},
 		},
 	).Respond(w, r); err != nil {

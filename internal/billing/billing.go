@@ -163,8 +163,12 @@ func (b *BillingService) BillingPortal(
 }
 
 func (b *BillingService) billingPortal(r request.Request) (string, error) {
+	userid, err := r.Session().GetUserID()
+	if err != nil {
+		return "", fmt.Errorf("get user id: %w", err)
+	}
 	sub, err := b.store.GetStripeSubscriptionByUserID(
-		context.TODO(), r.Session().GetUserID(),
+		context.TODO(), userid,
 	)
 	if err != nil {
 		return "", fmt.Errorf("could not get subcription for user: %w", err)

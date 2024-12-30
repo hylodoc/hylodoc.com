@@ -76,8 +76,12 @@ func (b *BlogService) CreateRepositoryBlog(
 		return nil, fmt.Errorf("parse subdomain: %w", err)
 	}
 
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
-		UserID: sesh.GetUserID(),
+		UserID: userid,
 		GhRepositoryID: sql.NullInt64{
 			Valid: true,
 			Int64: intRepoID,
@@ -232,9 +236,13 @@ func (b *BlogService) CreateFolderBlog(
 		return nil, fmt.Errorf("get uploaded folder path: %w", err)
 	}
 
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
 	dst := filepath.Join(
 		config.Config.Progstack.FoldersPath,
-		strconv.FormatInt(int64(r.Session().GetUserID()), 10),
+		strconv.FormatInt(int64(userid), 10),
 		uuid.New().String(),
 	)
 
@@ -254,7 +262,7 @@ func (b *BlogService) CreateFolderBlog(
 	}
 
 	blog, err := b.store.CreateBlog(context.TODO(), model.CreateBlogParams{
-		UserID: sesh.GetUserID(),
+		UserID: userid,
 		GhRepositoryID: sql.NullInt64{
 			Valid: false,
 		},

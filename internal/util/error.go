@@ -16,7 +16,3 @@ func CreateCustomError(Message string, Code int) *CustomError {
 func (e *CustomError) Error() string {
 	return e.Message
 }
-
-type ErrorResponse struct {
-	Message string `json:"Message"`
-}
