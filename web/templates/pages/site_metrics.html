@@ -9,6 +9,12 @@
 			<span>(offline)</span>
 			{{ end }}
 		</h2>
+		{{ if not .Data.CanViewAnalyticsAndSendEmails }}
+		<p>
+			<a href="{{ .Data.UpgradeURL }}">Upgrade</a> your
+			account to view analytics and have email subscribers.
+		</p>
+		{{ end }}
 		<h3>Posts</h3>
 		{{ template "posts" .Data }}
 	</div>

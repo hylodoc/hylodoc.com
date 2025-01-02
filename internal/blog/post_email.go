@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
+	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
 	"github.com/xr0-org/progstack/internal/email/emailaddr"
@@ -22,6 +23,16 @@ func (b *BlogService) SendPostEmail(
 	sesh.Println("SendPostEmail handler...")
 
 	r.MixpanelTrack("SendPostEmail")
+
+	canSend, err := authz.HasAnalyticsCustomDomainsImagesEmails(
+		b.store, sesh,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("can send email: %w", err)
+	}
+	if !canSend {
+		return nil, authz.SubscriptionError
+	}
 
 	token, err := uuid.Parse(r.GetURLQueryValue("token"))
 	if err != nil {

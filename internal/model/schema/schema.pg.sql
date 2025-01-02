@@ -294,7 +294,7 @@ CREATE INDEX ON subscriber_emails(url, blog);
 
 
 -- stripe integration
-CREATE TYPE sub_name AS ENUM ('Scout', 'Wayfarer', 'Voyager', 'Pathfinder');
+CREATE TYPE sub_name AS ENUM ('basic', 'premium');
 
 CREATE TABLE stripe_subscriptions (
 	id			SERIAL					PRIMARY KEY,

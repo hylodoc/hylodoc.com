@@ -70,8 +70,12 @@ func (u *UserService) CreateNewBlog(r request.Request) (response.Response, error
 
 	r.MixpanelTrack("CreateNewBlog")
 
-	if err := authz.CanCreateSite(u.store, sesh); err != nil {
+	can, err := authz.CanCreateSite(u.store, sesh)
+	if err != nil {
 		return nil, fmt.Errorf("CanCreateSite: %w", err)
+	}
+	if !can {
+		return nil, authz.SubscriptionError
 	}
 
 	return response.NewTemplate(
@@ -362,7 +366,7 @@ func getAccountDetails(s *model.Store, sesh *session.Session) (AccountDetails, e
 			err,
 		)
 	}
-	sesh.Printf("subName: %s modelName: %s", sub.SubName, model.SubNameScout)
+	sesh.Printf("subName: %s", sub.SubName)
 
 	accountDetails.Subscription = Subscription{
 		Plan: string(sub.SubName),

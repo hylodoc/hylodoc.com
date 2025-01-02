@@ -35,13 +35,23 @@
 		</form>
 
 		<h4>Custom Domain</h4>
+			{{ if .Data.CanCustomDomain }}
 		<p>
-			{{ if .Data.Blog.Domain }}
-			<b>{{.Data.Blog.Domain}}</b>.
-			<br>
-			{{ end }}
+				{{ if .Data.Blog.Domain }}
+				<b>{{.Data.Blog.Domain}}</b>.
+				<br>
+				{{ end }}
+				<a href="{{ .Data.Blog.ConfigureCustomDomainUrl }}">Click here</a> to configure.
+		</p>
+			{{ else }}
+		<p style="display: none">
+			<!-- include link as easter egg -->
 			<a href="{{ .Data.Blog.ConfigureCustomDomainUrl }}">Click here</a> to configure.
 		</p>
+		<p>
+				<a href="{{ .Data.UpgradeURL }}">Upgrade</a> your account to set up custom domains.
+		</p>
+			{{ end }}
 	</div>
 </section>
 

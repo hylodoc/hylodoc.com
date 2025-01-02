@@ -14,6 +14,7 @@ import (
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/assert"
+	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
@@ -53,24 +54,38 @@ func (b *BlogService) Config(
 	if err != nil {
 		return nil, fmt.Errorf("get blog info: %w", err)
 	}
+	canConfigure, err := authz.HasAnalyticsCustomDomainsImagesEmails(
+		b.store, sesh,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("can configure custom domain: %w", err)
+	}
 
 	return response.NewTemplate(
 		[]string{"blog_config.html"},
 		util.PageInfo{
 			Data: struct {
-				Title        string
-				UserInfo     *session.UserInfo
-				ID           int32
-				Blog         BlogInfo
-				Themes       []string
-				CurrentTheme string
+				Title           string
+				UserInfo        *session.UserInfo
+				ID              int32
+				Blog            BlogInfo
+				Themes          []string
+				CurrentTheme    string
+				CanCustomDomain bool
+				UpgradeURL      string
 			}{
-				Title:        "Blog Setup",
-				UserInfo:     session.ConvertSessionToUserInfo(sesh),
-				ID:           int32(intBlogID),
-				Blog:         blogInfo,
-				Themes:       BuildThemes(config.Config.ProgstackSsg.Themes),
-				CurrentTheme: string(blogInfo.Theme),
+				Title:           "Blog Setup",
+				UserInfo:        session.ConvertSessionToUserInfo(sesh),
+				ID:              int32(intBlogID),
+				Blog:            blogInfo,
+				Themes:          BuildThemes(config.Config.ProgstackSsg.Themes),
+				CurrentTheme:    string(blogInfo.Theme),
+				CanCustomDomain: canConfigure,
+				UpgradeURL: fmt.Sprintf(
+					"%s://%s/pricing",
+					config.Config.Progstack.Protocol,
+					config.Config.Progstack.RootDomain,
+				),
 			},
 		},
 	), nil

@@ -8,13 +8,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/xr0-org/progstack/internal/authz/internal/size"
 	"github.com/xr0-org/progstack/internal/model"
 )
 
-func UserStorageUsed(s *model.Store, userID int32) (int64, error) {
+func UserStorageUsed(s *model.Store, userID int32) (size.Size, error) {
 	paths, err := listUserDiskPaths(userID, s)
 	if err != nil {
-		return -1, fmt.Errorf("paths: %w", err)
+		return 0, fmt.Errorf("paths: %w", err)
 	}
 	/* loop over repos */
 	var totalBytes int64
@@ -23,15 +24,15 @@ func UserStorageUsed(s *model.Store, userID int32) (int64, error) {
 			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
-			return -1, fmt.Errorf("stat: %w", err)
+			return 0, fmt.Errorf("stat: %w", err)
 		}
 		bytes, err := dirBytes(path)
 		if err != nil {
-			return -1, fmt.Errorf("path: %w", err)
+			return 0, fmt.Errorf("path: %w", err)
 		}
 		totalBytes += bytes
 	}
-	return totalBytes, nil
+	return size.Size(totalBytes), nil
 }
 
 func listUserDiskPaths(userID int32, s *model.Store) ([]string, error) {

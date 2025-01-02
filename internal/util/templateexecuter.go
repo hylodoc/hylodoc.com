@@ -3,7 +3,7 @@ package util
 import (
 	"fmt"
 	"html/template"
-	"net/http"
+	"io"
 	"path"
 	"strings"
 )
@@ -33,7 +33,7 @@ type PageInfo struct {
 }
 
 func ExecTemplate(
-	w http.ResponseWriter, names []string, info PageInfo,
+	w io.Writer, names []string, info PageInfo,
 	progstackurl, cdnurl string,
 ) error {
 	tmpl, err := template.New(names[0]).Funcs(

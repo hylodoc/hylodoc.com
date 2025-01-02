@@ -44,39 +44,15 @@ func (b *BillingService) Pricing(r request.Request) (response.Response, error) {
 		[]string{"pricing.html"},
 		util.PageInfo{
 			Data: struct {
-				Title             string
-				UserInfo          *session.UserInfo
-				TierNames         []string
-				Features          []string
-				SubscriptionTiers []authz.SubscriptionFeatures
+				Title    string
+				UserInfo *session.UserInfo
+				Features []authz.Feature
+				Tiers    []authz.Tier
 			}{
 				Title:    "Pricing",
 				UserInfo: session.ConvertSessionToUserInfo(r.Session()),
-				TierNames: []string{
-					"Scout",
-					"Wayfarer",
-					"Voyager",
-					"Pathfinder",
-				},
-				Features: []string{
-					"projects",
-					"storage",
-					"visitorsPerMonth",
-					"customDomain",
-					"themes",
-					"codeStyle",
-					"images",
-					"emailSubscribers",
-					"analytics",
-					"rss",
-					"likes",
-					"comments",
-					"teamMembers",
-					"passwordProtectedPages",
-					"downloadablePdfPages",
-					"paidSubscribers",
-				},
-				SubscriptionTiers: authz.OrderedSubscriptionTiers(),
+				Features: authz.GetFeatures(),
+				Tiers:    authz.GetTiers(),
 			},
 		},
 	), nil
@@ -108,7 +84,7 @@ func AutoSubscribeToFreePlan(
 		context.TODO(),
 		model.CreateStripeSubscriptionParams{
 			UserID:               user.ID,
-			SubName:              model.SubNameScout,
+			SubName:              model.SubNameBasic,
 			StripeCustomerID:     cust.ID,
 			StripeSubscriptionID: sub.ID,
 			StripeStatus:         string(sub.Status),

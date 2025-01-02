@@ -12,6 +12,7 @@ import (
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
+	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/blog/emaildata"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/model"
@@ -47,6 +48,13 @@ func (b *BlogService) SiteMetrics(
 	if err != nil {
 		return nil, fmt.Errorf("get site metrics: %w", err)
 	}
+	canView, err := authz.HasAnalyticsCustomDomainsImagesEmails(
+		b.store, sesh,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("can view analytics: %w", err)
+	}
+
 	return response.NewTemplate(
 		[]string{"site_metrics.html", "posts.html"},
 		util.PageInfo{
@@ -56,13 +64,21 @@ func (b *BlogService) SiteMetrics(
 				IsLive   bool
 				UserInfo *session.UserInfo
 				SiteData
-				PostData []postdata
+				PostData                      []postdata
+				CanViewAnalyticsAndSendEmails bool
+				UpgradeURL                    string
 			}{
-				Title:    "Dashboard",
-				SiteName: getsitename(&blog),
-				IsLive:   blog.IsLive,
-				UserInfo: session.ConvertSessionToUserInfo(sesh),
-				PostData: data,
+				Title:                         "Dashboard",
+				SiteName:                      getsitename(&blog),
+				IsLive:                        blog.IsLive,
+				UserInfo:                      session.ConvertSessionToUserInfo(sesh),
+				PostData:                      data,
+				CanViewAnalyticsAndSendEmails: canView,
+				UpgradeURL: fmt.Sprintf(
+					"%s://%s/pricing",
+					config.Config.Progstack.Protocol,
+					config.Config.Progstack.RootDomain,
+				),
 			},
 		},
 	), nil

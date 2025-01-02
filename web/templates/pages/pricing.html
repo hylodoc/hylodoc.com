@@ -3,114 +3,26 @@
 <section>
 	<div class="container">
 		{{ if .Data.UserInfo.UserID }}
-		<p>To manage your subscription, <a href="/user/stripe/billing-portal">click here</a></p>
+		<p>To manage your subscription, <a href="/user/stripe/billing-portal">click here</a>.</p>
 		{{ end }}
 		<table>
 			<thead>
 				<tr>
 					<th>Feature</th>
-					{{range .Data.TierNames }}
-					<th>{{ . }}</th>
+					{{range .Data.Tiers}}
+					<th>{{ .Name }}</th>
 					{{end}}
 				</tr>
 			</thead>
 			<tbody>
+				{{range $feat := .Data.Features}}
 				<tr>
-					<td>Projects</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.Projects}}</td>
+					<td>{{ $feat.Name }}</td>
+					{{ range $tier := $.Data.Tiers}}
+					<td>{{ $feat.Value $tier }}</td>
 					{{end}}
 				</tr>
-				<tr>
-					<td>Storage (MB)</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.Storage}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Visitors per Month</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.VisitorsPerMonth}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Custom Domain</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.CustomDomain}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Themes</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{join .Themes ", "}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Code Style</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{join .CodeStyle ", "}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Images</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.Images}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Email Subscribers</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.EmailSubscribers}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Analytics</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.Analytics}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>RSS</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.Rss}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Likes</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.Likes}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Comments</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.Comments}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Team Members</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.TeamMembers}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Password Protected Pages</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.PasswordProtectedPages}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Downloadable PDF Pages</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.DownloadablePdfPages}}</td>
-					{{end}}
-				</tr>
-				<tr>
-					<td>Paid Subscribers</td>
-					{{range .Data.SubscriptionTiers}}
-					<td>{{.PaidSubscribers}}</td>
-					{{end}}
-				</tr>
+				{{end}}
 			</tbody>
 		</table>
 	</div>

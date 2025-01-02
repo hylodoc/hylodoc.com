@@ -5,9 +5,11 @@
 		<tr>
 			<th>Post</th>
 			<th>Date</th>
+			{{ if .CanViewAnalyticsAndSendEmails }}
 			<th>Views</th>
 			<th>New Subs</th>
 			<th>Email</th>
+			{{ end }}
 		</tr>
 	</thead>
 	<tbody>
@@ -27,6 +29,7 @@
 						N/A
 					{{ end }}
 				</td>
+				{{ if $.CanViewAnalyticsAndSendEmails }}
 				<td>{{ .Views }}</td>
 				<td>{{ .NewSubs }}</td>
 				<td>
@@ -40,6 +43,7 @@
 						{{ end }}
 					{{ end }}
 				</td>
+				{{ end }}
 			</tr>
 		{{end}}
 	</tbody>

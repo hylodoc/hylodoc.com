@@ -3,58 +3,42 @@ package authz
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/xr0-org/progstack/internal/assert"
+	"github.com/xr0-org/progstack/internal/authz/internal/option"
+	"github.com/xr0-org/progstack/internal/authz/internal/size"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
 )
 
-func CanCreateSite(s *model.Store, sesh *session.Session) error {
+func CanCreateSite(s *model.Store, sesh *session.Session) (bool, error) {
 	/* get user's storage footprint */
 	userid, err := sesh.GetUserID()
 	if err != nil {
-		return fmt.Errorf("get user id: %w", err)
+		return false, fmt.Errorf("get user id: %w", err)
 	}
 	storageUsed, err := UserStorageUsed(s, userid)
 	if err != nil {
-		return fmt.Errorf("calculate user storage used: %w", err)
+		return false, fmt.Errorf("calculate user storage used: %w", err)
 	}
 	/* get user's site count */
 	blogCount, err := s.CountLiveBlogsByUserID(context.TODO(), userid)
 	if err != nil {
-		return fmt.Errorf("get user project count: %w", err)
+		return false, fmt.Errorf("get user project count: %w", err)
 	}
 	/* get user's tier features */
 	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
-		return fmt.Errorf("get user subscription: %w", err)
+		return false, fmt.Errorf("get user subscription: %w", err)
 	}
-	tier := SubscriptionTiers[string(plan)]
-	if err := tier.canCreateProject(
-		storageUsed, int(blogCount),
-	); err != nil {
-		return newSubErr(err)
-	}
-	return nil
+	tier := subscriptionTiers[plan]
+	return tier.canCreateProject(storageUsed, int(blogCount)), nil
 }
 
-func CanConfigureCustomDomain(s *model.Store, sesh *session.Session) error {
-	/* get user's tier features */
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return fmt.Errorf("get user id: %w", err)
-	}
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
-	if err != nil {
-		return fmt.Errorf("get user subscription: %w", err)
-	}
-	tier := SubscriptionTiers[string(plan)]
-	if !tier.CustomDomain {
-		return newSubErr(fmt.Errorf("can't configure custom domain"))
-	}
-	return nil
-}
-
-func CanViewAnalytics(s *model.Store, sesh *session.Session) (bool, error) {
+func HasAnalyticsCustomDomainsImagesEmails(
+	s *model.Store, sesh *session.Session,
+) (bool, error) {
 	/* get user's tier features */
 	userid, err := sesh.GetUserID()
 	if err != nil {
@@ -62,23 +46,10 @@ func CanViewAnalytics(s *model.Store, sesh *session.Session) (bool, error) {
 	}
 	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
-		return false, fmt.Errorf("error getting user subscription: %w", err)
+		return false, fmt.Errorf("get user subscription: %w", err)
 	}
-	tier := SubscriptionTiers[string(plan)]
-	return tier.Analytics, nil
-}
-
-func CanUploadImages(s *model.Store, sesh *session.Session) (bool, error) {
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return false, fmt.Errorf("get user id: %w", err)
-	}
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
-	if err != nil {
-		return false, fmt.Errorf("error getting user subscription: %w", err)
-	}
-	tier := SubscriptionTiers[string(plan)]
-	return tier.Images, nil
+	tier := subscriptionTiers[plan]
+	return tier.analyticsCustomDomainImagesEmails.Value(), nil
 }
 
 func CanUseTheme(s *model.Store, theme string, sesh *session.Session) (bool, error) {
@@ -90,234 +61,149 @@ func CanUseTheme(s *model.Store, theme string, sesh *session.Session) (bool, err
 	if err != nil {
 		return false, fmt.Errorf("error getting user subscription: %w", err)
 	}
-	tier := SubscriptionTiers[string(plan)]
+	tier := subscriptionTiers[plan]
 	return tier.canUseTheme(theme), nil
 }
 
-func CanHaveEmailSubscribers(s *model.Store, sesh *session.Session) (bool, error) {
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return false, fmt.Errorf("get user id: %w", err)
-	}
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
-	if err != nil {
-		return false, fmt.Errorf("error getting user subscription: %w", err)
-	}
-	tier := SubscriptionTiers[string(plan)]
-	return tier.EmailSubscribers, nil
+type Tier interface {
+	Name() string
 }
 
-func CanHaveLikes(s *model.Store, sesh *session.Session) (bool, error) {
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return false, fmt.Errorf("get user id: %w", err)
+func GetTiers() []Tier {
+	return []Tier{
+		subscriptionTiers[model.SubNameBasic],
+		subscriptionTiers[model.SubNamePremium],
 	}
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
-	if err != nil {
-		return false, fmt.Errorf("error getting user subscription: %w", err)
-	}
-	tier := SubscriptionTiers[string(plan)]
-	return tier.Likes, nil
 }
 
-func CanHaveComments(s *model.Store, sesh *session.Session) (bool, error) {
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return false, fmt.Errorf("get user id: %w", err)
-	}
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
-	if err != nil {
-		return false, fmt.Errorf("error getting user subscription: %w", err)
-	}
-	tier := SubscriptionTiers[string(plan)]
-	return tier.Comments, nil
+type subscriptionTier struct {
+	name                              string
+	projects                          int
+	storageSize                       size.Size
+	visitorsPerMonth                  int
+	themes                            []string
+	codeStyles                        []string
+	analyticsCustomDomainImagesEmails option.Option
 }
 
-func CanHaveTeamMembers(s *model.Store, sesh *session.Session) (bool, error) {
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return false, fmt.Errorf("get user id: %w", err)
-	}
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
-	if err != nil {
-		return false, fmt.Errorf("error getting user subscription: %w", err)
-	}
-	tier := SubscriptionTiers[string(plan)]
-	return tier.TeamMembers, nil
-}
+func (tier subscriptionTier) Name() string { return tier.name }
 
-func CanHavePasswordProtectedPages(s *model.Store, sesh *session.Session) (bool, error) {
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return false, fmt.Errorf("get user id: %w", err)
-	}
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
-	if err != nil {
-		return false, fmt.Errorf("error getting user subscription: %w", err)
-	}
-	tier := SubscriptionTiers[string(plan)]
-	return tier.PasswordProtectedPages, nil
-}
-
-func CanHaveDownloadablePdfPages(s *model.Store, sesh *session.Session) (bool, error) {
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return false, fmt.Errorf("get user id: %w", err)
-	}
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
-	if err != nil {
-		return false, fmt.Errorf("error getting user subscription: %w", err)
-	}
-	tier := SubscriptionTiers[string(plan)]
-	return tier.PasswordProtectedPages, nil
-}
-
-func CanHavePaidSubscribers(s *model.Store, sesh *session.Session) (bool, error) {
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return false, fmt.Errorf("get user id: %w", err)
-	}
-	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
-	if err != nil {
-		return false, fmt.Errorf("error getting user subscription: %w", err)
-	}
-	tier := SubscriptionTiers[string(plan)]
-	return tier.PaidSubscribers, nil
-}
-
-type SubscriptionFeatures struct {
-	Projects               int
-	Storage                int
-	VisitorsPerMonth       int
-	CustomDomain           bool
-	Themes                 []string
-	CodeStyle              []string
-	Images                 bool
-	EmailSubscribers       bool
-	Analytics              bool
-	Rss                    bool
-	Likes                  bool
-	Comments               bool
-	TeamMembers            bool
-	PasswordProtectedPages bool
-	DownloadablePdfPages   bool
-	PaidSubscribers        bool
-}
-
-var SubscriptionTiers = map[string]SubscriptionFeatures{
-	"Scout": {
-		Projects:               1,
-		Storage:                24, /* 24MB */
-		VisitorsPerMonth:       1000,
-		Themes:                 []string{"lit"},
-		CodeStyle:              []string{"lit"},
-		CustomDomain:           false,
-		Images:                 false,
-		EmailSubscribers:       false,
-		Analytics:              false,
-		Rss:                    false,
-		Likes:                  false,
-		Comments:               false,
-		TeamMembers:            false,
-		PasswordProtectedPages: false,
-		DownloadablePdfPages:   false,
-		PaidSubscribers:        false,
+var subscriptionTiers = map[model.SubName]subscriptionTier{
+	model.SubNameBasic: {
+		name:                              "basic",
+		projects:                          1,
+		storageSize:                       32 * size.Megabyte,
+		visitorsPerMonth:                  10000,
+		themes:                            []string{"lit"},
+		codeStyles:                        []string{"lit"},
+		analyticsCustomDomainImagesEmails: option.New(false),
 	},
-	"Wayfarer": {
-		Projects:               1,
-		Storage:                256, /* 256MB */
-		VisitorsPerMonth:       5000,
-		Themes:                 []string{"lit", "latex"},
-		CodeStyle:              []string{"lit", "latex"},
-		CustomDomain:           true,
-		Images:                 true,
-		EmailSubscribers:       true,
-		Analytics:              true,
-		Rss:                    true,
-		Likes:                  true,
-		Comments:               true,
-		TeamMembers:            false,
-		PasswordProtectedPages: false,
-		DownloadablePdfPages:   false,
-		PaidSubscribers:        false,
-	},
-	"Voyager": {
-		Projects:               3,
-		Storage:                1024, /* 1GB */
-		VisitorsPerMonth:       10000,
-		Themes:                 []string{"lit", "latex"},
-		CodeStyle:              []string{"lit", "latex"},
-		CustomDomain:           true,
-		Images:                 true,
-		EmailSubscribers:       true,
-		Analytics:              true,
-		Rss:                    true,
-		Likes:                  true,
-		Comments:               true,
-		TeamMembers:            true,
-		PasswordProtectedPages: true,
-		DownloadablePdfPages:   false,
-		PaidSubscribers:        false,
-	},
-	"Pathfinder": {
-		Projects:               10,
-		Storage:                10240, /* 10GB */
-		VisitorsPerMonth:       100000,
-		CustomDomain:           true,
-		Themes:                 []string{"lit", "latex"},
-		CodeStyle:              []string{"lit", "latex"},
-		Images:                 true,
-		EmailSubscribers:       true,
-		Analytics:              true,
-		Rss:                    true,
-		Likes:                  true,
-		Comments:               true,
-		TeamMembers:            true,
-		PasswordProtectedPages: true,
-		DownloadablePdfPages:   true,
-		PaidSubscribers:        true,
+	model.SubNamePremium: {
+		name:                              "premium",
+		projects:                          10,
+		storageSize:                       size.Gigabyte,
+		visitorsPerMonth:                  100000,
+		themes:                            []string{"lit", "latex"},
+		codeStyles:                        []string{"lit", "latex"},
+		analyticsCustomDomainImagesEmails: option.New(true),
 	},
 }
 
-func (s *SubscriptionFeatures) canCreateProject(
-	bytesUsed int64, blogCount int,
-) error {
-	if blogCount >= s.Projects {
-		return fmt.Errorf(
-			"site count %d excess max %d",
-			blogCount,
-			s.Projects,
-		)
-	}
-	maxBytes := megabytesToBytes(int64(s.Storage))
-	if bytesUsed > maxBytes {
-		return fmt.Errorf(
-			"used %d of %d bytes",
-			bytesUsed,
-			maxBytes,
-		)
-	}
-	return nil
+type Feature interface {
+	Name() string
+	Value(Tier) string
 }
 
-func megabytesToBytes(mb int64) int64 {
-	return mb * 1024 * 1024
+func GetFeatures() []Feature {
+	return []Feature{
+		featureProjects,
+		featureStorage,
+		featureVisitorsPerMonth,
+		featureCustomDomain,
+		featureThemes,
+		featureCodeStyle,
+		featureImages,
+		featureEmailSubscribers,
+		featureAnalytics,
+	}
 }
 
-func (s *SubscriptionFeatures) canUseTheme(theme string) bool {
-	for _, t := range s.Themes {
+type feature int
+
+const (
+	featureProjects feature = iota
+	featureStorage
+	featureVisitorsPerMonth
+	featureCustomDomain
+	featureThemes
+	featureCodeStyle
+	featureImages
+	featureEmailSubscribers
+	featureAnalytics
+)
+
+func (f feature) Name() string {
+	switch f {
+	case featureProjects:
+		return "Projects"
+	case featureStorage:
+		return "Storage"
+	case featureVisitorsPerMonth:
+		return "Visitors per month"
+	case featureCustomDomain:
+		return "Custom domain"
+	case featureThemes:
+		return "Themes"
+	case featureCodeStyle:
+		return "Code styles"
+	case featureImages:
+		return "Images"
+	case featureEmailSubscribers:
+		return "Email subscribers"
+	case featureAnalytics:
+		return "Analytics"
+	default:
+		assert.Assert(false)
+		return ""
+	}
+}
+
+func (f feature) Value(rawtier Tier) string {
+	tier, ok := rawtier.(subscriptionTier)
+	assert.Assert(ok)
+	switch f {
+	case featureProjects:
+		return fmt.Sprintf("%d", tier.projects)
+	case featureStorage:
+		return tier.storageSize.Abbrev(0)
+	case featureVisitorsPerMonth:
+		return fmt.Sprintf("%d", tier.visitorsPerMonth)
+	case featureThemes:
+		return strings.Join(tier.themes, ", ")
+	case featureCodeStyle:
+		return strings.Join(tier.codeStyles, ", ")
+	case featureCustomDomain,
+		featureImages,
+		featureEmailSubscribers,
+		featureAnalytics:
+		return tier.analyticsCustomDomainImagesEmails.String()
+	default:
+		assert.Assert(false)
+		return ""
+	}
+}
+
+func (s *subscriptionTier) canCreateProject(
+	sizeUsed size.Size, blogCount int,
+) bool {
+	return blogCount < s.projects && sizeUsed < s.storageSize
+}
+
+func (s *subscriptionTier) canUseTheme(theme string) bool {
+	for _, t := range s.themes {
 		if t == theme {
 			return true
 		}
 	}
 	return false
-}
-
-func OrderedSubscriptionTiers() []SubscriptionFeatures {
-	var tiers []SubscriptionFeatures
-	tiers = append(tiers, SubscriptionTiers["Scout"])
-	tiers = append(tiers, SubscriptionTiers["Wayfarer"])
-	tiers = append(tiers, SubscriptionTiers["Voyager"])
-	tiers = append(tiers, SubscriptionTiers["Pathfinder"])
-	return tiers
 }

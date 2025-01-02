@@ -208,10 +208,12 @@ func (b *BlogService) DomainSubmit(
 
 	r.MixpanelTrack("DomainSubmit")
 
-	if err := authz.CanConfigureCustomDomain(
-		b.store, r.Session(),
-	); err != nil {
-		return nil, fmt.Errorf("can configure custom domain: %w", err)
+	has, err := authz.HasAnalyticsCustomDomainsImagesEmails(b.store, sesh)
+	if err != nil {
+		return nil, fmt.Errorf("has analytics et al: %w", err)
+	}
+	if !has {
+		return nil, authz.SubscriptionError
 	}
 
 	blogIDRaw, ok := r.GetRouteVar("blogID")
