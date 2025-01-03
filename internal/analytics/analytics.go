@@ -39,11 +39,10 @@ func (m *MixpanelClientWrapper) track(r *http.Request, event string) error {
 		return fmt.Errorf("No session for tracking")
 	}
 
-	ip := r.Header.Get("X-Forwarded-For")
 	identifiers := getIndentifiers(sesh)
 	props := map[string]interface{}{
 		"distinct_id": identifiers.distinctId,
-		"ip":          ip,
+		"ip":          getIP(r),
 		"url":         r.URL.String(),
 		"time":        time.Now().Unix(),
 		"status":      identifiers.status,
@@ -61,6 +60,14 @@ func (m *MixpanelClientWrapper) track(r *http.Request, event string) error {
 		return fmt.Errorf("Error calling mixpanel: %w", err)
 	}
 	return nil
+}
+
+func getIP(r *http.Request) string {
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded != "" {
+		return forwarded
+	}
+	return r.RemoteAddr
 }
 
 type identifiers struct {
