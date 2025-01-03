@@ -178,6 +178,31 @@ CREATE TABLE blogs (
 	)
 );
 
+-- table for ensuring reserved subdomains are unavailable
+CREATE TABLE reserved_subdomains (
+	id		SERIAL		PRIMARY KEY,
+	subdomain	VARCHAR(255)	NOT NULL	UNIQUE
+);
+
+-- trigger function
+CREATE OR REPLACE FUNCTION check_reserved_subdomains()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- check if the new subdomain exists in the reserved_subdomains table
+    IF EXISTS (SELECT 1 FROM reserved_subdomains WHERE subdomain = NEW.subdomain) THEN
+        RAISE EXCEPTION 'The subdomain "%s" is reserved and cannot be used.', NEW.subdomain;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- attach trigger function to blogs
+CREATE TRIGGER enforce_reserved_subdomains
+BEFORE INSERT OR UPDATE ON blogs
+FOR EACH ROW -- trigger runs for each row being inserted/updated
+EXECUTE FUNCTION check_reserved_subdomains();
+
 CREATE TABLE generations (
 	id		SERIAL		PRIMARY KEY,
 	created_at	TIMESTAMPTZ	NOT NULL	DEFAULT(now()),
