@@ -81,7 +81,6 @@
 
 
 <!-- Configure git -->
-{{ if .Data.Blog.IsRepository }}
 <section>
 	<div class="container">
 		<h3>Repo</h3>
@@ -116,23 +115,6 @@
 		<a href="{{ .Data.Blog.SyncUrl }}" class="button">Sync</a>
 	</div>
 </section>
-{{ else }}
-<section>
-	<div class="container">
-		<form id="folderUpdateForm" enctype="multipart/form-data">
-			<!-- Select folder -->
-			<div class="row">
-				<div class="four columns">
-					<label for="folder">Select Folder (ZIP):</label>
-					<input type="file" id="folder" name="folder" accept=".zip" required>
-				</div>
-			</div>
-
-			<button type="submit" id="folderUpdateBtn">Update</button>
-		</form>
-	</div>
-</section>
-{{ end }}
 
 <!-- Toggle site between live/offline -->
 <section>
@@ -174,16 +156,11 @@
 		const themeForm = document.getElementById("theme-form")
 		const liveBranchInputForm = document.getElementById("live-branch-form")
 		const statusForm = document.getElementById("status-form")
-		const folderUpdateForm = document.getElementById("folderUpdateForm")
 
 		subdomainInput.addEventListener("input", handleInput);
 		subdomainForm.addEventListener("submit", handleSubdomainFormSubmit);
 		themeForm.addEventListener("submit", handleThemeFormSubmit);
-		{{ if .Data.Blog.IsRepository }}
-			liveBranchInputForm.addEventListener("submit", handleLiveBranchFormSubmit)
-		{{ else }}
-			folderUpdateForm.addEventListener("submit", handleFolderUpdateSubmit)
-		{{ end }}
+		liveBranchInputForm.addEventListener("submit", handleLiveBranchFormSubmit)
 		statusForm.addEventListener("submit", handleStatusFormSubmit)
 	}
 
@@ -338,34 +315,6 @@
 			showToast(data.message);
 		})
 		.catch(error => console.error("Error submitting live branch:", error));
-	}
-
-	function handleFolderUpdateSubmit(event) {
-		event.preventDefault();
-
-		const fileInput = document.getElementById("folder");
-
-		if (!fileInput) {
-			alert("please upload a .zip folder")
-		}
-
-		const formData = new FormData();
-		formData.append("folder", fileInput.files[0]);
-
-		fetch("set-folder", {
-			method: "POST",
-			body: formData
-		}).then(response => {
-			if (response.ok) {
-				return response.json();
-			} else {
-				throw new Error("failed to submit form");
-			}
-		}).then(data => {
-			showToast(data.message);
-		}).catch(error => {
-			showToast("an error occured" + error.message);
-		})
 	}
 
 	function handleStatusFormSubmit(event) {

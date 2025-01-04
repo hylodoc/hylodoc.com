@@ -7,7 +7,6 @@
 			<th>Repository Link</th>
 			<th>Subscribers</th>
 			<th>Metrics</th>
-			<th>Type</th>
 			<th>Status</th>
 			<th>Updated At</th>
 			<th>Configuration</th>
@@ -24,15 +23,10 @@
 					{{ end }}
 				</td>
 				<td>
-					{{ if .IsRepository }}
-						<a href="{{ .RepositoryUrl }}" target="_blank">link</a>
-					{{ else }}
-						N/A
-					{{ end }}
+					<a href="{{ .RepositoryUrl }}" target="_blank">link</a>
 				</td>
 				<td><a href="{{ .SubscriberMetricsUrl }}">view</a></td>
 				<td><a href="{{ .MetricsUrl }}">dashboard</a></td>
-				<td>{{ .Type }}</td>
 				<td>{{ if .IsLive }}live{{ else }}offline{{end}}</td>
 				<td>{{ .UpdatedAt.Format "2006-01-02" }}</td>
 				<td><a href="{{ .ConfigUrl }}" class="button-primary">edit</a> </td>

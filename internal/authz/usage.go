@@ -36,15 +36,11 @@ func UserStorageUsed(s *model.Store, userID int32) (size.Size, error) {
 }
 
 func listUserDiskPaths(userID int32, s *model.Store) ([]string, error) {
-	folders, err := s.ListBlogFolderPathsByUserID(context.TODO(), userID)
-	if err != nil {
-		return nil, fmt.Errorf("folder: %w", err)
-	}
 	repos, err := s.ListRepositoryPathsOnDiskByUserID(context.TODO(), userID)
 	if err != nil {
 		return nil, fmt.Errorf("repo: %w", err)
 	}
-	return append(folders, repos...), nil
+	return repos, nil
 }
 
 /* calculate the disk usage of a single folder */

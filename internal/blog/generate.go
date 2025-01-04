@@ -93,13 +93,8 @@ func GetFreshGeneration(blogid int32, s *model.Store) (int32, error) {
 }
 
 func getpathondisk(blog *model.Blog, s *model.Store) (string, error) {
-	if blog.BlogType == model.BlogTypeFolder {
-		assert.Assert(blog.FolderPath.Valid)
-		return blog.FolderPath.String, nil
-	}
-	assert.Assert(blog.GhRepositoryID.Valid)
 	repo, err := s.GetRepositoryByGhRepositoryID(
-		context.TODO(), blog.GhRepositoryID.Int64,
+		context.TODO(), blog.GhRepositoryID,
 	)
 	if err != nil {
 		return "", fmt.Errorf("get repo: %w", err)
