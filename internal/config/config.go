@@ -33,8 +33,8 @@ type ProgstackParams struct {
 	Progstack            string `mapstructure:"progstack"`
 	Protocol             string `mapstructure:"protocol"`
 	RootDomain           string `mapstructure:"root_domain"`
-	RepositoriesPath     string `mapstructure:"repositories_path"`
-	FoldersPath          string `mapstructure:"folders_path"`
+	CheckoutsPath        string `mapstructure:"checkouts_path"`
+	GitdirsPath          string `mapstructure:"gitdirs_path"`
 	CertsPath            string `mapstructure:"certs_path"`
 	WebsitesPath         string `mapstructure:"websites_path"`
 	EmailDomain          string `mapstructure:"email_domain"`

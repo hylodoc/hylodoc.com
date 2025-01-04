@@ -59,7 +59,7 @@ func (b *BillingService) Pricing(r request.Request) (response.Response, error) {
 }
 
 func AutoSubscribeToFreePlan(
-	user model.User, s *model.Store, sesh *session.Session,
+	user *model.User, s *model.Store, sesh *session.Session,
 ) error {
 	sesh.Println("AutoSubscribeToFreePlan...")
 

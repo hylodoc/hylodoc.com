@@ -3,8 +3,8 @@ progstack:
   protocol: "http"
   root_domain: "localhost:7999"
   domain: "localhost"
-  repositories_path: "./repositories"
-  folders_path: "./folders"
+  checkouts_path: "./checkouts"
+  gitdirs_path: "./gitdirs"
   websites_path: "./websites"
   certs_path: "./certs"
   accounts_email: "accounts@lbnz.dev"	# billing query email

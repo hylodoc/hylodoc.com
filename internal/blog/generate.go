@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/google/uuid"
 	"github.com/xr0-org/progstack-ssg/pkg/ssg"
 	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/authz"
@@ -28,11 +29,7 @@ func GetFreshGeneration(blogid int32, s *model.Store) (int32, error) {
 	if err != nil {
 		return -1, fmt.Errorf("cannot get blog: %w", err)
 	}
-	path, err := getpathondisk(&b, s)
-	if err != nil {
-		return -1, fmt.Errorf("path: %w", err)
-	}
-	site, err := ssgGenerateWithAuthZRestrictions(path, &b, s)
+	site, err := ssgGenerateWithAuthZRestrictions(&b, s)
 	if err != nil {
 		return -1, fmt.Errorf("generate with authz: %w", err)
 	}
@@ -92,32 +89,29 @@ func GetFreshGeneration(blogid int32, s *model.Store) (int32, error) {
 	return gen, nil
 }
 
-func getpathondisk(blog *model.Blog, s *model.Store) (string, error) {
-	repo, err := s.GetRepositoryByGhRepositoryID(
-		context.TODO(), blog.GhRepositoryID,
-	)
-	if err != nil {
-		return "", fmt.Errorf("get repo: %w", err)
-	}
-	return repo.PathOnDisk, nil
-}
-
 func ssgGenerateWithAuthZRestrictions(
-	src string, b *model.Blog, store *model.Store,
+	b *model.Blog, s *model.Store,
 ) (ssg.Site, error) {
 	canHaveSubs, err := authz.HasAnalyticsCustomDomainsImagesEmails(
-		store, b.UserID,
+		s, b.UserID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("can have subscribers: %w", err)
 	}
+	assert.Assert(b.LiveHash.Valid)
+	src := filepath.Join(
+		config.Config.Progstack.CheckoutsPath,
+		b.LiveHash.String,
+	)
+	dst := filepath.Join(
+		config.Config.Progstack.WebsitesPath,
+		b.Subdomain.String(),
+		uuid.New().String(),
+	)
 	if !canHaveSubs {
 		return ssg.GenerateSiteWithBindings(
 			src,
-			filepath.Join(
-				config.Config.Progstack.WebsitesPath,
-				b.Subdomain.String(),
-			),
+			dst,
 			config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
 			"algol_nu", "", "",
 			map[string]ssg.CustomPage{
@@ -133,10 +127,7 @@ func ssgGenerateWithAuthZRestrictions(
 	}
 	return ssg.GenerateSiteWithBindings(
 		src,
-		filepath.Join(
-			config.Config.Progstack.WebsitesPath,
-			b.Subdomain.String(),
-		),
+		dst,
 		config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
 		"algol_nu",
 		"",

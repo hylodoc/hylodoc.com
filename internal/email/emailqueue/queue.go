@@ -28,11 +28,11 @@ func NewEmail(
 }
 
 func (e *email) Queue(store *model.Store) error {
-	return store.ExecTx(context.TODO(), e.queuetx)
+	return store.ExecTx(e.queuetx)
 }
 
-func (e *email) queuetx(q *model.Queries) error {
-	id, err := q.InsertQueuedEmail(
+func (e *email) queuetx(s *model.Store) error {
+	id, err := s.InsertQueuedEmail(
 		context.TODO(),
 		model.InsertQueuedEmailParams{
 			FromAddr: e.from,
@@ -47,7 +47,7 @@ func (e *email) queuetx(q *model.Queries) error {
 		return fmt.Errorf("insert: %w", err)
 	}
 	for name, value := range e.headers {
-		if err := q.InsertQueuedEmailHeader(
+		if err := s.InsertQueuedEmailHeader(
 			context.TODO(),
 			model.InsertQueuedEmailHeaderParams{
 				Email: id,

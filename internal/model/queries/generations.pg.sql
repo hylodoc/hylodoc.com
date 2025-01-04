@@ -16,6 +16,13 @@ WHERE b.id = @blog_id
 	AND g.stale = false
 LIMIT 1;
 
+-- name: MarkBlogGenerationsStale :exec
+UPDATE generations g
+SET stale = true
+FROM blogs b
+WHERE b.live_hash = g.hash
+AND b.id = $1;
+
 -- name: MarkGenerationsStaleByStripeSubscriptionID :exec
 UPDATE generations g
 SET stale = true

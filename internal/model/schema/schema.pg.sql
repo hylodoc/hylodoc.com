@@ -111,7 +111,7 @@ CREATE TABLE repositories (
 	full_name		VARCHAR(255)	NOT NULL,
 	url			VARCHAR(255)	NOT NULL,
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
-	path_on_disk		VARCHAR(1000)	NOT NULL,
+	gitdir_path		VARCHAR(1000)	NOT NULL,
 
 	CONSTRAINT fk_gh_installation_id
 		FOREIGN KEY (installation_id)

@@ -114,14 +114,15 @@ func (b *BlogService) ThemeSubmit(
 
 	r.MixpanelTrack("ThemeSubmit")
 
-	blogID, ok := r.GetRouteVar("blogID")
+	rawBlogID, ok := r.GetRouteVar("blogID")
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
 	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	intBlogID, err := strconv.ParseInt(rawBlogID, 10, 32)
 	if err != nil {
 		return nil, fmt.Errorf("parse blogID: %w", err)
 	}
+	blogID := int32(intBlogID)
 
 	var req struct {
 		Theme string `json:"theme"`
@@ -134,24 +135,51 @@ func (b *BlogService) ThemeSubmit(
 		return nil, fmt.Errorf("decode body: %w", err)
 	}
 
-	theme, err := validateTheme(req.Theme)
+	theme, err := getTheme(req.Theme)
 	if err != nil {
-		return nil, fmt.Errorf("validate theme: %w", err)
+		return nil, fmt.Errorf("get theme: %w", err)
 	}
-
-	if err := b.store.SetBlogThemeByID(
-		context.TODO(),
-		model.SetBlogThemeByIDParams{
-			ID:    int32(intBlogID),
-			Theme: theme,
+	if err := b.store.ExecTx(
+		func(tx *model.Store) error {
+			return updateBlogThemeTx(blogID, theme, tx)
 		},
 	); err != nil {
-		return nil, fmt.Errorf("set blog theme: %w", err)
+		return nil, fmt.Errorf("update blog theme tx: %w", err)
 	}
 
 	return response.NewJson(struct {
 		Message string `json:"message"`
 	}{"Theme changed successsfully!"})
+}
+
+func updateBlogThemeTx(
+	blogID int32, theme model.BlogTheme, tx *model.Store,
+) error {
+	if err := tx.SetBlogThemeByID(
+		context.TODO(),
+		model.SetBlogThemeByIDParams{
+			ID:    blogID,
+			Theme: theme,
+		},
+	); err != nil {
+		return fmt.Errorf("set blog theme: %w", err)
+	}
+	if err := regenerateBlog(blogID, tx); err != nil {
+		return fmt.Errorf("regenerate blog: %w", err)
+	}
+	return nil
+}
+
+func regenerateBlog(blogID int32, s *model.Store) error {
+	if err := s.MarkBlogGenerationsStale(
+		context.TODO(), blogID,
+	); err != nil {
+		return fmt.Errorf("mark blog generations stale: %w", err)
+	}
+	if _, err := GetFreshGeneration(blogID, s); err != nil {
+		return fmt.Errorf("get fresh generation: %w", err)
+	}
+	return nil
 }
 
 /* Git branch info */
@@ -185,21 +213,47 @@ func (b *BlogService) LiveBranchSubmit(
 		return nil, fmt.Errorf("decode body: %w", err)
 	}
 
-	/* XXX: validate input before wrinting to db */
-	if err := b.store.SetLiveBranchByID(
-		context.TODO(),
-		model.SetLiveBranchByIDParams{
-			ID:         int32(intBlogID),
-			LiveBranch: req.Branch,
+	if err := b.store.ExecTx(
+		func(tx *model.Store) error {
+			return updateBlogLiveBranchTx(
+				int32(intBlogID), req.Branch, tx, b.client, sesh,
+			)
 		},
 	); err != nil {
-		return nil, fmt.Errorf("set live branch: %w", err)
+		return nil, fmt.Errorf("update blog live branch tx: %w", err)
 	}
 
 	return response.NewJson(struct {
 		Message string `json:"message"`
 	}{"Live branch submitted successsfully!"})
 
+}
+
+func updateBlogLiveBranchTx(
+	blogID int32, branch string,
+	tx *model.Store, c *httpclient.Client, sesh *session.Session,
+) error {
+	/* TODO: validate input before wrinting to db */
+	if err := tx.SetLiveBranchByID(
+		context.TODO(),
+		model.SetLiveBranchByIDParams{
+			ID:         blogID,
+			LiveBranch: branch,
+		},
+	); err != nil {
+		return fmt.Errorf("set live branch: %w", err)
+	}
+	b, err := tx.GetBlogByID(context.TODO(), blogID)
+	if err != nil {
+		return fmt.Errorf("get blog: %w", err)
+	}
+	if err := UpdateRepositoryOnDisk(c, &b, sesh, tx); err != nil {
+		return fmt.Errorf("update repo on disk: %w", err)
+	}
+	if err := regenerateBlog(blogID, tx); err != nil {
+		return fmt.Errorf("regenerate blog: %w", err)
+	}
+	return nil
 }
 
 func (b *BlogService) SetStatusSubmit(
@@ -284,7 +338,7 @@ func handleStatusChange(
 		return nil, fmt.Errorf("invalid status change: %w", err)
 	}
 	if islive {
-		return setBlogToLive(&blog, s, sesh)
+		return setBlogToLive(&blog, sesh, s)
 	} else {
 		return setBlogToOffline(&blog, s)
 	}
@@ -305,7 +359,7 @@ func validateStatusChange(blogID int32, islive bool, s *model.Store) error {
 }
 
 func setBlogToLive(
-	b *model.Blog, s *model.Store, sesh *session.Session,
+	b *model.Blog, sesh *session.Session, s *model.Store,
 ) (*statusChangeResponse, error) {
 	if err := s.SetBlogToLive(context.TODO(), b.ID); err != nil {
 		return nil, err
@@ -385,7 +439,7 @@ func (b *BlogService) SyncRepository(
 		return nil, fmt.Errorf("error getting blog `%d': %w", intBlogID, err)
 	}
 	if err := UpdateRepositoryOnDisk(
-		b.client, b.store, &blog, sesh,
+		b.client, &blog, sesh, b.store,
 	); err != nil {
 		return nil, fmt.Errorf("update error: %w", err)
 	}

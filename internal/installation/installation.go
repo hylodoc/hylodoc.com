@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
+	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
@@ -176,31 +176,86 @@ func handleInstallationCreated(
 	sesh.Printf("repos: %s\n", str)
 
 	/* write installation and repos to db Tx */
-	createInstallationTxParams := buildCreateInstallationTxParams(ghInstallationID, userID, ghEmail, repos)
-	if err = s.CreateInstallationTx(context.TODO(), createInstallationTxParams); err != nil {
+	if err = createInstallationTx(
+		buildCreateinstallationTxParams(
+			ghInstallationID, userID, ghEmail, repos,
+		), s,
+	); err != nil {
 		/* XXX: wipe relavant repos from disk */
 		return fmt.Errorf("error executing db transaction: %w", err)
 	}
-
 	return nil
 }
 
-func buildCreateInstallationTxParams(installationID int64, userID int32, ghEmail string, repos []Repository) model.InstallationTxParams {
-	var iTxParams model.InstallationTxParams
+func buildCreateinstallationTxParams(
+	installationID int64, userID int32, ghEmail string, repos []Repository,
+) *installationTxParams {
+	var iTxParams installationTxParams
 	iTxParams.InstallationID = installationID
 	iTxParams.UserID = userID
 	iTxParams.Email = ghEmail
-	var repositoryTxParams []model.RepositoryTxParams
+	var params []repositoryTxParams
 	for _, repo := range repos {
-		repositoryTxParams = append(repositoryTxParams, model.RepositoryTxParams{
-			RepositoryID: repo.ID,
-			Name:         repo.Name,
-			FullName:     repo.FullName,
-		})
+		params = append(
+			params,
+			repositoryTxParams{
+				RepositoryID: repo.ID,
+				Name:         repo.Name,
+				FullName:     repo.FullName,
+			},
+		)
 	}
-	iTxParams.RepositoriesTxParams = repositoryTxParams
-	iTxParams.RepositoriesPath = config.Config.Progstack.RepositoriesPath
-	return iTxParams
+	iTxParams.RepositoriesTxParams = params
+	return &iTxParams
+}
+
+type repositoryTxParams struct {
+	RepositoryID int64
+	Name         string
+	FullName     string
+	Url          string
+}
+
+type installationTxParams struct {
+	InstallationID       int64
+	UserID               int32
+	Email                string
+	RepositoriesTxParams []repositoryTxParams
+}
+
+func createInstallationTx(arg *installationTxParams, s *model.Store) error {
+	return s.ExecTx(func(tx *model.Store) error {
+		installation, err := tx.CreateInstallation(
+			context.TODO(),
+			model.CreateInstallationParams{
+				GhInstallationID: arg.InstallationID,
+				UserID:           arg.UserID,
+			},
+		)
+		if err != nil {
+			return err
+		}
+		for _, repositoryTxParams := range arg.RepositoriesTxParams {
+			_, err := tx.CreateRepository(
+				context.TODO(),
+				model.CreateRepositoryParams{
+					InstallationID: installation.GhInstallationID,
+					RepositoryID:   repositoryTxParams.RepositoryID,
+					Name:           repositoryTxParams.Name,
+					FullName:       repositoryTxParams.FullName,
+					Url:            fmt.Sprintf("https://github.com/%s", repositoryTxParams.FullName), /* ghUrl not always in events */
+					GitdirPath: filepath.Join(
+						config.Config.Progstack.GitdirsPath,
+						repositoryTxParams.FullName,
+					),
+				},
+			)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 type InstallationRepositoriesResponse struct {
@@ -244,36 +299,7 @@ func handleInstallationDeleted(
 	userID int32, sesh *session.Session,
 ) error {
 	sesh.Println("handling installation deleted event...")
-
-	/* fetch repos associated with installation */
-	sesh.Printf("deleting installation %d for user %d...", ghInstallationID, userID)
-	repos, err := s.ListBlogsForInstallationByGhInstallationID(context.TODO(), ghInstallationID)
-	if err != nil {
-		return fmt.Errorf("error getting repositories for installation %d: %w", ghInstallationID, err)
-	}
-	/* delete the repos on disk */
-	sesh.Println("deleting repos from disk...")
-	for _, repo := range repos {
-		path := fmt.Sprintf("%s/%d/%s", config.Config.Progstack.RepositoriesPath, userID, repo.FullName)
-		sesh.Printf("deleting repo at `%s' from disk...\n", path)
-		if err := os.RemoveAll(path); err != nil {
-			return fmt.Errorf("error deleting repo `%d' from disk: %w", repo.ID, err)
-		}
-	}
-	/* delete generated websites */
-	sesh.Println("deleting generated websites from disk...")
-	for _, repo := range repos {
-		path := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, repo.Subdomain)
-		sesh.Printf("deleting website at `%s' from disk...\n", path)
-		if err := os.RemoveAll(path); err != nil {
-			return fmt.Errorf("error deleting website `%s' from disk: %w", repo.Subdomain, err)
-		}
-	}
-	/* cascade delete the installation and associated repos */
-	sesh.Printf("deleting installation with ghInstallationID `%d'...\n", ghInstallationID)
-	if err = s.DeleteInstallationWithGithubInstallationID(context.TODO(), ghInstallationID); err != nil {
-		return fmt.Errorf("error deleting installation: %w", err)
-	}
+	assert.Assert(false)
 	return nil
 }
 
@@ -376,8 +402,8 @@ func handleInstallationRepositoriesAdded(
 			Name:           repo.Name,
 			FullName:       repo.FullName,
 			Url:            fmt.Sprintf("https://github.com/%s", repo.FullName),
-			PathOnDisk: filepath.Join(
-				config.Config.Progstack.RepositoriesPath,
+			GitdirPath: filepath.Join(
+				config.Config.Progstack.GitdirsPath,
 				repo.FullName,
 			),
 		})
@@ -394,30 +420,7 @@ func handleInstallationRepositoriesRemoved(
 	repos []Repository, sesh *session.Session,
 ) error {
 	sesh.Println("handling repositories removed event...")
-
-	/* delete generated sites from disk, generated sites need subdomain */
-	sesh.Println("deleting websites from disk...")
-	for _, repo := range repos {
-		path := fmt.Sprintf("%s/%s", config.Config.Progstack.WebsitesPath, repo.FullName)
-		if err := os.RemoveAll(path); err != nil {
-			return fmt.Errorf("error deleting repo `%s' from disk: %w", path, err)
-		}
-	}
-	/* delete repostories removed from disk */
-	sesh.Println("deleting repositories from disk...")
-	for _, repo := range repos {
-		path := fmt.Sprintf("%s/%s", config.Config.Progstack.RepositoriesPath, repo.FullName)
-		if err := os.RemoveAll(path); err != nil {
-			return fmt.Errorf("error deleting repo `%s' from disk: %w", path, err)
-		}
-	}
-	/* delete blogs removed from db */
-	sesh.Println("deleting blogs from db...")
-	for _, repo := range repos {
-		if err := s.DeleteRepositoryWithGhRepositoryID(context.TODO(), repo.ID); err != nil {
-			return fmt.Errorf("error deleting repository with ghRepositoryID `%d': %w", repo.ID, err)
-		}
-	}
+	assert.Assert(false)
 	return nil
 }
 
@@ -466,7 +469,7 @@ func handlePush(
 		return nil
 	}
 
-	if err := blog.UpdateRepositoryOnDisk(c, s, &b, sesh); err != nil {
+	if err := blog.UpdateRepositoryOnDisk(c, &b, sesh, s); err != nil {
 		return fmt.Errorf("error pulling latest changes: %w", err)
 	}
 	return nil
