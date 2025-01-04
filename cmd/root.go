@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -10,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	server "github.com/xr0-org/progstack/internal/app"
 	"github.com/xr0-org/progstack/internal/config"
+	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/email/emailqueue"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
@@ -28,6 +30,9 @@ var rootCmd = &cobra.Command{
 		}
 		c := httpclient.NewHttpClient(clientTimeout)
 		store := model.NewStore(db)
+		if err := reserveSubdomains(store); err != nil {
+			return fmt.Errorf("reserve subdomains: %w", err)
+		}
 		go func() {
 			if err := emailqueue.Run(c, store); err != nil {
 				log.Fatal("email queue error", err)
@@ -35,6 +40,22 @@ var rootCmd = &cobra.Command{
 		}()
 		return server.Serve(c, store)
 	},
+}
+
+func reserveSubdomains(s *model.Store) error {
+	if err := s.DeleteReservedSubdomains(context.TODO()); err != nil {
+		return fmt.Errorf("delete reserved subdomains: %w", err)
+	}
+	for _, rawsub := range config.Config.ReservedSubdomains {
+		sub, err := dns.ParseSubdomain(rawsub)
+		if err != nil {
+			return fmt.Errorf("parse subdomain: %w", err)
+		}
+		if err := s.ReserveSubdomain(context.TODO(), sub); err != nil {
+			return fmt.Errorf("reserve subdomain: %w", err)
+		}
+	}
+	return nil
 }
 
 func Execute() {

@@ -16,26 +16,26 @@ INSERT INTO blogs (
 )
 RETURNING *;
 
--- name: DomainExists :one
+-- name: BlogDomainExists :one
 SELECT EXISTS (
 	SELECT 1
 	FROM blogs
 	WHERE domain = $1::VARCHAR
 );
 
--- name: SubdomainExists :one
+-- name: SubdomainIsTaken :one
 SELECT EXISTS (
-	SELECT 1
-	FROM blogs
-	WHERE subdomain = $1
+	SELECT 1 FROM blogs b WHERE b.subdomain = $1
+	UNION
+	SELECT 1 FROM reserved_subdomains r WHERE r.subdomain = $1
 );
 
--- name: UpdateSubdomainByID :exec
+-- name: UpdateBlogSubdomainByID :exec
 UPDATE blogs
 SET subdomain = $1
 WHERE id = $2;
 
--- name: UpdateDomainByID :exec
+-- name: UpdateBlogDomainByID :exec
 UPDATE blogs
 SET domain = $1
 WHERE id = $2;

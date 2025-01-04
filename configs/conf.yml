@@ -63,3 +63,7 @@ stripe:
   secret_key: "<StripeSecretKey>"
   webhook_signing_secret: "<StripeWebhookKey>"
   free_plan_price_id: "<StripeFreePlanPriceID>"
+
+reserved_subdomains:
+  - "subdomain1"
+  - "subdomain2"

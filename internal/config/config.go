@@ -19,13 +19,14 @@ func init() {
 var Config Configuration
 
 type Configuration struct {
-	Progstack    ProgstackParams    `mapstructure:"progstack"`
-	ProgstackSsg ProgstackSsgParams `mapstructure:"progstack_ssg"`
-	Github       GithubParams       `mapstructure:"github"`
-	Db           DbParams           `mapstructure:"postgres"`
-	Email        EmailParams        `mapstructure:"email"`
-	Stripe       StripeParams       `mapstructure:"stripe"`
-	Mixpanel     MixpanelParams     `mapstructure:"mixpanel"`
+	Progstack          ProgstackParams    `mapstructure:"progstack"`
+	ProgstackSsg       ProgstackSsgParams `mapstructure:"progstack_ssg"`
+	Github             GithubParams       `mapstructure:"github"`
+	Db                 DbParams           `mapstructure:"postgres"`
+	Email              EmailParams        `mapstructure:"email"`
+	Stripe             StripeParams       `mapstructure:"stripe"`
+	Mixpanel           MixpanelParams     `mapstructure:"mixpanel"`
+	ReservedSubdomains []string           `mapstructure:"reserved_subdomains"`
 }
 
 type ProgstackParams struct {

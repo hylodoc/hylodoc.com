@@ -133,7 +133,7 @@ CREATE TABLE blogs (
 
 	subdomain		VARCHAR(255)	NOT NULL
 		CONSTRAINT unique_blog_subdomain UNIQUE,
-		CHECK (subdomain NOT IN ('', 'custom-domain-cname-target')),
+		CHECK (subdomain <> ''),
 
 	domain			VARCHAR(255)			UNIQUE
 		CHECK (domain <> ''),
@@ -177,6 +177,47 @@ CREATE TABLE blogs (
 		)
 	)
 );
+
+CREATE TABLE reserved_subdomains (
+	subdomain		VARCHAR(255)			PRIMARY KEY,
+	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now())
+);
+
+CREATE OR REPLACE FUNCTION check_reserved_subdomain()
+RETURNS TRIGGER AS $$
+BEGIN
+	IF EXISTS (
+		SELECT 1
+		FROM reserved_subdomains
+		WHERE subdomain = NEW.subdomain
+	) THEN RAISE EXCEPTION '"%" is reserved', NEW.subdomain;
+	END IF;
+	RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION check_used_subdomain()
+RETURNS TRIGGER AS $$
+BEGIN
+	IF EXISTS (
+		SELECT 1
+		FROM blogs
+		WHERE subdomain = NEW.subdomain
+	) THEN RAISE EXCEPTION '"%" is used', NEW.subdomain;
+	END IF;
+	RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER check_reserved_subdomain_trigger
+BEFORE INSERT OR UPDATE ON blogs
+FOR EACH ROW
+EXECUTE FUNCTION check_reserved_subdomain();
+
+CREATE TRIGGER check_used_subdomain_trigger
+BEFORE INSERT OR UPDATE ON reserved_subdomains
+FOR EACH ROW
+EXECUTE FUNCTION check_used_subdomain();
 
 CREATE TABLE generations (
 	id		SERIAL		PRIMARY KEY,

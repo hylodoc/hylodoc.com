@@ -16,3 +16,9 @@ sql:
               import: "github.com/xr0-org/progstack/internal/dns"
               type: "Subdomain"
               pointer: true
+
+          - column: reserved_subdomains.subdomain
+            go_type:
+              import: "github.com/xr0-org/progstack/internal/dns"
+              type: "Subdomain"
+              pointer: true

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/lib/pq"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
@@ -68,55 +67,13 @@ func (b *BlogService) subdomainCheck(r request.Request) error {
 		}
 		return fmt.Errorf("subdomain: %w", err)
 	}
-	exists, err := b.store.SubdomainExists(context.TODO(), sub)
+	taken, err := b.store.SubdomainIsTaken(context.TODO(), sub)
 	if err != nil {
-		return fmt.Errorf("error checking for subdomain in db: %w", err)
+		return fmt.Errorf("subdomain is taken: %w", err)
 	}
-	if exists {
+	if taken {
 		return createCustomError(
 			"subdomain already exists",
-			http.StatusBadRequest,
-		)
-	}
-	return nil
-}
-
-func validateSubdomain(subdomain string) error {
-	if len(subdomain) < 1 || len(subdomain) > 63 {
-		return createCustomError(
-			"Subdomain must be between 1 and 63 characters long",
-			http.StatusBadRequest,
-		)
-	}
-	for _, r := range subdomain {
-		if unicode.IsSpace(r) {
-			return createCustomError(
-				"Subdomain cannot contain spaces.",
-				http.StatusBadRequest,
-			)
-		}
-	}
-	previousChar := ' ' /* start with a space to avoid consecutive check on the first character */
-	for _, r := range subdomain {
-		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-') {
-			return createCustomError(
-				"Subdomain can only contain letters, numbers, and hyphens.",
-				http.StatusBadRequest,
-			)
-		}
-		/* check for consecutive hyphens */
-		if r == '-' && previousChar == '-' {
-			return createCustomError(
-				"Subdomain cannot contain consecutive hyphens.",
-				http.StatusBadRequest,
-			)
-		}
-		previousChar = r
-	}
-	/* check that it does not start or end with a hyphen */
-	if subdomain[0] == '-' || subdomain[len(subdomain)-1] == '-' {
-		return createCustomError(
-			"Subdomain cannot start or end with a hyphen.",
 			http.StatusBadRequest,
 		)
 	}
@@ -176,8 +133,8 @@ func (b *BlogService) subdomainSubmit(r request.Request) error {
 	if err != nil {
 		return fmt.Errorf("parse blogID: %w", err)
 	}
-	if err := b.store.UpdateSubdomainByID(
-		context.TODO(), model.UpdateSubdomainByIDParams{
+	if err := b.store.UpdateBlogSubdomainByID(
+		context.TODO(), model.UpdateBlogSubdomainByIDParams{
 			ID:        int32(intBlogID),
 			Subdomain: sub,
 		},
@@ -233,8 +190,8 @@ func (b *BlogService) DomainSubmit(
 		)
 	}
 
-	if err := b.store.UpdateDomainByID(
-		context.TODO(), model.UpdateDomainByIDParams{
+	if err := b.store.UpdateBlogDomainByID(
+		context.TODO(), model.UpdateBlogDomainByIDParams{
 			ID: int32(blogID),
 			Domain: wrapNullString(
 				strings.TrimSpace(strings.ToLower(domain)),
