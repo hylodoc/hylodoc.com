@@ -48,8 +48,12 @@ func (b *BlogService) SiteMetrics(
 	if err != nil {
 		return nil, fmt.Errorf("get site metrics: %w", err)
 	}
+	userID, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
 	canView, err := authz.HasAnalyticsCustomDomainsImagesEmails(
-		b.store, sesh,
+		b.store, userID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("can view analytics: %w", err)

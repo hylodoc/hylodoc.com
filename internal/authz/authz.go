@@ -9,15 +9,9 @@ import (
 	"github.com/xr0-org/progstack/internal/authz/internal/option"
 	"github.com/xr0-org/progstack/internal/authz/internal/size"
 	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/session"
 )
 
-func CanCreateSite(s *model.Store, sesh *session.Session) (bool, error) {
-	/* get user's storage footprint */
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return false, fmt.Errorf("get user id: %w", err)
-	}
+func CanCreateSite(s *model.Store, userid int32) (bool, error) {
 	storageUsed, err := UserStorageUsed(s, userid)
 	if err != nil {
 		return false, fmt.Errorf("calculate user storage used: %w", err)
@@ -37,13 +31,8 @@ func CanCreateSite(s *model.Store, sesh *session.Session) (bool, error) {
 }
 
 func HasAnalyticsCustomDomainsImagesEmails(
-	s *model.Store, sesh *session.Session,
+	s *model.Store, userid int32,
 ) (bool, error) {
-	/* get user's tier features */
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return false, fmt.Errorf("get user id: %w", err)
-	}
 	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return false, fmt.Errorf("get user subscription: %w", err)
@@ -52,14 +41,10 @@ func HasAnalyticsCustomDomainsImagesEmails(
 	return tier.analyticsCustomDomainImagesEmails.Value(), nil
 }
 
-func CanUseTheme(s *model.Store, theme string, sesh *session.Session) (bool, error) {
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return false, fmt.Errorf("get user id: %w", err)
-	}
+func CanUseTheme(s *model.Store, theme string, userid int32) (bool, error) {
 	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
-		return false, fmt.Errorf("error getting user subscription: %w", err)
+		return false, fmt.Errorf("get user subscription: %w", err)
 	}
 	tier := subscriptionTiers[plan]
 	return tier.canUseTheme(theme), nil

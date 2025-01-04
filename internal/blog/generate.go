@@ -9,6 +9,7 @@ import (
 
 	"github.com/xr0-org/progstack-ssg/pkg/ssg"
 	"github.com/xr0-org/progstack/internal/assert"
+	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/model"
 )
@@ -31,44 +32,9 @@ func GetFreshGeneration(blogid int32, s *model.Store) (int32, error) {
 	if err != nil {
 		return -1, fmt.Errorf("path: %w", err)
 	}
-	site, err := ssg.GenerateSiteWithBindings(
-		path,
-		filepath.Join(
-			config.Config.Progstack.WebsitesPath,
-			b.Subdomain.String(),
-		),
-		config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
-		"algol_nu",
-		"",
-		"<p>Subscribe via <a href=\"/subscribe\">email</a>.</p>",
-		map[string]ssg.CustomPage{
-			"/subscribe": ssg.NewSubscriberPage(
-				fmt.Sprintf(
-					"%s://%s/blogs/%d/subscribe",
-					config.Config.Progstack.Protocol,
-					config.Config.Progstack.RootDomain,
-					b.ID,
-				),
-			),
-			"/subscribed": ssg.NewMessagePage(
-				"Subscribed",
-				"<p>You have been subscribed. Please check your email.</p>",
-			),
-			"/unsubscribed": ssg.NewMessagePage(
-				"Unsubscribed",
-				`<p>
-					You have been unsubscribed from this site.
-					You will no longer receive email updates for posts.
-				</p>
-				<p>
-					If this was a mistake, you can resubscribe
-					<a href="/subscribe">here</a>.
-				</p>`,
-			),
-		},
-	)
+	site, err := ssgGenerateWithAuthZRestrictions(path, &b, s)
 	if err != nil {
-		return -1, fmt.Errorf("error generating site: %w", err)
+		return -1, fmt.Errorf("generate with authz: %w", err)
 	}
 	if title := site.Title(); title != "" {
 		if err := s.UpdateBlogName(
@@ -139,6 +105,73 @@ func getpathondisk(blog *model.Blog, s *model.Store) (string, error) {
 		return "", fmt.Errorf("get repo: %w", err)
 	}
 	return repo.PathOnDisk, nil
+}
+
+func ssgGenerateWithAuthZRestrictions(
+	src string, b *model.Blog, store *model.Store,
+) (ssg.Site, error) {
+	canHaveSubs, err := authz.HasAnalyticsCustomDomainsImagesEmails(
+		store, b.UserID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("can have subscribers: %w", err)
+	}
+	if !canHaveSubs {
+		return ssg.GenerateSiteWithBindings(
+			src,
+			filepath.Join(
+				config.Config.Progstack.WebsitesPath,
+				b.Subdomain.String(),
+			),
+			config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
+			"algol_nu", "", "",
+			map[string]ssg.CustomPage{
+				"/unsubscribed": ssg.NewMessagePage(
+					"Unsubscribed",
+					`<p>
+					You have been unsubscribed from this site.
+					You will no longer receive email updates for posts.
+				</p>`,
+				),
+			},
+		)
+	}
+	return ssg.GenerateSiteWithBindings(
+		src,
+		filepath.Join(
+			config.Config.Progstack.WebsitesPath,
+			b.Subdomain.String(),
+		),
+		config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
+		"algol_nu",
+		"",
+		"<p>Subscribe via <a href=\"/subscribe\">email</a>.</p>",
+		map[string]ssg.CustomPage{
+			"/subscribe": ssg.NewSubscriberPage(
+				fmt.Sprintf(
+					"%s://%s/blogs/%d/subscribe",
+					config.Config.Progstack.Protocol,
+					config.Config.Progstack.RootDomain,
+					b.ID,
+				),
+			),
+			"/subscribed": ssg.NewMessagePage(
+				"Subscribed",
+				"<p>You have been subscribed. Please check your email.</p>",
+			),
+			"/unsubscribed": ssg.NewMessagePage(
+				"Unsubscribed",
+				`<p>
+					You have been unsubscribed from this site.
+					You will no longer receive email updates for posts.
+				</p>
+				<p>
+					If this was a mistake, you can resubscribe
+					<a href="/subscribe">here</a>.
+				</p>`,
+			),
+		},
+	)
 }
 
 func upsertPost(

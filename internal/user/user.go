@@ -70,7 +70,11 @@ func (u *UserService) CreateNewBlog(r request.Request) (response.Response, error
 
 	r.MixpanelTrack("CreateNewBlog")
 
-	can, err := authz.CanCreateSite(u.store, sesh)
+	userID, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
+	can, err := authz.CanCreateSite(u.store, userID)
 	if err != nil {
 		return nil, fmt.Errorf("CanCreateSite: %w", err)
 	}

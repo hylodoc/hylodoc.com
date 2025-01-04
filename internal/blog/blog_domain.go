@@ -165,7 +165,11 @@ func (b *BlogService) DomainSubmit(
 
 	r.MixpanelTrack("DomainSubmit")
 
-	has, err := authz.HasAnalyticsCustomDomainsImagesEmails(b.store, sesh)
+	userID, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
+	has, err := authz.HasAnalyticsCustomDomainsImagesEmails(b.store, userID)
 	if err != nil {
 		return nil, fmt.Errorf("has analytics et al: %w", err)
 	}

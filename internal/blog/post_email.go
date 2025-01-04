@@ -24,8 +24,12 @@ func (b *BlogService) SendPostEmail(
 
 	r.MixpanelTrack("SendPostEmail")
 
+	userID, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
 	canSend, err := authz.HasAnalyticsCustomDomainsImagesEmails(
-		b.store, sesh,
+		b.store, userID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("can send email: %w", err)

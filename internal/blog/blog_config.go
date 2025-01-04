@@ -54,8 +54,12 @@ func (b *BlogService) Config(
 	if err != nil {
 		return nil, fmt.Errorf("get blog info: %w", err)
 	}
+	userID, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
 	canConfigure, err := authz.HasAnalyticsCustomDomainsImagesEmails(
-		b.store, sesh,
+		b.store, userID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("can configure custom domain: %w", err)
