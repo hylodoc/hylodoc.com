@@ -103,10 +103,10 @@ func getpathondisk(blog *model.Blog, s *model.Store) (string, error) {
 }
 
 func ssgGenerateWithAuthZRestrictions(
-	src string, b *model.Blog, store *model.Store,
+	src string, b *model.Blog, s *model.Store,
 ) (ssg.Site, error) {
 	canHaveSubs, err := authz.HasAnalyticsCustomDomainsImagesEmails(
-		store, b.UserID,
+		s, b.UserID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("can have subscribers: %w", err)

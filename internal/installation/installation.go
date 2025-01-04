@@ -466,7 +466,7 @@ func handlePush(
 		return nil
 	}
 
-	if err := blog.UpdateRepositoryOnDisk(c, s, &b, sesh); err != nil {
+	if err := blog.UpdateRepositoryOnDisk(c, &b, sesh, s); err != nil {
 		return fmt.Errorf("error pulling latest changes: %w", err)
 	}
 	return nil

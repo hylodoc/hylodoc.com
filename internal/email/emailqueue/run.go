@@ -24,8 +24,8 @@ func Run(c *httpclient.Client, s *model.Store) error {
 	for {
 		if err := s.ExecTx(
 			context.TODO(),
-			func(q *model.Queries) error {
-				return runbatchtx(c, q)
+			func(s *model.Store) error {
+				return runbatchtx(c, s)
 			},
 		); err != nil {
 			return err
@@ -34,12 +34,12 @@ func Run(c *httpclient.Client, s *model.Store) error {
 	}
 }
 
-func runbatchtx(c *httpclient.Client, q *model.Queries) error {
-	emails, err := q.GetTopNQueuedEmails(context.TODO(), postmarkBatchSize)
+func runbatchtx(c *httpclient.Client, s *model.Store) error {
+	emails, err := s.GetTopNQueuedEmails(context.TODO(), postmarkBatchSize)
 	if err != nil {
 		return fmt.Errorf("get top N: %w", err)
 	}
-	batch, err := buildbatch(emails, q)
+	batch, err := buildbatch(emails, s)
 	if err != nil {
 		return fmt.Errorf("build batch: %w", err)
 	}
@@ -49,7 +49,7 @@ func runbatchtx(c *httpclient.Client, q *model.Queries) error {
 	}
 	for i := range responses {
 		e := emails[i]
-		if err := processresp(&e, responses[i], q); err != nil {
+		if err := processresp(&e, responses[i], s); err != nil {
 			return fmt.Errorf("process %d: %w", e.ID, err)
 		}
 	}
@@ -57,11 +57,11 @@ func runbatchtx(c *httpclient.Client, q *model.Queries) error {
 }
 
 func buildbatch(
-	emails []model.QueuedEmail, q *model.Queries,
+	emails []model.QueuedEmail, s *model.Store,
 ) ([]postmark.Email, error) {
 	batch := make([]postmark.Email, len(emails))
 	for i, e := range emails {
-		headers, err := getheaders(e.ID, q)
+		headers, err := getheaders(e.ID, s)
 		if err != nil {
 			return nil, fmt.Errorf("headers: %w", err)
 		}
@@ -76,10 +76,10 @@ func buildbatch(
 }
 
 func processresp(
-	e *model.QueuedEmail, resp postmark.Response, q *model.Queries,
+	e *model.QueuedEmail, resp postmark.Response, s *model.Store,
 ) error {
 	if resp.ErrorCode() == 0 {
-		if err := q.MarkQueuedEmailSent(
+		if err := s.MarkQueuedEmailSent(
 			context.TODO(), e.ID,
 		); err != nil {
 			return fmt.Errorf("mark sent: %w", err)
@@ -92,7 +92,7 @@ func processresp(
 		"e.ID send error %d: code: %d, message: %s\n",
 		e.ID, resp.ErrorCode(), resp.Message(),
 	)
-	if err := q.InsertQueuedEmailPostmarkError(
+	if err := s.InsertQueuedEmailPostmarkError(
 		context.TODO(),
 		model.InsertQueuedEmailPostmarkErrorParams{
 			Email:   e.ID,
@@ -102,7 +102,7 @@ func processresp(
 	); err != nil {
 		return fmt.Errorf("save postmark error: %w", err)
 	}
-	if err := q.IncrementQueuedEmailFailCount(
+	if err := s.IncrementQueuedEmailFailCount(
 		context.TODO(),
 		e.ID,
 	); err != nil {
@@ -112,7 +112,7 @@ func processresp(
 		e.FailCount <= config.Config.Email.Queue.MaxRetries,
 	)
 	if e.FailCount == config.Config.Email.Queue.MaxRetries {
-		if err := q.MarkQueuedEmailFailed(
+		if err := s.MarkQueuedEmailFailed(
 			context.TODO(), e.ID,
 		); err != nil {
 			return fmt.Errorf("mark failed: %w", err)
@@ -123,8 +123,8 @@ func processresp(
 	return nil
 }
 
-func getheaders(emailid int32, q *model.Queries) (map[string]string, error) {
-	dbheaders, err := q.GetQueuedEmailHeaders(context.TODO(), emailid)
+func getheaders(emailid int32, s *model.Store) (map[string]string, error) {
+	dbheaders, err := s.GetQueuedEmailHeaders(context.TODO(), emailid)
 	if err != nil {
 		return nil, err
 	}

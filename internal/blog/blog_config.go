@@ -284,7 +284,7 @@ func handleStatusChange(
 		return nil, fmt.Errorf("invalid status change: %w", err)
 	}
 	if islive {
-		return setBlogToLive(&blog, s, sesh)
+		return setBlogToLive(&blog, sesh, s)
 	} else {
 		return setBlogToOffline(&blog, s)
 	}
@@ -305,7 +305,7 @@ func validateStatusChange(blogID int32, islive bool, s *model.Store) error {
 }
 
 func setBlogToLive(
-	b *model.Blog, s *model.Store, sesh *session.Session,
+	b *model.Blog, sesh *session.Session, s *model.Store,
 ) (*statusChangeResponse, error) {
 	if err := s.SetBlogToLive(context.TODO(), b.ID); err != nil {
 		return nil, err
@@ -385,7 +385,7 @@ func (b *BlogService) SyncRepository(
 		return nil, fmt.Errorf("error getting blog `%d': %w", intBlogID, err)
 	}
 	if err := UpdateRepositoryOnDisk(
-		b.client, b.store, &blog, sesh,
+		b.client, &blog, sesh, b.store,
 	); err != nil {
 		return nil, fmt.Errorf("update error: %w", err)
 	}
