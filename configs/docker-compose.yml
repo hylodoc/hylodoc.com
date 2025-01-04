@@ -1,0 +1,69 @@
+services:
+  progstack:
+    container_name: progstack_container
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '7980:80'
+      - '7999:443'
+    volumes:
+      - './certs:/app/certs'
+      - './folders:/app/folders'
+      - './repositories:/app/repositories'
+      - './websites:/app/websites'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - monitor-network
+
+  prometheus:
+    image: prom/prometheus
+    logging:
+      driver: none
+    volumes:
+      - './prometheus.yml:/etc/prometheus/prometheus.yml'
+    ports:
+      - "9090:9090"
+    networks:
+      - monitor-network
+
+  grafana:
+    image: grafana/grafana
+    logging:
+      driver: none
+    ports:
+      - "3000:3000"
+    networks:
+      - monitor-network
+    depends_on:
+      - prometheus
+
+  postgres:
+    image: postgres:12-alpine
+    container_name: postgres_container
+    ports:
+      - '65432:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 5
+    volumes:
+      - './internal/model/:/docker-entrypoint-initdb.d/'
+    restart: unless-stopped
+    networks:
+      - monitor-network
+
+volumes:
+  certs:
+  folders:
+  repositories:
+  websites:
+
+networks:
+  monitor-network:
+    driver: bridge

@@ -1,0 +1,65 @@
+progstack:
+  progstack: "Progstack"
+  protocol: "http"
+  root_domain: "localhost:7999"
+  domain: "localhost"
+  repositories_path: "./repositories"
+  folders_path: "./folders"
+  websites_path: "./websites"
+  certs_path: "./certs"
+  accounts_email: "accounts@lbnz.dev"	# billing query email
+  email_domain: "mails.lbnz.dev"
+  custom_domain_cname: "custom-domain-cname-target.hylodoc.com"
+  custom_domain_ip: "34.218.85.117"
+  custom_domain_guide_url: "https://google.com"
+  open_issue_url: "https://github.com"
+  discord_url: "https://discord.com"
+  cdn: "https://cdn.progstack.com"
+
+progstack_ssg:
+  themes:
+    lit:
+      name: "lit"
+      description: "pretty, simple"
+      path: "progstack-ssg/theme/lit"
+    latex:
+      name: "latex"
+      description: "latex style"
+      path: "progstack-ssg/theme/latex"
+
+github:
+  app_id: 999929
+  app_name: "progstack-dev"
+  client_id: "<GithubClientID>"
+  client_secret: "<GithubClientSecret>"
+  webhook_secret: "<GithubWebhookSecret>"
+  private_key_path: "/path/to/private/key/private-key.pem"
+  oauth_callback: "http://localhost:7999/gh/oauthcallback"
+  link_callback: "http://localhost:7999/gh/linkcallback"
+
+docker:
+  container_name: "progstack_container"
+  postgres_image: "postgres:12-alpine"
+
+mixpanel:
+  token: "<MixpanelProjectToken>"
+
+postgres:
+  host: "postgres"
+  name: "progstack_db"
+  user: "postgres"
+  schema: "progstack"
+  password: "<Secret>"
+  port: 5432
+
+email:
+  postmark_api_key: "<PostmarkAPIKey>"
+  queue:
+    max_retries: 3
+    period: 5s # time.Duration
+
+stripe:
+  publishable_key: "<StripePublishableKey>"
+  secret_key: "<StripeSecretKey>"
+  webhook_signing_secret: "<StripeWebhookKey>"
+  free_plan_price_id: "<StripeFreePlanPriceID>"
