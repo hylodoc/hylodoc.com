@@ -26,7 +26,6 @@ type BlogInfo struct {
 	Theme                    string
 	Type                     string
 	Status                   string
-	TestBranch               string
 	LiveBranch               string
 	UpdatedAt                time.Time
 	IsRepository             bool
@@ -152,7 +151,6 @@ func getBlogInfo(s *model.Store, blogID int32) (BlogInfo, error) {
 		SubscriberMetricsUrl:     buildSubscriberMetricsUrl(blog.ID),
 		MetricsUrl:               buildMetricsUrl(blog.ID),
 		ConfigUrl:                buildConfigUrl(blog.ID),
-		TestBranch:               blog.TestBranch.String,
 		LiveBranch:               blog.LiveBranch.String,
 		Theme:                    string(blog.Theme),
 		Type:                     string(blog.BlogType),

@@ -144,7 +144,6 @@ CREATE TABLE blogs (
 	live_hash		VARCHAR(1000),
 
 	gh_repository_id	BIGINT				UNIQUE		DEFAULT(NULL),
-	test_branch		VARCHAR(100),
 	live_branch		VARCHAR(100),
 
 	folder_path		VARCHAR(1000),			-- path on disk
@@ -165,13 +164,11 @@ CREATE TABLE blogs (
 		(
 			blog_type = 'repository'
 			AND gh_repository_id	IS NOT NULL
-			AND test_branch		IS NOT NULL
 			AND live_branch 	IS NOT NULL
 			AND folder_path		IS NULL
 		) OR (
 			blog_type = 'folder'
 			AND gh_repository_id	IS NULL
-			AND test_branch		IS NULL
 			AND live_branch 	IS NULL
 			AND folder_path		IS NOT NULL
 		)

@@ -42,7 +42,6 @@ func (b *BlogService) CreateRepositoryBlog(
 		Subdomain    string `json:"subdomain"`
 		RepositoryID string `json:"repository_id"`
 		Theme        string `json:"theme"`
-		TestBranch   string `json:"test_branch"`
 		LiveBranch   string `json:"live_branch"`
 		Flow         string `json:"flow"`
 	}
@@ -87,10 +86,6 @@ func (b *BlogService) CreateRepositoryBlog(
 		},
 		Theme:     theme,
 		Subdomain: sub,
-		TestBranch: sql.NullString{
-			Valid:  true,
-			String: req.TestBranch,
-		},
 		LiveBranch: sql.NullString{
 			Valid:  true,
 			String: req.LiveBranch,

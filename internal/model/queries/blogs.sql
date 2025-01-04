@@ -5,14 +5,13 @@ INSERT INTO blogs (
 	folder_path,
 	theme,
 	subdomain,
-	test_branch,
 	live_branch,
 	live_hash,
 	from_address,
 	blog_type,
 	email_mode
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 )
 RETURNING *;
 
@@ -119,12 +118,6 @@ WHERE user_id = $1 AND is_live = true;
 UPDATE blogs
 SET
 	theme = $1
-WHERE id = $2;
-
--- name: SetTestBranchByID :exec
-UPDATE blogs
-SET
-	test_branch = $1
 WHERE id = $2;
 
 -- name: SetLiveBranchByID :exec

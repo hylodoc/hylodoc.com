@@ -160,52 +160,6 @@ func (b *BlogService) ThemeSubmit(
 
 /* Git branch info */
 
-func (b *BlogService) TestBranchSubmit(
-	r request.Request,
-) (response.Response, error) {
-	sesh := r.Session()
-	sesh.Println("TestBranchSubmit handler...")
-
-	r.MixpanelTrack("TestBranchSubmit")
-
-	blogID, ok := r.GetRouteVar("blogID")
-	if !ok {
-		return nil, createCustomError("", http.StatusNotFound)
-	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse blogID: %w", err)
-	}
-
-	var req struct {
-		Branch string `json:"branch"`
-	}
-	body, err := r.ReadBody()
-	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
-	}
-	if err := json.Unmarshal(body, &req); err != nil {
-		return nil, fmt.Errorf("decode body: %w", err)
-	}
-
-	/* XXX: validate input before writing to db */
-	if err := b.store.SetTestBranchByID(
-		context.TODO(),
-		model.SetTestBranchByIDParams{
-			ID: int32(intBlogID),
-			TestBranch: sql.NullString{
-				Valid:  true,
-				String: req.Branch,
-			},
-		}); err != nil {
-		return nil, fmt.Errorf("error updating branch info: %w", err)
-	}
-
-	return response.NewJson(struct {
-		Message string `json:"message"`
-	}{"Test branch submitted successfully!"})
-}
-
 func (b *BlogService) LiveBranchSubmit(
 	r request.Request,
 ) (response.Response, error) {

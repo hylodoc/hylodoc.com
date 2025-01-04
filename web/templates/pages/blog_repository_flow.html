@@ -66,14 +66,6 @@
 				</div>
 			</div>
 
-			<!-- Select test branch -->
-			<div class="row">
-				<label for="testBranchInput">Set git branch for test site generation</label>
-				<div class="row">
-					<input class="four columns" type="text" id="testBranchInput" placeholder="Enter test-build branch"/>
-				</div>
-			</div>
-
 			<!-- Submit git branch for live builds -->
 			<div class="row">
 				<label for="liveBranchInput">Set git branch for live builds</label>
@@ -149,19 +141,17 @@
 		const subdomain = document.getElementById("subdomainInput").value.trim();
 		const repoID = document.getElementById("repositoriesDropdown").value.trim();
 		const theme = document.getElementById("themesDropdown").value.trim();
-		const testBranch = document.getElementById("testBranchInput").value.trim();
 		const liveBranch = document.getElementById("liveBranchInput").value.trim();
 		console.log("subdomain: ", subdomain);
 		console.log("repositoryID: ", repoID);
 		console.log("theme: ", theme);
-		console.log("testBranch: ", testBranch);
 		console.log("liveBranch: ", liveBranch);
 
-		submitBlog(subdomain, repoID, theme, testBranch, liveBranch);
+		submitBlog(subdomain, repoID, theme, liveBranch);
 	}
 
 	/* Submit the subdomain to the server */
-	function submitBlog(subdomain, repoID, theme, testBranch, liveBranch) {
+	function submitBlog(subdomain, repoID, theme, liveBranch) {
 		fetch("/user/create-repository-blog", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -169,7 +159,6 @@
 				subdomain: subdomain,
 				repository_id: repoID,
 				theme: theme,
-				test_branch: testBranch,
 				live_branch: liveBranch
 			})
 		})

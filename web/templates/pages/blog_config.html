@@ -87,26 +87,7 @@
 		<h3>Repo</h3>
 
 		<h4>Branches</h4>
-		<!-- Submit git branch for test builds -->
-		<form id="test-branch-form" onsubmit="return false;">
-			<label for="testBranch">Test branch</label>
-			<div class="row">
-				<div class="four columns">
-					<input
-						class="u-full-width"
-						autocomplete="off"
-						type="text"
-						id="testBranch"
-						value="{{ if .Data.Blog.TestBranch }}{{ .Data.Blog.TestBranch }}{{ end }}"
-						placeholder="Enter test-build branch"
-					/>
-				</div>
-				<div class="three columns u-pull-left">
-					<button type="submit">Save</button>
-				</div>
-			</div>
-		</form>
-
+		
 		<!-- Submit git branch for live builds -->
 		<form id="live-branch-form" onsubmit="return false;">
 			<label for="liveBranch">Live branch</label>
@@ -191,7 +172,6 @@
 		const subdomainInput = document.getElementById("subdomainInput");
 		const subdomainForm = document.getElementById("subdomainForm");
 		const themeForm = document.getElementById("theme-form")
-		const testBranchInputForm = document.getElementById("test-branch-form")
 		const liveBranchInputForm = document.getElementById("live-branch-form")
 		const statusForm = document.getElementById("status-form")
 		const folderUpdateForm = document.getElementById("folderUpdateForm")
@@ -200,7 +180,6 @@
 		subdomainForm.addEventListener("submit", handleSubdomainFormSubmit);
 		themeForm.addEventListener("submit", handleThemeFormSubmit);
 		{{ if .Data.Blog.IsRepository }}
-			testBranchInputForm.addEventListener("submit", handleTestBranchFormSubmit)
 			liveBranchInputForm.addEventListener("submit", handleLiveBranchFormSubmit)
 		{{ else }}
 			folderUpdateForm.addEventListener("submit", handleFolderUpdateSubmit)
@@ -327,39 +306,6 @@
 		})
 		.catch(error => {
 			console.log("error submitting theme: ", error)
-			showToast(error);
-		});
-	}
-
-	function handleTestBranchFormSubmit(event) {
-		event.preventDefault(); /* Prevent default form submission */
-
-		const testBranch = document.getElementById("testBranch").value.trim();
-		submitTestBranch(testBranch);
-	}	
-
-	/* Submit the test branch to the server */
-	function submitTestBranch(testBranch) {
-		fetch("set-test-branch", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ branch: testBranch }),
-		})
-		.then(response => {
-			if (!response.ok) {
-				return response.json().then(errorData => {
-					showToast(errorData.message);
-					throw new Error(errorData.message);
-				});
-			}
-			return response.json();
-		})
-		.then(data => {
-			console.log("test branch submitted successfully: ", data.message);
-			showToast(data.message);
-		})
-		.catch(error => {
-			console.error("Error submitting test branch:", error)
 			showToast(error);
 		});
 	}

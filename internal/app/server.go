@@ -156,7 +156,6 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	handler.Handle(blogR, "/config-domain", blogService.ConfigDomain)
 	handler.Handle(blogR, "/set-domain", blogService.DomainSubmit)
 	handler.Handle(blogR, "/set-theme", blogService.ThemeSubmit)
-	handler.Handle(blogR, "/set-test-branch", blogService.TestBranchSubmit)
 	handler.Handle(blogR, "/set-live-branch", blogService.LiveBranchSubmit)
 	handler.Handle(blogR, "/set-folder", blogService.FolderSubmit)
 	handler.Handle(blogR, "/set-status", blogService.SetStatusSubmit)
