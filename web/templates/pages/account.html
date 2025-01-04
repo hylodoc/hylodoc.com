@@ -2,9 +2,9 @@
 
 <section>
 	<div class="container">
-		<h3>Storage Info</h3>
+		<h3>Storage info</h3>
 		<p>
-			<strong>Storage Used:</strong>
+			<strong>Storage used:</strong>
 			{{ .Data.StorageDetails.Used }} of {{ .Data.StorageDetails.Limit}} MB
 		</p>
 	</div>
@@ -12,11 +12,13 @@
 
 <section>
 	<div class="container">
-		<h3>Account Details</h3>
-		<p>Username: {{ .Data.AccountDetails.Username }}</p>
-		<p>Email: {{ .Data.AccountDetails.Email }}</p>
+		<h3>Account details</h3>
+		<p><strong>Username:</strong> {{ .Data.AccountDetails.Username }}</p>
+		<p><strong>Email:</strong> {{ .Data.AccountDetails.Email }}</p>
 		{{ if .Data.AccountDetails.IsLinked }}
-			<p>Linked GitHub Email: {{ .Data.AccountDetails.GithubEmail }}
+			<p>
+			<strong>Linked GitHub email:</strong> {{ .Data.AccountDetails.GithubEmail }}
+			</p>
 		{{ else }}
 			<a href="gh/linkgithub">Link your GithHub account</a>
 		{{ end }}
@@ -26,22 +28,23 @@
 <section>
 	<div class="container">
 		<h3>Subscription</h3>
-		<p>Plan: {{ .Data.AccountDetails.Subscription.Plan }}
-		<p>To manage your subscription, <a href="/user/stripe/billing-portal">click here</a></p>
+		<p><strong>Plan:</strong> {{ .Data.AccountDetails.Subscription.Plan }}
+		<p>To manage your subscription, <a
+			href="/user/stripe/billing-portal">click here</a>.</p>
 		<br>
 	</div>
 </section>
 
 <section>
 	<div class="container">
-		<h3>Actions</h3>
-		<p>If you wish to delete your account, please email us at
-		<a href="mailto:support@hylodoc.com?subject=Account%20Deletion%20Request">
-			support@hylodoc.com
-		</a>
-		with the subject line "Account Deletion
-		Request". We will process your request and provide
-		confirmation once your account has been deleted.</p>
+		<h3>Delete account</h3>
+		<p>
+			If you wish to delete your account, please email us at
+			<a href="mailto:support@hylodoc.com?subject=Account%20Deletion%20Request">support@hylodoc.com</a>
+			with the subject line "Account Deletion Request". 
+			We will process your request and provide confirmation
+			once your account has been deleted.
+		</p>
 	</div>
 </section>
 

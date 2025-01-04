@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/stripe/stripe-go/v78"
-	"github.com/stripe/stripe-go/v78/price"
-	"github.com/stripe/stripe-go/v78/product"
-	"github.com/stripe/stripe-go/v78/subscription"
-	"github.com/stripe/stripe-go/v78/webhook"
+	"github.com/stripe/stripe-go/v81"
+	"github.com/stripe/stripe-go/v81/price"
+	"github.com/stripe/stripe-go/v81/product"
+	"github.com/stripe/stripe-go/v81/subscription"
+	"github.com/stripe/stripe-go/v81/webhook"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/config"
@@ -41,8 +41,7 @@ func (b *BillingService) stripeWebhook(r request.Request) error {
 		r.GetHeader("Stripe-Signature"),
 		config.Config.Stripe.WebhookSigningSecret,
 	); err != nil {
-		/* TODO: verify */
-		sesh.Printf("invalid webhook signature: %s\n", err)
+		return fmt.Errorf("invalid webhook signature: %w", err)
 	}
 
 	event, err := parseEvent(payload)
@@ -138,6 +137,11 @@ func handleCustomerSubscriptionUpdated(
 		},
 	); err != nil {
 		return fmt.Errorf("error writing stripe subscription to db: %w", err)
+	}
+	if err := s.MarkGenerationsStaleByStripeSubscriptionID(
+		context.TODO(), sub.ID,
+	); err != nil {
+		return fmt.Errorf("mark generations stale: %w", err)
 	}
 
 	return nil

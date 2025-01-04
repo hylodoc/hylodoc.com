@@ -13,10 +13,10 @@ import (
 	"github.com/xr0-org/progstack/internal/session"
 	"github.com/xr0-org/progstack/internal/util"
 
-	"github.com/stripe/stripe-go/v78"
-	bSession "github.com/stripe/stripe-go/v78/billingportal/session"
-	"github.com/stripe/stripe-go/v78/customer"
-	"github.com/stripe/stripe-go/v78/subscription"
+	"github.com/stripe/stripe-go/v81"
+	bSession "github.com/stripe/stripe-go/v81/billingportal/session"
+	"github.com/stripe/stripe-go/v81/customer"
+	"github.com/stripe/stripe-go/v81/subscription"
 )
 
 type BillingService struct {
@@ -152,11 +152,13 @@ func (b *BillingService) billingPortal(r request.Request) (string, error) {
 
 	params := &stripe.BillingPortalSessionParams{
 		Customer: stripe.String(sub.StripeCustomerID),
-		ReturnURL: stripe.String(fmt.Sprintf(
-			"%s://%s/user/account",
-			config.Config.Progstack.Protocol,
-			config.Config.Progstack.RootDomain,
-		)),
+		ReturnURL: stripe.String(
+			fmt.Sprintf(
+				"%s://%s/user/account",
+				config.Config.Progstack.Protocol,
+				config.Config.Progstack.RootDomain,
+			),
+		),
 	}
 
 	/* set private key for stripe client */

@@ -16,6 +16,13 @@ WHERE b.id = @blog_id
 	AND g.stale = false
 LIMIT 1;
 
+-- name: MarkGenerationsStaleByStripeSubscriptionID :exec
+UPDATE generations g
+SET stale = true
+FROM stripe_subscriptions s
+	INNER JOIN blogs b ON b.user_id = s.user_id
+WHERE s.stripe_subscription_id = $1 AND b.live_hash = g.hash;
+
 -- name: InsertBinding :exec
 INSERT INTO bindings (
 	gen, url, path

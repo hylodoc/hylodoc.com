@@ -224,13 +224,13 @@ CREATE TABLE generations (
 	created_at	TIMESTAMPTZ	NOT NULL	DEFAULT(now()),
 	hash		VARCHAR(1000)	NOT NULL,
 	boot_id		INTEGER		NOT NULL	REFERENCES boots,
-	stale		BOOLEAN		NOT NULL	DEFAULT(false),
-
-	CONSTRAINT unique_hash_boot_id
-		UNIQUE (hash, boot_id)
+	stale		BOOLEAN		NOT NULL	DEFAULT(false)
 );
 CREATE INDEX ON generations(stale);
 CREATE INDEX ON generations(boot_id);
+CREATE UNIQUE INDEX unique_hash_boot_id
+	ON generations (hash, boot_id)
+	WHERE stale = false;
 
 CREATE TABLE bindings (
 	gen 	INTEGER		NOT NULL	REFERENCES generations,
@@ -334,16 +334,16 @@ CREATE INDEX ON subscriber_emails(clicked);
 CREATE INDEX ON subscriber_emails(url, blog);
 
 
--- stripe integration
-CREATE TYPE sub_name AS ENUM ('basic', 'premium');
+-- NB: these must match the names on Stripe
+CREATE TYPE sub_name AS ENUM ('Basic', 'Premium');
 
 CREATE TABLE stripe_subscriptions (
-	id			SERIAL					PRIMARY KEY,
-	user_id			INTEGER			NOT NULL,
-	sub_name		sub_name		NOT NULL,
-	stripe_subscription_id	VARCHAR(255)		NOT NULL,
+	stripe_subscription_id	VARCHAR(255)		NOT NULL	PRIMARY KEY,
 	stripe_customer_id	VARCHAR(255)		NOT NULL,
 	stripe_status		VARCHAR(255)		NOT NULL,
+	sub_name		sub_name		NOT NULL,
+
+	user_id			INTEGER			NOT NULL	REFERENCES users,
 	created_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
 	updated_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now())
 );
