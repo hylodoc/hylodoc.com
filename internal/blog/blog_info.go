@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/xr0-org/progstack/internal/config"
@@ -28,6 +29,7 @@ type BlogInfo struct {
 	UpdatedAt                time.Time
 	IsLive                   bool
 	Hash                     string
+	HashUrl                  string
 	SyncUrl                  string
 }
 
@@ -48,14 +50,18 @@ func GetBlogsInfo(s *model.Store, userID int32) ([]BlogInfo, error) {
 	return info, nil
 }
 
-func getghurl(blog *model.Blog, s *model.Store) (string, error) {
+func getghurl(blog *model.Blog, s *model.Store) (*url.URL, error) {
 	repo, err := s.GetRepositoryByGhRepositoryID(
 		context.TODO(), blog.GhRepositoryID,
 	)
 	if err != nil {
-		return "", fmt.Errorf("get repo: %w", err)
+		return nil, fmt.Errorf("get repo: %w", err)
 	}
-	return repo.Url, nil
+	u, err := url.Parse(repo.Url)
+	if err != nil {
+		return nil, fmt.Errorf("parse: %w", err)
+	}
+	return u, nil
 }
 
 func getname(blog model.Blog) string {
@@ -140,7 +146,7 @@ func getBlogInfo(s *model.Store, blogID int32) (BlogInfo, error) {
 		Url:                      buildUrl(blog.Subdomain.String()),
 		ConfigureCustomDomainUrl: buildConfigureCustomDomainUrl(blog.ID),
 		SetDomainUrl:             buildSetDomainUrl(blog.ID),
-		RepositoryUrl:            ghurl,
+		RepositoryUrl:            ghurl.String(),
 		SubscriberMetricsUrl:     buildSubscriberMetricsUrl(blog.ID),
 		MetricsUrl:               buildMetricsUrl(blog.ID),
 		ConfigUrl:                buildConfigUrl(blog.ID),
@@ -148,8 +154,11 @@ func getBlogInfo(s *model.Store, blogID int32) (BlogInfo, error) {
 		Theme:                    string(blog.Theme),
 		UpdatedAt:                blog.UpdatedAt,
 		IsLive:                   isLive,
-		Hash:                     blog.LiveHash.String,
 		SyncUrl:                  buildSyncUrl(blog.ID),
+		Hash:                     blog.LiveHash.String,
+		HashUrl: ghurl.JoinPath(
+			"commit", blog.LiveHash.String,
+		).String(),
 	}, nil
 }
 

@@ -34,11 +34,11 @@
 			<div id="availabilityMessage" class="availability-message"></div>
 		</form>
 
-		<h4>Custom Domain</h4>
+		<h4>Custom domain</h4>
 			{{ if .Data.CanCustomDomain }}
 		<p>
 				{{ if .Data.Blog.Domain }}
-				<b>{{.Data.Blog.Domain}}</b>.
+				<strong>{{.Data.Blog.Domain}}</strong>.
 				<br>
 				{{ end }}
 				<a href="{{ .Data.Blog.ConfigureCustomDomainUrl }}">Click here</a> to configure.
@@ -85,11 +85,11 @@
 	<div class="container">
 		<h3>Repo</h3>
 
-		<h4>Branches</h4>
+		<h4>Branch</h4>
 		
 		<!-- Submit git branch for live builds -->
 		<form id="live-branch-form" onsubmit="return false;">
-			<label for="liveBranch">Live branch</label>
+			<label for="liveBranch">Git branch</label>
 			<div class="row">
 				<div class="four columns">
 					<input
@@ -109,7 +109,10 @@
 
 
 		<h4>Manual sync</h4>
-		<p>Current hash: {{ .Data.Blog.Hash }}</p>
+		<p>
+			<strong>Commit:</strong>
+			<a href="{{ .Data.Blog.HashUrl }}">{{ .Data.Blog.Hash }}</a>
+		</p>
 		<p>Hit the button below to manually sync with the repository on
 		GitHub.</p>
 		<a href="{{ .Data.Blog.SyncUrl }}" class="button">Sync</a>
