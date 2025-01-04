@@ -64,62 +64,6 @@ func (u *UserService) Home(r request.Request) (response.Response, error) {
 	), nil
 }
 
-func (u *UserService) CreateNewBlog(r request.Request) (response.Response, error) {
-	sesh := r.Session()
-	sesh.Println("CreateNewBlog handler...")
-
-	r.MixpanelTrack("CreateNewBlog")
-
-	userID, err := sesh.GetUserID()
-	if err != nil {
-		return nil, fmt.Errorf("get user id: %w", err)
-	}
-	can, err := authz.CanCreateSite(u.store, userID)
-	if err != nil {
-		return nil, fmt.Errorf("CanCreateSite: %w", err)
-	}
-	if !can {
-		return nil, authz.SubscriptionError
-	}
-
-	return response.NewTemplate(
-		[]string{"blog_create.html"},
-		util.PageInfo{
-			Data: struct {
-				Title    string
-				UserInfo *session.UserInfo
-			}{
-				Title:    "Create New Blog",
-				UserInfo: session.ConvertSessionToUserInfo(sesh),
-			},
-		},
-	), nil
-}
-
-func (u *UserService) FolderFlow(r request.Request) (response.Response, error) {
-	sesh := r.Session()
-	sesh.Printf("FolderFlow handler...")
-
-	r.MixpanelTrack("FolderFlow")
-
-	return response.NewTemplate(
-		[]string{"blog_folder_flow.html"},
-		util.PageInfo{
-			Data: struct {
-				Title      string
-				UserInfo   *session.UserInfo
-				RootDomain string
-				Themes     []string
-			}{
-				Title:      "Folder Flow",
-				UserInfo:   session.ConvertSessionToUserInfo(r.Session()),
-				RootDomain: config.Config.Progstack.RootDomain,
-				Themes:     blog.BuildThemes(config.Config.ProgstackSsg.Themes),
-			},
-		},
-	), nil
-}
-
 func (u *UserService) GithubInstallation(
 	r request.Request,
 ) (response.Response, error) {
@@ -224,7 +168,7 @@ func (u *UserService) RepositoryFlow(
 				Repositories   []Repository
 				Themes         []string
 			}{
-				Title:          "Repository Flow",
+				Title:          "Create new blog",
 				UserInfo:       session.ConvertSessionToUserInfo(sesh),
 				AccountDetails: details,
 				RootDomain:     config.Config.Progstack.RootDomain,

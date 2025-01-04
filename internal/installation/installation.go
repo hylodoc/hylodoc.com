@@ -435,10 +435,7 @@ func handlePush(
 	sesh.Printf("push event: %s\n", str)
 
 	/* validate that blog exists for repository */
-	b, err := s.GetBlogByGhRepositoryID(context.TODO(), sql.NullInt64{
-		Valid: true,
-		Int64: event.Repository.ID,
-	})
+	b, err := s.GetBlogByGhRepositoryID(context.TODO(), event.Repository.ID)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return fmt.Errorf(
@@ -460,15 +457,11 @@ func handlePush(
 	if err != nil {
 		return err
 	}
-	if !b.LiveBranch.Valid {
-		/* XXX: should never fail we constraint this at the db level */
-		return fmt.Errorf("blog has no live branch configured")
-	}
 
 	sesh.Printf("event branch: `%s'\n", branchName)
-	sesh.Printf("live branch: `%s'\n", b.LiveBranch.String)
+	sesh.Printf("live branch: `%s'\n", b.LiveBranch)
 
-	if branchName != b.LiveBranch.String {
+	if branchName != b.LiveBranch {
 		/* event does not match live branch */
 		return nil
 	}

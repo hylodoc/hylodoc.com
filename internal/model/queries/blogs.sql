@@ -2,16 +2,14 @@
 INSERT INTO blogs (
 	user_id,
 	gh_repository_id,
-	folder_path,
 	theme,
 	subdomain,
 	live_branch,
 	live_hash,
 	from_address,
-	blog_type,
 	email_mode
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+	$1, $2, $3, $4, $5, $6, $7, $8
 )
 RETURNING *;
 
@@ -65,7 +63,7 @@ WHERE id = $1;
 -- name: GetBlogByGhRepositoryID :one
 SELECT *
 FROM blogs
-WHERE gh_repository_id = $1 AND blog_type = 'repository';
+WHERE gh_repository_id = $1;
 
 -- name: GetBlogBySubdomain :one
 SELECT *
@@ -81,11 +79,6 @@ WHERE domain = $1::VARCHAR;
 SELECT id
 FROM blogs b
 WHERE user_id = $1;
-
--- name: ListBlogFolderPathsByUserID :many
-SELECT folder_path::VARCHAR
-FROM blogs b
-WHERE user_id = $1 AND blog_type = 'folder';
 
 -- name: GetBlogIsLive :one
 SELECT is_live

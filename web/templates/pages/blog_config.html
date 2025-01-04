@@ -34,11 +34,11 @@
 			<div id="availabilityMessage" class="availability-message"></div>
 		</form>
 
-		<h4>Custom Domain</h4>
+		<h4>Custom domain</h4>
 			{{ if .Data.CanCustomDomain }}
 		<p>
 				{{ if .Data.Blog.Domain }}
-				<b>{{.Data.Blog.Domain}}</b>.
+				<strong>{{.Data.Blog.Domain}}</strong>.
 				<br>
 				{{ end }}
 				<a href="{{ .Data.Blog.ConfigureCustomDomainUrl }}">Click here</a> to configure.
@@ -81,16 +81,15 @@
 
 
 <!-- Configure git -->
-{{ if .Data.Blog.IsRepository }}
 <section>
 	<div class="container">
 		<h3>Repo</h3>
 
-		<h4>Branches</h4>
+		<h4>Branch</h4>
 		
 		<!-- Submit git branch for live builds -->
 		<form id="live-branch-form" onsubmit="return false;">
-			<label for="liveBranch">Live branch</label>
+			<label for="liveBranch">Git branch</label>
 			<div class="row">
 				<div class="four columns">
 					<input
@@ -110,29 +109,15 @@
 
 
 		<h4>Manual sync</h4>
-		<p>Current hash: {{ .Data.Blog.Hash }}</p>
+		<p>
+			<strong>Commit:</strong>
+			<a href="{{ .Data.Blog.HashUrl }}">{{ .Data.Blog.Hash }}</a>
+		</p>
 		<p>Hit the button below to manually sync with the repository on
 		GitHub.</p>
 		<a href="{{ .Data.Blog.SyncUrl }}" class="button">Sync</a>
 	</div>
 </section>
-{{ else }}
-<section>
-	<div class="container">
-		<form id="folderUpdateForm" enctype="multipart/form-data">
-			<!-- Select folder -->
-			<div class="row">
-				<div class="four columns">
-					<label for="folder">Select Folder (ZIP):</label>
-					<input type="file" id="folder" name="folder" accept=".zip" required>
-				</div>
-			</div>
-
-			<button type="submit" id="folderUpdateBtn">Update</button>
-		</form>
-	</div>
-</section>
-{{ end }}
 
 <!-- Toggle site between live/offline -->
 <section>
@@ -174,16 +159,11 @@
 		const themeForm = document.getElementById("theme-form")
 		const liveBranchInputForm = document.getElementById("live-branch-form")
 		const statusForm = document.getElementById("status-form")
-		const folderUpdateForm = document.getElementById("folderUpdateForm")
 
 		subdomainInput.addEventListener("input", handleInput);
 		subdomainForm.addEventListener("submit", handleSubdomainFormSubmit);
 		themeForm.addEventListener("submit", handleThemeFormSubmit);
-		{{ if .Data.Blog.IsRepository }}
-			liveBranchInputForm.addEventListener("submit", handleLiveBranchFormSubmit)
-		{{ else }}
-			folderUpdateForm.addEventListener("submit", handleFolderUpdateSubmit)
-		{{ end }}
+		liveBranchInputForm.addEventListener("submit", handleLiveBranchFormSubmit)
 		statusForm.addEventListener("submit", handleStatusFormSubmit)
 	}
 
@@ -338,34 +318,6 @@
 			showToast(data.message);
 		})
 		.catch(error => console.error("Error submitting live branch:", error));
-	}
-
-	function handleFolderUpdateSubmit(event) {
-		event.preventDefault();
-
-		const fileInput = document.getElementById("folder");
-
-		if (!fileInput) {
-			alert("please upload a .zip folder")
-		}
-
-		const formData = new FormData();
-		formData.append("folder", fileInput.files[0]);
-
-		fetch("set-folder", {
-			method: "POST",
-			body: formData
-		}).then(response => {
-			if (response.ok) {
-				return response.json();
-			} else {
-				throw new Error("failed to submit form");
-			}
-		}).then(data => {
-			showToast(data.message);
-		}).catch(error => {
-			showToast("an error occured" + error.message);
-		})
 	}
 
 	function handleStatusFormSubmit(event) {

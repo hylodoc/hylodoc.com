@@ -139,12 +139,9 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	handler.Handle(authR, "/gh/linkgithub", authNService.LinkGithubAccount)
 	handler.Handle(authR, "/account", userService.Account)
 	handler.Handle(authR, "/subdomain-check", blogService.SubdomainCheck)
-	handler.Handle(authR, "/create-new-blog", userService.CreateNewBlog)
-	handler.Handle(authR, "/repository-flow", userService.RepositoryFlow)
+	handler.Handle(authR, "/create-new-blog", userService.RepositoryFlow)
 	handler.Handle(authR, "/github-installation", userService.GithubInstallation)
-	handler.Handle(authR, "/folder-flow", userService.FolderFlow)
 	handler.Handle(authR, "/create-repository-blog", blogService.CreateRepositoryBlog)
-	handler.Handle(authR, "/create-folder-blog", blogService.CreateFolderBlog)
 
 	/* billing */
 	handler.Handle(authR, "/stripe/billing-portal", billingService.BillingPortal)
@@ -157,7 +154,6 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	handler.Handle(blogR, "/set-domain", blogService.DomainSubmit)
 	handler.Handle(blogR, "/set-theme", blogService.ThemeSubmit)
 	handler.Handle(blogR, "/set-live-branch", blogService.LiveBranchSubmit)
-	handler.Handle(blogR, "/set-folder", blogService.FolderSubmit)
 	handler.Handle(blogR, "/set-status", blogService.SetStatusSubmit)
 	handler.Handle(blogR, "/sync", blogService.SyncRepository)
 	handler.Handle(blogR, "/email", blogService.SendPostEmail)

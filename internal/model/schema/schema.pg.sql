@@ -119,7 +119,6 @@ CREATE TABLE repositories (
 		ON DELETE CASCADE -- delete repositories when installation deleted
 );
 
-CREATE TYPE blog_type AS ENUM ('repository', 'folder');
 CREATE TYPE blog_theme AS ENUM ('lit', 'latex');
 CREATE TYPE email_mode AS ENUM ('plaintext', 'html');
 
@@ -139,14 +138,11 @@ CREATE TABLE blogs (
 		CHECK (domain <> ''),
 
 	from_address		VARCHAR(255)	NOT NULL,
-	blog_type		blog_type	NOT NULL,
 	email_mode		email_mode	NOT NULL,
 	live_hash		VARCHAR(1000),
 
-	gh_repository_id	BIGINT				UNIQUE		DEFAULT(NULL),
-	live_branch		VARCHAR(100),
-
-	folder_path		VARCHAR(1000),			-- path on disk
+	gh_repository_id	BIGINT		NOT NULL	UNIQUE,
+	live_branch		VARCHAR(100)	NOT NULL,
 
 	is_live			BOOLEAN		NOT NULL			DEFAULT(false),
 
@@ -158,21 +154,7 @@ CREATE TABLE blogs (
 	CONSTRAINT fk_repository_id
 		FOREIGN KEY (gh_repository_id)
 		REFERENCES repositories(repository_id)
-		ON DELETE CASCADE,
-
-	CONSTRAINT blog_type_check CHECK (
-		(
-			blog_type = 'repository'
-			AND gh_repository_id	IS NOT NULL
-			AND live_branch 	IS NOT NULL
-			AND folder_path		IS NULL
-		) OR (
-			blog_type = 'folder'
-			AND gh_repository_id	IS NULL
-			AND live_branch 	IS NULL
-			AND folder_path		IS NOT NULL
-		)
-	)
+		ON DELETE CASCADE
 );
 
 CREATE TABLE reserved_subdomains (

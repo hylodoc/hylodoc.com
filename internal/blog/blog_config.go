@@ -2,18 +2,14 @@ package blog
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/authz"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/httpclient"
@@ -193,11 +189,8 @@ func (b *BlogService) LiveBranchSubmit(
 	if err := b.store.SetLiveBranchByID(
 		context.TODO(),
 		model.SetLiveBranchByIDParams{
-			ID: int32(intBlogID),
-			LiveBranch: sql.NullString{
-				Valid:  true,
-				String: req.Branch,
-			},
+			ID:         int32(intBlogID),
+			LiveBranch: req.Branch,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("set live branch: %w", err)
@@ -207,102 +200,6 @@ func (b *BlogService) LiveBranchSubmit(
 		Message string `json:"message"`
 	}{"Live branch submitted successsfully!"})
 
-}
-
-func (b *BlogService) FolderSubmit(
-	r request.Request,
-) (response.Response, error) {
-	sesh := r.Session()
-	sesh.Println("FolderSubmit handler...")
-
-	r.MixpanelTrack("FolderSubmit")
-
-	type fsresp struct {
-		Message string `json:"message"`
-	}
-	if err := b.folderSubmit(r); err != nil {
-		return response.NewJson(&fsresp{"An unexpected error occured"})
-	}
-	return response.NewJson(&fsresp{"Folder updated successfully!"})
-}
-
-func (b *BlogService) folderSubmit(r request.Request) error {
-	sesh := r.Session()
-
-	src, err := getUploadedFolderPath(r)
-	if err != nil {
-		return fmt.Errorf("get uploaded folder path: %w", err)
-	}
-
-	blogID, ok := r.GetRouteVar("blogID")
-	if !ok {
-		return createCustomError("", http.StatusNotFound)
-	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-	if err != nil {
-		return fmt.Errorf("parse blogID: %w", err)
-	}
-
-	blog, err := b.store.GetBlogByID(context.TODO(), int32(intBlogID))
-	if err != nil {
-		return fmt.Errorf("get blog `%d': %w", intBlogID, err)
-	}
-
-	assert.Assert(blog.FolderPath.Valid)
-	if err := clearAndExtract(src, blog.FolderPath.String); err != nil {
-		return fmt.Errorf("clear and extract: %w", err)
-	}
-
-	if _, err := setBlogToLive(&blog, b.store, sesh); err != nil {
-		return fmt.Errorf("set blog to live: %w", err)
-	}
-	return nil
-}
-
-func clearAndExtract(src, dst string) error {
-	if err := os.RemoveAll(dst); err != nil {
-		return fmt.Errorf("failed to delete directory %s: %w", dst, err)
-	}
-	if err := os.MkdirAll(dst, os.ModePerm); err != nil {
-		return fmt.Errorf("failed to recreate directory %s: %w", dst, err)
-	}
-	if err := extractZip(src, dst); err != nil {
-		return fmt.Errorf("error extracting .zip: %w", err)
-	}
-	return nil
-}
-
-func getUploadedFolderPath(r request.Request) (string, error) {
-	sesh := r.Session()
-	file, header, err := r.GetFormFile("folder")
-	if err != nil {
-		sesh.Printf("error reading file: %v\n", err)
-		return "", createCustomError(
-			"Invalid file",
-			http.StatusBadRequest,
-		)
-	}
-	defer file.Close()
-
-	if !isValidFileType(header.Filename) {
-		sesh.Printf(
-			"invalid file extension for `%s'\n", header.Filename,
-		)
-		return "", createCustomError(
-			"Must upload a .zip file",
-			http.StatusBadRequest,
-		)
-	}
-
-	tmpFile, err := os.CreateTemp("", "uploaded-*.zip")
-	if err != nil {
-		return "", fmt.Errorf("create tmp file: %w", err)
-	}
-	defer tmpFile.Close()
-	if _, err = io.Copy(tmpFile, file); err != nil {
-		return "", fmt.Errorf("copy upload to temp file: %w", err)
-	}
-	return tmpFile.Name(), nil
 }
 
 func (b *BlogService) SetStatusSubmit(
