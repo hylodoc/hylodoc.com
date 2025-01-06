@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/google/uuid"
 	"github.com/xr0-org/progstack-ssg/pkg/ssg"
 	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/authz"
@@ -111,13 +112,15 @@ func ssgGenerateWithAuthZRestrictions(
 	if err != nil {
 		return nil, fmt.Errorf("can have subscribers: %w", err)
 	}
+	dst := filepath.Join(
+		config.Config.Progstack.WebsitesPath,
+		b.Subdomain.String(),
+		uuid.New().String(),
+	)
 	if !canHaveSubs {
 		return ssg.GenerateSiteWithBindings(
 			src,
-			filepath.Join(
-				config.Config.Progstack.WebsitesPath,
-				b.Subdomain.String(),
-			),
+			dst,
 			config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
 			"algol_nu", "", "",
 			map[string]ssg.CustomPage{
@@ -133,10 +136,7 @@ func ssgGenerateWithAuthZRestrictions(
 	}
 	return ssg.GenerateSiteWithBindings(
 		src,
-		filepath.Join(
-			config.Config.Progstack.WebsitesPath,
-			b.Subdomain.String(),
-		),
+		dst,
 		config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
 		"algol_nu",
 		"",

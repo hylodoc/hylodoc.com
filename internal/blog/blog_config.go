@@ -114,14 +114,15 @@ func (b *BlogService) ThemeSubmit(
 
 	r.MixpanelTrack("ThemeSubmit")
 
-	blogID, ok := r.GetRouteVar("blogID")
+	rawBlogID, ok := r.GetRouteVar("blogID")
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
 	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
+	intBlogID, err := strconv.ParseInt(rawBlogID, 10, 32)
 	if err != nil {
 		return nil, fmt.Errorf("parse blogID: %w", err)
 	}
+	blogID := int32(intBlogID)
 
 	var req struct {
 		Theme string `json:"theme"`
@@ -134,24 +135,44 @@ func (b *BlogService) ThemeSubmit(
 		return nil, fmt.Errorf("decode body: %w", err)
 	}
 
-	theme, err := validateTheme(req.Theme)
+	theme, err := getTheme(req.Theme)
 	if err != nil {
-		return nil, fmt.Errorf("validate theme: %w", err)
+		return nil, fmt.Errorf("get theme: %w", err)
 	}
-
-	if err := b.store.SetBlogThemeByID(
-		context.TODO(),
-		model.SetBlogThemeByIDParams{
-			ID:    int32(intBlogID),
-			Theme: theme,
+	if err := b.store.ExecTx(
+		func(tx *model.Store) error {
+			return updateBlogThemeTx(blogID, theme, tx)
 		},
 	); err != nil {
-		return nil, fmt.Errorf("set blog theme: %w", err)
+		return nil, fmt.Errorf("update blog theme tx: %w", err)
 	}
 
 	return response.NewJson(struct {
 		Message string `json:"message"`
 	}{"Theme changed successsfully!"})
+}
+
+func updateBlogThemeTx(
+	blogID int32, theme model.BlogTheme, tx *model.Store,
+) error {
+	if err := tx.SetBlogThemeByID(
+		context.TODO(),
+		model.SetBlogThemeByIDParams{
+			ID:    blogID,
+			Theme: theme,
+		},
+	); err != nil {
+		return fmt.Errorf("set blog theme: %w", err)
+	}
+	if err := tx.MarkBlogGenerationsStale(
+		context.TODO(), blogID,
+	); err != nil {
+		return fmt.Errorf("mark blog generations stale: %w", err)
+	}
+	if _, err := GetFreshGeneration(blogID, tx); err != nil {
+		return fmt.Errorf("get fresh generation: %w", err)
+	}
+	return nil
 }
 
 /* Git branch info */

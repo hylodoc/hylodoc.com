@@ -57,9 +57,9 @@ func (b *BlogService) CreateRepositoryBlog(
 		)
 	}
 
-	theme, err := validateTheme(req.Theme)
+	theme, err := getTheme(req.Theme)
 	if err != nil {
-		return nil, fmt.Errorf("validate theme: %w", err)
+		return nil, fmt.Errorf("get theme: %w", err)
 	}
 
 	sub, err := dns.ParseSubdomain(req.Subdomain)
@@ -143,7 +143,7 @@ func buildRepositoryUrl(fullName string) string {
 	)
 }
 
-func validateTheme(theme string) (model.BlogTheme, error) {
+func getTheme(theme string) (model.BlogTheme, error) {
 	switch theme {
 	case "lit":
 		return model.BlogThemeLit, nil
