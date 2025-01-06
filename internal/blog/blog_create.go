@@ -68,7 +68,6 @@ func (b *BlogService) CreateRepositoryBlog(
 	}
 
 	if err := b.store.ExecTx(
-		context.TODO(),
 		func(s *model.Store) error {
 			return createBlogTx(
 				intRepoID, &theme, sub, req.LiveBranch,

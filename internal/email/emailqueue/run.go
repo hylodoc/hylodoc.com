@@ -23,7 +23,6 @@ func Run(c *httpclient.Client, s *model.Store) error {
 	}
 	for {
 		if err := s.ExecTx(
-			context.TODO(),
 			func(s *model.Store) error {
 				return runbatchtx(c, s)
 			},

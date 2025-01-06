@@ -177,7 +177,7 @@ func handleInstallationCreated(
 
 	/* write installation and repos to db Tx */
 	createInstallationTxParams := buildCreateInstallationTxParams(ghInstallationID, userID, ghEmail, repos)
-	if err = s.CreateInstallationTx(context.TODO(), createInstallationTxParams); err != nil {
+	if err = s.CreateInstallationTx(createInstallationTxParams); err != nil {
 		/* XXX: wipe relavant repos from disk */
 		return fmt.Errorf("error executing db transaction: %w", err)
 	}

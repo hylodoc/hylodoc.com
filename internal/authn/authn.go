@@ -15,6 +15,7 @@ import (
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
+	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/email"
@@ -105,41 +106,13 @@ func (a *AuthNService) githubOAuthCallback(r request.Request) error {
 		config.Config.Github.ClientSecret,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("get access token: %w", err)
 	}
-	/* get user info using token */
-	ghUser, err := getGithubUserInfo(a.client, accessToken)
+	u, err := a.getOrCreateGhUser(accessToken, sesh)
 	if err != nil {
-		return err
+		return fmt.Errorf("get or create user: %w", err)
 	}
-
-	u, err := a.store.GetUserByGhUserID(context.TODO(), ghUser.ID)
-	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("error checking for user existence: %w", err)
-		}
-		/* new user signing in with github, create with github account */
-		sesh.Println("Creating user and linking to github account in db...")
-		u, err = a.store.CreateUserWithGithubAccountTx(
-			context.TODO(),
-			model.CreateGithubAccountParams{
-				GhUserID:   ghUser.ID,
-				GhEmail:    ghUser.Email,
-				GhUsername: ghUser.Username,
-			},
-		)
-		if err != nil {
-			sesh.Printf("Error creating user in db: %v", err)
-			return fmt.Errorf("error creating user in db: %w", err)
-		}
-		/* autosubscribe user to stripe */
-		if err = billing.AutoSubscribeToFreePlan(
-			u, a.store, sesh,
-		); err != nil {
-			return fmt.Errorf("error subscribing user to free plan: %w", err)
-		}
-	}
-	sesh.Printf("Got user: %v\n", u)
+	sesh.Printf("got user: %v\n", u)
 
 	/* create Auth Session */
 	if _, err := sesh.Authenticate(
@@ -149,6 +122,95 @@ func (a *AuthNService) githubOAuthCallback(r request.Request) error {
 	}
 
 	return nil
+}
+
+func (a *AuthNService) getOrCreateGhUser(
+	token string, sesh *session.Session,
+) (*model.User, error) {
+	ghUser, err := getGithubUserInfo(a.client, token)
+	if err != nil {
+		return nil, fmt.Errorf("get github user info: %w", err)
+	}
+	u, err := a.store.GetUserByGhUserID(context.TODO(), ghUser.ID)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf(
+				"check for user existence: %w", err,
+			)
+		}
+		/* new user signing in with github, create with github account */
+		sesh.Println("creating user and linking to github account in db...")
+		newu, err := createUserWithGithubAccount(
+			&model.CreateGithubAccountParams{
+				GhUserID:   ghUser.ID,
+				GhEmail:    ghUser.Email,
+				GhUsername: ghUser.Username,
+			},
+			a.store,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"create user with github account: %w", err,
+			)
+		}
+		/* autosubscribe user to stripe */
+		if err = billing.AutoSubscribeToFreePlan(
+			newu, a.store, sesh,
+		); err != nil {
+			return nil, fmt.Errorf(
+				"auto subscribe to free plan: %w", err,
+			)
+		}
+		return newu, nil
+	}
+	return &u, nil
+}
+
+func createUserWithGithubAccount(
+	arg *model.CreateGithubAccountParams, s *model.Store,
+) (*model.User, error) {
+	var res *model.User
+	if err := s.ExecTx(
+		func(tx *model.Store) error {
+			u, err := createUserWithGithubAccountTx(arg, tx)
+			if err != nil {
+				return err
+			}
+			res = u
+			return nil
+		},
+	); err != nil {
+		return nil, err
+	}
+	assert.Assert(res != nil)
+	return res, nil
+}
+
+func createUserWithGithubAccountTx(
+	arg *model.CreateGithubAccountParams, tx *model.Store,
+) (*model.User, error) {
+	u, err := tx.CreateUser(
+		context.TODO(),
+		model.CreateUserParams{
+			Email:    arg.GhEmail,
+			Username: arg.GhUsername, /* we use github username */
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create user: %w", err)
+	}
+	if _, err := tx.CreateGithubAccount(
+		context.TODO(),
+		model.CreateGithubAccountParams{
+			UserID:     u.ID,
+			GhUserID:   arg.GhUserID,
+			GhEmail:    arg.GhEmail,
+			GhUsername: arg.GhUsername,
+		},
+	); err != nil {
+		return nil, fmt.Errorf("create github account: %w", err)
+	}
+	return &u, nil
 }
 
 func getOauthAccessToken(
@@ -473,8 +535,7 @@ func (a *AuthNService) magicRegisterCallback(r request.Request) error {
 		return fmt.Errorf("error getting magic by token: %w", err)
 	}
 
-	/* create user */
-	u, err := a.store.CreateUserTx(context.TODO(), model.CreateUserParams{
+	u, err := a.store.CreateUser(context.TODO(), model.CreateUserParams{
 		Email:    magic.Email,
 		Username: GenerateUsername(),
 	})
@@ -484,7 +545,7 @@ func (a *AuthNService) magicRegisterCallback(r request.Request) error {
 	sesh.Printf("Successfully registered user `%v'\n", u)
 
 	/* autosubscribe user to stripe */
-	if err = billing.AutoSubscribeToFreePlan(*u, a.store, sesh); err != nil {
+	if err = billing.AutoSubscribeToFreePlan(&u, a.store, sesh); err != nil {
 		return fmt.Errorf("error subscribing user to free plan: %w", err)
 	}
 

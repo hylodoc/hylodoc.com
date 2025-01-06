@@ -28,7 +28,7 @@ func NewEmail(
 }
 
 func (e *email) Queue(store *model.Store) error {
-	return store.ExecTx(context.TODO(), e.queuetx)
+	return store.ExecTx(e.queuetx)
 }
 
 func (e *email) queuetx(s *model.Store) error {
