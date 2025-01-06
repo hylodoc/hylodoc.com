@@ -176,31 +176,88 @@ func handleInstallationCreated(
 	sesh.Printf("repos: %s\n", str)
 
 	/* write installation and repos to db Tx */
-	createInstallationTxParams := buildCreateInstallationTxParams(ghInstallationID, userID, ghEmail, repos)
-	if err = s.CreateInstallationTx(createInstallationTxParams); err != nil {
+	if err = createInstallationTx(
+		buildCreateinstallationTxParams(
+			ghInstallationID, userID, ghEmail, repos,
+		), s,
+	); err != nil {
 		/* XXX: wipe relavant repos from disk */
 		return fmt.Errorf("error executing db transaction: %w", err)
 	}
-
 	return nil
 }
 
-func buildCreateInstallationTxParams(installationID int64, userID int32, ghEmail string, repos []Repository) model.InstallationTxParams {
-	var iTxParams model.InstallationTxParams
+func buildCreateinstallationTxParams(
+	installationID int64, userID int32, ghEmail string, repos []Repository,
+) *installationTxParams {
+	var iTxParams installationTxParams
 	iTxParams.InstallationID = installationID
 	iTxParams.UserID = userID
 	iTxParams.Email = ghEmail
-	var repositoryTxParams []model.RepositoryTxParams
+	var params []repositoryTxParams
 	for _, repo := range repos {
-		repositoryTxParams = append(repositoryTxParams, model.RepositoryTxParams{
-			RepositoryID: repo.ID,
-			Name:         repo.Name,
-			FullName:     repo.FullName,
-		})
+		params = append(
+			params,
+			repositoryTxParams{
+				RepositoryID: repo.ID,
+				Name:         repo.Name,
+				FullName:     repo.FullName,
+			},
+		)
 	}
-	iTxParams.RepositoriesTxParams = repositoryTxParams
+	iTxParams.RepositoriesTxParams = params
 	iTxParams.RepositoriesPath = config.Config.Progstack.RepositoriesPath
-	return iTxParams
+	return &iTxParams
+}
+
+type repositoryTxParams struct {
+	RepositoryID int64
+	Name         string
+	FullName     string
+	Url          string
+}
+
+type installationTxParams struct {
+	InstallationID       int64
+	UserID               int32
+	Email                string
+	RepositoriesTxParams []repositoryTxParams
+	RepositoriesPath     string
+}
+
+func createInstallationTx(arg *installationTxParams, s *model.Store) error {
+	return s.ExecTx(func(tx *model.Store) error {
+		installation, err := tx.CreateInstallation(
+			context.TODO(),
+			model.CreateInstallationParams{
+				GhInstallationID: arg.InstallationID,
+				UserID:           arg.UserID,
+			},
+		)
+		if err != nil {
+			return err
+		}
+		for _, repositoryTxParams := range arg.RepositoriesTxParams {
+			_, err := tx.CreateRepository(
+				context.TODO(),
+				model.CreateRepositoryParams{
+					InstallationID: installation.GhInstallationID,
+					RepositoryID:   repositoryTxParams.RepositoryID,
+					Name:           repositoryTxParams.Name,
+					FullName:       repositoryTxParams.FullName,
+					Url:            fmt.Sprintf("https://github.com/%s", repositoryTxParams.FullName), /* ghUrl not always in events */
+					PathOnDisk: filepath.Join(
+						arg.RepositoriesPath,
+						repositoryTxParams.FullName,
+					),
+				},
+			)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 type InstallationRepositoriesResponse struct {
