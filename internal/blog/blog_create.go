@@ -3,11 +3,17 @@ package blog
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 
-	"github.com/xr0-org/progstack-ssg/pkg/ssg"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authn"
@@ -173,17 +179,11 @@ func UpdateRepositoryOnDisk(
 	if err != nil {
 		return fmt.Errorf("access token: %w", err)
 	}
-	if err := cloneRepo(
-		repo.PathOnDisk,
-		repo.Url,
-		blog.LiveBranch,
-		accessToken,
-	); err != nil {
-		return fmt.Errorf("clone: %w", err)
-	}
-	h, err := ssg.GetSiteHash(repo.PathOnDisk)
+	h, err := updateAndCheckout(
+		repo.Url, repo.GitdirPath, blog.LiveBranch, accessToken,
+	)
 	if err != nil {
-		return fmt.Errorf("get site hash: %w", err)
+		return fmt.Errorf("update and checkout: %w", err)
 	}
 	if err := s.UpdateBlogLiveHash(
 		context.TODO(),
@@ -193,6 +193,70 @@ func UpdateRepositoryOnDisk(
 		},
 	); err != nil {
 		return fmt.Errorf("update live hash: %w", err)
+	}
+	return nil
+}
+
+// updateAndCheckout clones the repo at the given URL into a bare git dir as
+// provided, and then clones and checks out locally the branch given by its
+// latest hash into config.Config.Progstack.CheckoutsPath. It returns this
+// latest hash.
+//
+// If gitdir already exists, it is removed before the cloning.
+func updateAndCheckout(repoURL, gitdir, branch, token string) (string, error) {
+	if err := removeDirIfExists(gitdir); err != nil {
+		return "", fmt.Errorf("remove gitdir if exists: %w", err)
+	}
+	refname := plumbing.NewBranchReferenceName(branch)
+	repo, err := git.PlainClone(
+		gitdir,
+		true,
+		&git.CloneOptions{
+			URL: repoURL,
+			Auth: &githttp.BasicAuth{
+				Username: "github", Password: token,
+			},
+			ReferenceName: refname,
+		},
+	)
+	if err != nil {
+		return "", fmt.Errorf("bare clone: %w", err)
+	}
+
+	ref, err := repo.Reference(refname, true)
+	if err != nil {
+		return "", fmt.Errorf("reference: %w", err)
+	}
+	h := ref.Hash().String()
+
+	checkoutdir := filepath.Join(config.Config.Progstack.CheckoutsPath, h)
+	if err := removeDirIfExists(checkoutdir); err != nil {
+		return "", fmt.Errorf("remove checkoutdir if exists: %w", err)
+	}
+	if _, err := git.PlainClone(
+		checkoutdir,
+		false,
+		&git.CloneOptions{
+			URL:           gitdir,
+			ReferenceName: refname,
+		},
+	); err != nil {
+		return "", fmt.Errorf("checkout clone: %w", err)
+	}
+
+	return h, nil
+}
+
+func removeDirIfExists(dir string) error {
+	_, err := os.Stat(dir)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("stat: %w", err)
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		return fmt.Errorf("remove: %w", err)
 	}
 	return nil
 }

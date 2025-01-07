@@ -9,8 +9,8 @@ services:
       - '7999:443'
     volumes:
       - './certs:/app/certs'
-      - './folders:/app/folders'
-      - './repositories:/app/repositories'
+      - './checkouts:/app/checkouts'
+      - './gitdirs:/app/gitdirs'
       - './websites:/app/websites'
     depends_on:
       postgres:

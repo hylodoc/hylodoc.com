@@ -16,7 +16,7 @@
 		<h4>Subdomain</h4>
 		<!-- need these as templates so that multiple blogs can be setup at once -->
 		<form id="subdomainForm" onsubmit="return false;">
-			<label for="subdomainInput">Configure subdomain</label>
+			<label for="subdomainInput">Set subdomain</label>
 			<div class="row">
 				<div class="four columns"> <input
 						class="u-full-width"
@@ -61,7 +61,7 @@
 		<h3>Theme</h3>
 
 		<form id="theme-form" onsubmit="return false">
-			<label for="themesDropdown">Change theme</label>
+			<label for="themesDropdown">Select a theme</label>
 			<div class="row">
 				<div class="four columns">
 					<select id="themesDropdown">
@@ -89,7 +89,7 @@
 		
 		<!-- Submit git branch for live builds -->
 		<form id="live-branch-form" onsubmit="return false;">
-			<label for="liveBranch">Git branch</label>
+			<label for="liveBranch">Set branch</label>
 			<div class="row">
 				<div class="four columns">
 					<input
@@ -107,12 +107,12 @@
 			</div>
 		</form>
 
-
-		<h4>Manual sync</h4>
 		<p>
 			<strong>Commit:</strong>
 			<a href="{{ .Data.Blog.HashUrl }}">{{ .Data.Blog.Hash }}</a>
 		</p>
+
+		<h4>Manual sync</h4>
 		<p>Hit the button below to manually sync with the repository on
 		GitHub.</p>
 		<a href="{{ .Data.Blog.SyncUrl }}" class="button">Sync</a>

@@ -13,7 +13,9 @@ import (
 )
 
 func UserStorageUsed(s *model.Store, userID int32) (size.Size, error) {
-	paths, err := listUserDiskPaths(userID, s)
+	paths, err := s.ListRepositoriesGitdirPathsByUserID(
+		context.TODO(), userID,
+	)
 	if err != nil {
 		return 0, fmt.Errorf("paths: %w", err)
 	}
@@ -33,14 +35,6 @@ func UserStorageUsed(s *model.Store, userID int32) (size.Size, error) {
 		totalBytes += bytes
 	}
 	return size.Size(totalBytes), nil
-}
-
-func listUserDiskPaths(userID int32, s *model.Store) ([]string, error) {
-	repos, err := s.ListRepositoryPathsOnDiskByUserID(context.TODO(), userID)
-	if err != nil {
-		return nil, fmt.Errorf("repo: %w", err)
-	}
-	return repos, nil
 }
 
 /* calculate the disk usage of a single folder */

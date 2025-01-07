@@ -8,9 +8,6 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/util"
 )
@@ -85,31 +82,6 @@ func extractTarball(src, dst string) error {
 	cmd := exec.Command("tar", "--strip-components=1", "-xzf", src, "-C", dst)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("error extraction tar file: %w", err)
-	}
-	return nil
-}
-
-func cloneRepo(
-	dst, repoURL, branch, token string,
-) error {
-	if _, err := os.Stat(dst); err == nil {
-		log.Printf("destination directory `%s' already exists; removing it\n", dst)
-		if err := os.RemoveAll(dst); err != nil {
-			return fmt.Errorf("error removing destination directory: %w", err)
-		}
-	}
-	auth := &githttp.BasicAuth{Username: "github", Password: token}
-	_, err := git.PlainClone(
-		dst,
-		false,
-		&git.CloneOptions{
-			URL:           repoURL,
-			Auth:          auth,
-			ReferenceName: plumbing.ReferenceName(branch),
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("git error: %w", err)
 	}
 	return nil
 }

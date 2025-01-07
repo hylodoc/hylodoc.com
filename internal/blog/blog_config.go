@@ -164,12 +164,19 @@ func updateBlogThemeTx(
 	); err != nil {
 		return fmt.Errorf("set blog theme: %w", err)
 	}
-	if err := tx.MarkBlogGenerationsStale(
+	if err := regenerateBlog(blogID, tx); err != nil {
+		return fmt.Errorf("regenerate blog: %w", err)
+	}
+	return nil
+}
+
+func regenerateBlog(blogID int32, s *model.Store) error {
+	if err := s.MarkBlogGenerationsStale(
 		context.TODO(), blogID,
 	); err != nil {
 		return fmt.Errorf("mark blog generations stale: %w", err)
 	}
-	if _, err := GetFreshGeneration(blogID, tx); err != nil {
+	if _, err := GetFreshGeneration(blogID, s); err != nil {
 		return fmt.Errorf("get fresh generation: %w", err)
 	}
 	return nil
@@ -206,21 +213,47 @@ func (b *BlogService) LiveBranchSubmit(
 		return nil, fmt.Errorf("decode body: %w", err)
 	}
 
-	/* XXX: validate input before wrinting to db */
-	if err := b.store.SetLiveBranchByID(
-		context.TODO(),
-		model.SetLiveBranchByIDParams{
-			ID:         int32(intBlogID),
-			LiveBranch: req.Branch,
+	if err := b.store.ExecTx(
+		func(tx *model.Store) error {
+			return updateBlogLiveBranchTx(
+				int32(intBlogID), req.Branch, tx, b.client, sesh,
+			)
 		},
 	); err != nil {
-		return nil, fmt.Errorf("set live branch: %w", err)
+		return nil, fmt.Errorf("update blog live branch tx: %w", err)
 	}
 
 	return response.NewJson(struct {
 		Message string `json:"message"`
 	}{"Live branch submitted successsfully!"})
 
+}
+
+func updateBlogLiveBranchTx(
+	blogID int32, branch string,
+	tx *model.Store, c *httpclient.Client, sesh *session.Session,
+) error {
+	/* TODO: validate input before wrinting to db */
+	if err := tx.SetLiveBranchByID(
+		context.TODO(),
+		model.SetLiveBranchByIDParams{
+			ID:         blogID,
+			LiveBranch: branch,
+		},
+	); err != nil {
+		return fmt.Errorf("set live branch: %w", err)
+	}
+	b, err := tx.GetBlogByID(context.TODO(), blogID)
+	if err != nil {
+		return fmt.Errorf("get blog: %w", err)
+	}
+	if err := UpdateRepositoryOnDisk(c, &b, sesh, tx); err != nil {
+		return fmt.Errorf("update repo on disk: %w", err)
+	}
+	if err := regenerateBlog(blogID, tx); err != nil {
+		return fmt.Errorf("regenerate blog: %w", err)
+	}
+	return nil
 }
 
 func (b *BlogService) SetStatusSubmit(

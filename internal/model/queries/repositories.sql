@@ -5,7 +5,7 @@ INSERT INTO repositories (
 	url,
 	name,
 	full_name,
-	path_on_disk
+	gitdir_path
 ) VALUES (
 	$1, $2, $3, $4, $5, $6
 )
@@ -16,8 +16,8 @@ SELECT *
 FROM repositories
 WHERE repository_id = $1;
 
--- name: ListRepositoryPathsOnDiskByUserID :many
-SELECT r.path_on_disk
+-- name: ListRepositoriesGitdirPathsByUserID :many
+SELECT r.gitdir_path
 FROM repositories r
 INNER JOIN installations i
 	ON i.gh_installation_id = r.installation_id
