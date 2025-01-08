@@ -139,9 +139,9 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	handler.Handle(authR, "/gh/linkgithub", authNService.LinkGithubAccount)
 	handler.Handle(authR, "/account", userService.Account)
 	handler.Handle(authR, "/subdomain-check", blogService.SubdomainCheck)
-	handler.Handle(authR, "/create-new-blog", userService.RepositoryFlow)
+	handler.Handle(authR, "/create-new-blog", userService.RepositoryFlow).Methods("GET")
+	handler.Handle(authR, "/create-new-blog", blogService.CreateRepositoryBlog).Methods("POST")
 	handler.Handle(authR, "/github-installation", userService.GithubInstallation)
-	handler.Handle(authR, "/create-repository-blog", blogService.CreateRepositoryBlog)
 
 	/* billing */
 	handler.Handle(authR, "/stripe/billing-portal", billingService.BillingPortal)

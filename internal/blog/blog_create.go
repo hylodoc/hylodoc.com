@@ -2,7 +2,6 @@ package blog
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -37,58 +36,54 @@ func (b *BlogService) CreateRepositoryBlog(
 
 	r.MixpanelTrack("CreateRepositoryBlog")
 
-	var req struct {
-		Subdomain    string `json:"subdomain"`
-		RepositoryID string `json:"repository_id"`
-		Theme        string `json:"theme"`
-		LiveBranch   string `json:"live_branch"`
-		Flow         string `json:"flow"`
-	}
-	body, err := r.ReadBody()
+	rawRepoID, err := r.GetPostFormValue("repositoriesDropdown")
 	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
+		return nil, fmt.Errorf("get rawRepoID: %w", err)
 	}
-	if err := json.Unmarshal(body, &req); err != nil {
-		return nil, createCustomError(
-			"error decoding request body",
-			http.StatusBadRequest,
-		)
-	}
-
-	intRepoID, err := strconv.ParseInt(req.RepositoryID, 10, 64)
+	intRepoID, err := strconv.ParseInt(rawRepoID, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"convert repositoryID `%s' to int64: %w",
-			req.RepositoryID, err,
+			rawRepoID, err,
 		)
 	}
 
-	theme, err := getTheme(req.Theme)
+	rawSubdomain, err := r.GetPostFormValue("subdomainInput")
+	if err != nil {
+		return nil, fmt.Errorf("get rawSubdomain: %w", err)
+	}
+	sub, err := dns.ParseSubdomain(rawSubdomain)
+	if err != nil {
+		return nil, fmt.Errorf("parse subdomain: %w", err)
+	}
+
+	rawTheme, err := r.GetPostFormValue("themesDropdown")
+	if err != nil {
+		return nil, fmt.Errorf("get rawTheme: %w", err)
+	}
+	theme, err := getTheme(rawTheme)
 	if err != nil {
 		return nil, fmt.Errorf("get theme: %w", err)
 	}
 
-	sub, err := dns.ParseSubdomain(req.Subdomain)
+	branch, err := r.GetPostFormValue("liveBranchInput")
 	if err != nil {
-		return nil, fmt.Errorf("parse subdomain: %w", err)
+		return nil, fmt.Errorf("get branch: %w", err)
 	}
 
 	if err := b.store.ExecTx(
 		func(s *model.Store) error {
 			return createBlogTx(
-				intRepoID, &theme, sub, req.LiveBranch,
+				intRepoID, &theme, sub, branch,
 				b.client, sesh, s,
 			)
 		},
 	); err != nil {
 		return nil, fmt.Errorf("create blog tx: %w", err)
 	}
-	return response.NewJson(
-		CreateBlogResponse{
-			Url:     buildUrl(sub.String()),
-			Message: "Successfully created repository-based blog!",
-		},
-	)
+	return response.NewRedirect(
+		buildUrl(sub.String()), http.StatusTemporaryRedirect,
+	), nil
 }
 
 func createBlogTx(
@@ -197,6 +192,8 @@ func UpdateRepositoryOnDisk(
 	return nil
 }
 
+var branchError = errors.New("branch error")
+
 // updateAndCheckout clones the repo at the given URL into a bare git dir as
 // provided, and then clones and checks out locally the branch given by its
 // latest hash into config.Config.Progstack.CheckoutsPath. It returns this
@@ -207,28 +204,24 @@ func updateAndCheckout(repoURL, gitdir, branch, token string) (string, error) {
 	if err := removeDirIfExists(gitdir); err != nil {
 		return "", fmt.Errorf("remove gitdir if exists: %w", err)
 	}
-	refname := plumbing.NewBranchReferenceName(branch)
+	auth := &githttp.BasicAuth{Username: "github", Password: token}
 	repo, err := git.PlainClone(
 		gitdir,
 		true,
 		&git.CloneOptions{
-			URL: repoURL,
-			Auth: &githttp.BasicAuth{
-				Username: "github", Password: token,
-			},
-			ReferenceName: refname,
+			URL:  repoURL,
+			Auth: auth,
 		},
 	)
 	if err != nil {
 		return "", fmt.Errorf("bare clone: %w", err)
 	}
-
+	refname := plumbing.NewRemoteReferenceName("origin", branch)
 	ref, err := repo.Reference(refname, true)
 	if err != nil {
 		return "", fmt.Errorf("reference: %w", err)
 	}
 	h := ref.Hash().String()
-
 	checkoutdir := filepath.Join(config.Config.Progstack.CheckoutsPath, h)
 	if err := removeDirIfExists(checkoutdir); err != nil {
 		return "", fmt.Errorf("remove checkoutdir if exists: %w", err)
@@ -243,7 +236,6 @@ func updateAndCheckout(repoURL, gitdir, branch, token string) (string, error) {
 	); err != nil {
 		return "", fmt.Errorf("checkout clone: %w", err)
 	}
-
 	return h, nil
 }
 

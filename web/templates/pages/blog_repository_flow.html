@@ -1,7 +1,5 @@
 {{ template "header" . }}
 
-<div id="toast" class="toast"></div>
-
 <section>
 	<div class="container">
 		<h3>Create new blog</h3>
@@ -10,7 +8,7 @@
 
 <section>
 	<div class="container">
-		<form id="blogForm" onsubmit="return false;">
+		<form id="blogForm" action="/user/create-new-blog" method="POST">
 			{{ if not .Data.AccountDetails.IsLinked }}
 				<p>
 					To create a repository based site, you need to link a Github Account.
@@ -32,37 +30,50 @@
 				</p>
 			{{ end }}
 
+			<!-- Select repository -->
+			<div class="row">
+				<div class="four columns">
+					<label for="repositoriesDropdown">Select a repository</label>
+					<select class="u-full-width" id="repositoriesDropdown" name="repositoriesDropdown" required>
+						<option value="" disabled selected>···</option>
+						{{ range .Data.Repositories }}
+							<option value="{{ .Value }}">{{ .Name }}</option>
+						{{ end }}
+					</select>
+					<div id="repositoryError" class="error-div">
+						{{ .Data.RepositoryError }}
+					</div>
+				</div>
+			</div>
+
 			<!-- Subdomain configuration -->
 			<label for="subdomainInput">Set subdomain</label>
 			<div>
 				<div class="row">
-					<input class="four columns" autocomplete="off" type="text" id="subdomainInput" placeholder="Enter your subdomain"/>
+					<div class="four columns">
+					<input class="u-full-width"
+					autocomplete="off" type="text" id="subdomainInput" name="subdomainInput" placeholder="Enter subdomain" required/>
+					</div>
 					<span> .{{ .Data.RootDomain }}</span>
 				</div>
-				<div id="availabilityMessage" class="availability-message"></div>
+				<div id="subdomainError" class="error-div">
+					{{ .Data.SubdomainError }}
+				</div>
 			</div>
 
 			<!-- Select theme -->
 			<div class="row">
 				<div class="four columns">
 					<label for="themesDropdown">Select a theme</label>
-					<select id="themesDropdown">
+					<select id="themesDropdown" name="themesDropdown" class="u-full-width" required>
+						<option value="" disabled selected>···</option>
 						{{ range .Data.Themes }}
 							<option value="{{ . }}">{{ . }}</option>
 						{{ end }}
 					</select>
-				</div>
-			</div>
-
-			<!-- Select repository -->
-			<div class="row">
-				<div class="four columns">
-					<label for="repositoriesDropdown">Select a repository</label>
-					<select id="repositoriesDropdown">
-						{{ range .Data.Repositories }}
-							<option value="{{ .Value }}">{{ .Name }}</option>
-						{{ end }}
-					</select>
+					<div id="themeErrror" class="error-div">
+						{{ .Data.ThemeError }}
+					</div>
 				</div>
 			</div>
 
@@ -70,14 +81,19 @@
 			<div class="row">
 				<label for="liveBranchInput">Set branch</label>
 				<div class="row">
-					<input class="four columns" type="text" id="liveBranchInput" placeholder="Enter live-build branch"/>
+					<div class="four columns">
+						<input class="u-full-width" type="text" id="liveBranchInput" name="liveBranchInput" placeholder="Enter branch" required/>
+					</div>
+				</div>
+				<div id="branchError" class="error-div">
+					{{ .Data.BranchError }}
 				</div>
 			</div>
 
 			<br><br>
 
 			<!-- Submit button -->
-			<button type="submit" id="submitBlogBtn" disabled>Launch</button>
+			<button type="submit">Launch</button>
 		</form>
 	</div>
 </section>
@@ -86,36 +102,33 @@
 	let debounceTimer;
 
 	function init() {
-		const blogForm = document.getElementById("blogForm");
 		const subdomainInput = document.getElementById("subdomainInput");
 
 		/* subdomain availability feedback */
 		subdomainInput.addEventListener("input", handleInput);
-		blogForm.addEventListener("submit", handleBlogFormSubmit);
 	}
 
 	/* handle input event with debounce */
 	function handleInput() {
 		const subdomain = this.value.trim();
-		const messageElement = document.getElementById("availabilityMessage");
-		const submitBlogBtn = document.getElementById("submitBlogBtn");
+		const subdomainErrorElement = document.getElementById("subdomainError");
 
 		clearTimeout(debounceTimer); /* clear previous timer */
 
 		if (subdomain.length > 0) {
-			updateMessage(messageElement, "Checking availability...", "loading");
+			updateMessage(subdomainErrorElement, "Checking availability...", "loading");
 		} else {
-			resetMessage(messageElement, submitBlogBtn); /* Clear message if input is empty */
+			resetMessage(subdomainErrorElement); /* Clear message if input is empty */
 			return;
 		}
 
 		debounceTimer = setTimeout(() => {
-			checkSubdomainAvailability(subdomain, messageElement, submitBlogBtn);
+			checkSubdomainAvailability(subdomain, subdomainErrorElement);
 		}, 300); /* 300ms debounce delay */
 	}
 
 	/* Check subdomain availability */
-	function checkSubdomainAvailability(subdomain, messageElement, submitSubdomainBtn) {
+	function checkSubdomainAvailability(subdomain, subdomainErrorElement) {
 		fetch("/user/subdomain-check", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -124,94 +137,29 @@
 		.then(response => response.json())
 		.then(data => {
 			if (data.available) {
-				updateMessage(messageElement, "✅ This subdomain is available!", "available");
-				submitSubdomainBtn.disabled = false;
+				updateMessage(subdomainErrorElement, "✅ This subdomain is available!", "available");
 			} else {
-				updateMessage(messageElement, "❌ " + data.message, "unavailable");
-				submitSubdomainBtn.disabled = true;
+				updateMessage(subdomainErrorElement, "❌ " + data.message, "unavailable");
 			}
 		})
-		.catch(error => handleError(error, messageElement, submitSubdomainBtn));
-	}
-
-	/* Handle subdomain form submission */
-	function handleBlogFormSubmit(event) {
-		event.preventDefault(); /* Prevent default form submission */
-
-		const subdomain = document.getElementById("subdomainInput").value.trim();
-		const repoID = document.getElementById("repositoriesDropdown").value.trim();
-		const theme = document.getElementById("themesDropdown").value.trim();
-		const liveBranch = document.getElementById("liveBranchInput").value.trim();
-		console.log("subdomain: ", subdomain);
-		console.log("repositoryID: ", repoID);
-		console.log("theme: ", theme);
-		console.log("liveBranch: ", liveBranch);
-
-		submitBlog(subdomain, repoID, theme, liveBranch);
-	}
-
-	/* Submit the subdomain to the server */
-	function submitBlog(subdomain, repoID, theme, liveBranch) {
-		fetch("/user/create-repository-blog", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				subdomain: subdomain,
-				repository_id: repoID,
-				theme: theme,
-				live_branch: liveBranch
-			})
-		})
-		.then(response => {
-			if (!response.ok) {
-				return response.json().then(errorData => {
-					showToast(errorData.message);
-					throw new Error(errorData.message);
-				});
-			}
-			return response.json();
-		})
-		.then(data => {
-			console.log("success: ", data.message);
-			showToast(data.message);
-			setTimeout(() => {
-				window.location.href = data.url;
-			}, 1000);
-		})
-		.catch(error => {
-			console.error("Error submitting blog:", error)
-			showToast(error.message);
-		});
+		.catch(error => handleError(error, subdomainErrorElement));
 	}
 
 	/* Update the availability message */
 	function updateMessage(element, message, status) {
 		element.textContent = message;
-		element.className = `availability-message ${status}`;
+		element.className = `error-div ${status}`;
 	}
 
 	/* Reset the message and disable submit button */
-	function resetMessage(messageElement, submitSubdomainBtn) {
-		messageElement.textContent = ""; /* Clear message */
-		submitSubdomainBtn.disabled = true; /* Disable submit button */
+	function resetMessage(subdomainErrorElement) {
+		subdomainErrorElement.textContent = ""; /* Clear message */
 	}
 
 	/* Handle fetch errors */
-	function handleError(error, messageElement, submitBlogBtn) {
+	function handleError(error, subdomainErrorElement) {
 		console.error("Error checking subdomain:", error);
-		updateMessage(messageElement, "⚠️ An error occurred while checking availability.", "unavailable");
-		submitBlogBtn.disabled = true; /* Disable submit button on error */
-	}
-
-	/* Show a toast message */
-	function showToast(message) {
-		const toast = document.getElementById("toast");
-		toast.textContent = message;
-		toast.style.display = "block";
-
-		setTimeout(() => {
-			toast.style.display = "none";
-		}, 3000); // Hide after 3 seconds
+		updateMessage(subdomainErrorElement, "⚠️ An error occurred while checking availability.", "unavailable");
 	}
 
 	/* Initialize the script on page load */

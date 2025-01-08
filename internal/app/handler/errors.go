@@ -31,6 +31,7 @@ func internalServerError(w http.ResponseWriter, r *http.Request) {
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	assert.Assert(ok)
 	w.WriteHeader(http.StatusInternalServerError)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := response.NewTemplate(
 		[]string{"500.html"},
 		util.PageInfo{
@@ -58,6 +59,7 @@ func unauthorised(w http.ResponseWriter, r *http.Request) {
 	sesh, ok := r.Context().Value(session.CtxSessionKey).(*session.Session)
 	assert.Assert(ok)
 	w.WriteHeader(http.StatusInternalServerError)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := response.NewTemplate(
 		[]string{"401.html"},
 		util.PageInfo{
@@ -82,6 +84,7 @@ func NotFound(w http.ResponseWriter, r *http.Request) {
 	assert.Assert(ok)
 	sesh.Println("404", r.URL)
 	w.WriteHeader(http.StatusNotFound)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := response.NewTemplate(
 		[]string{"404.html"},
 		util.PageInfo{
@@ -106,6 +109,7 @@ func NotFoundSubdomain(w http.ResponseWriter, r *http.Request) {
 	assert.Assert(ok)
 	sesh.Println("404 (subdomain)", r.Host, r.URL)
 	w.WriteHeader(http.StatusNotFound)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := response.NewTemplate(
 		[]string{"404_subdomain.html"},
 		util.PageInfo{
@@ -140,6 +144,7 @@ func NotFoundDomain(w http.ResponseWriter, r *http.Request) {
 	assert.Assert(ok)
 	sesh.Println("404 (domain)", r.Host, r.URL)
 	w.WriteHeader(http.StatusNotFound)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := response.NewTemplate(
 		[]string{"404_domain.html"},
 		util.PageInfo{

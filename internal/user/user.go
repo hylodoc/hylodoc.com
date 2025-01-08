@@ -167,6 +167,11 @@ func (u *UserService) RepositoryFlow(
 				RootDomain     string
 				Repositories   []Repository
 				Themes         []string
+
+				RepositoryError string
+				SubdomainError  string
+				ThemeError      string
+				BranchError     string
 			}{
 				Title:          "Create new blog",
 				UserInfo:       session.ConvertSessionToUserInfo(sesh),

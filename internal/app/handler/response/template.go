@@ -19,6 +19,8 @@ func NewTemplate(names []string, info util.PageInfo) Response {
 }
 
 func (t *tmpl) Respond(w http.ResponseWriter, _ *http.Request) error {
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	var tmp bytes.Buffer
 	if err := util.ExecTemplate(
 		&tmp, t.names, t.info,
