@@ -80,7 +80,7 @@ func getIndentifiers(sesh *session.Session) identifiers {
 		userid, err := sesh.GetUserID()
 		assert.Assert(err == nil)
 		return identifiers{
-			distinctId: fmt.Sprintf("%d", userid),
+			distinctId: fmt.Sprintf("%s", userid),
 			status:     "auth",
 		}
 	} else {

@@ -23,7 +23,7 @@ var (
 
 type Session struct {
 	id              uuid.UUID
-	userID          *int32
+	userID          *string
 	email           *string
 	username        *string
 	githubLinked    bool
@@ -67,15 +67,18 @@ func CreateUnauthSession(
 }
 
 func createAuthSession(
-	s *model.Store, w http.ResponseWriter, userID int32, expiresAt time.Time,
-	logger *anonymousLogger,
+	s *model.Store, w http.ResponseWriter, userID string,
+	expiresAt time.Time, logger *anonymousLogger,
 ) (*Session, error) {
 	logger.Println("Creating auth session...")
 
-	authSession, err := s.CreateAuthSession(context.TODO(), model.CreateAuthSessionParams{
-		UserID:    userID,
-		ExpiresAt: expiresAt,
-	})
+	authSession, err := s.CreateAuthSession(
+		context.TODO(),
+		model.CreateAuthSessionParams{
+			UserID:    userID,
+			ExpiresAt: expiresAt,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating auth session: %w", err)
 	}
@@ -99,7 +102,8 @@ func createAuthSession(
 }
 
 func (sesh *Session) Authenticate(
-	s *model.Store, w http.ResponseWriter, userID int32, expiresAt time.Time,
+	s *model.Store, w http.ResponseWriter, userID string,
+	expiresAt time.Time,
 ) (*Session, error) {
 	return createAuthSession(
 		s, w, userID, expiresAt, newAnonymousLogger(sesh.GetSessionID()),
@@ -195,11 +199,11 @@ func (s *Session) GetEmail() string {
 	return ""
 }
 
-func (s *Session) GetUserID() (int32, error) {
+func (s *Session) GetUserID() (string, error) {
 	if s.IsAuthenticated() {
 		return *s.userID, nil
 	}
-	return -1, fmt.Errorf("unauthenticated")
+	return "", fmt.Errorf("unauthenticated")
 }
 
 func (s *Session) GetUsername() string {

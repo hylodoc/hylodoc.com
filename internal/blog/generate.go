@@ -15,7 +15,7 @@ import (
 	"github.com/xr0-org/progstack/internal/model"
 )
 
-func GetFreshGeneration(blogid int32, s *model.Store) (int32, error) {
+func GetFreshGeneration(blogid string, s *model.Store) (int32, error) {
 	freshgen, err := s.GetFreshGeneration(context.TODO(), blogid)
 	if err == nil {
 		return freshgen, nil
@@ -135,7 +135,7 @@ func ssgGenerateWithAuthZRestrictions(
 		map[string]ssg.CustomPage{
 			"/subscribe": ssg.NewSubscriberPage(
 				fmt.Sprintf(
-					"%s://%s/blogs/%d/subscribe",
+					"%s://%s/blogs/%s/subscribe",
 					config.Config.Progstack.Protocol,
 					config.Config.Progstack.RootDomain,
 					b.ID,
@@ -161,7 +161,7 @@ func ssgGenerateWithAuthZRestrictions(
 }
 
 func upsertPost(
-	post ssg.Post, url string, blogid int32, s *model.Store,
+	post ssg.Post, url string, blogid string, s *model.Store,
 ) error {
 	params := model.InsertRPostParams{
 		Url:         url,

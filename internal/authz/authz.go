@@ -11,7 +11,7 @@ import (
 	"github.com/xr0-org/progstack/internal/model"
 )
 
-func CanCreateSite(s *model.Store, userid int32) (bool, error) {
+func CanCreateSite(s *model.Store, userid string) (bool, error) {
 	storageUsed, err := UserStorageUsed(s, userid)
 	if err != nil {
 		return false, fmt.Errorf("calculate user storage used: %w", err)
@@ -31,7 +31,7 @@ func CanCreateSite(s *model.Store, userid int32) (bool, error) {
 }
 
 func HasAnalyticsCustomDomainsImagesEmails(
-	s *model.Store, userid int32,
+	s *model.Store, userid string,
 ) (bool, error) {
 	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
@@ -41,7 +41,7 @@ func HasAnalyticsCustomDomainsImagesEmails(
 	return tier.analyticsCustomDomainImagesEmails.Value(), nil
 }
 
-func CanUseTheme(s *model.Store, theme string, userid int32) (bool, error) {
+func CanUseTheme(s *model.Store, theme string, userid string) (bool, error) {
 	plan, err := s.GetUserSubscriptionByID(context.TODO(), userid)
 	if err != nil {
 		return false, fmt.Errorf("get user subscription: %w", err)

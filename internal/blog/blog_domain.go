@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/lib/pq"
@@ -129,13 +128,10 @@ func (b *BlogService) subdomainSubmit(r request.Request) error {
 	if !ok {
 		return fmt.Errorf("no blogID")
 	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-	if err != nil {
-		return fmt.Errorf("parse blogID: %w", err)
-	}
+
 	if err := b.store.UpdateBlogSubdomainByID(
 		context.TODO(), model.UpdateBlogSubdomainByIDParams{
-			ID:        int32(intBlogID),
+			ID:        blogID,
 			Subdomain: sub,
 		},
 	); err != nil {
@@ -177,13 +173,9 @@ func (b *BlogService) DomainSubmit(
 		return nil, authz.SubscriptionError
 	}
 
-	blogIDRaw, ok := r.GetRouteVar("blogID")
+	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
-	}
-	blogID, err := strconv.ParseInt(blogIDRaw, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse blogID: %w", err)
 	}
 
 	domain, err := r.GetPostFormValue("domain")
@@ -196,7 +188,7 @@ func (b *BlogService) DomainSubmit(
 
 	if err := b.store.UpdateBlogDomainByID(
 		context.TODO(), model.UpdateBlogDomainByIDParams{
-			ID: int32(blogID),
+			ID: blogID,
 			Domain: wrapNullString(
 				strings.TrimSpace(strings.ToLower(domain)),
 			),
@@ -206,7 +198,7 @@ func (b *BlogService) DomainSubmit(
 	}
 	return response.NewRedirect(
 		fmt.Sprintf(
-			"%s://%s/user/blogs/%d/config",
+			"%s://%s/user/blogs/%s/config",
 			config.Config.Progstack.Protocol,
 			config.Config.Progstack.RootDomain,
 			blogID,

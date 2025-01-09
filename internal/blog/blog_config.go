@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
@@ -42,11 +41,8 @@ func (b *BlogService) Config(
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
 	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse int: %w", err)
-	}
-	blogInfo, err := getBlogInfo(b.store, int32(intBlogID))
+
+	blogInfo, err := getBlogInfo(b.store, blogID)
 	if err != nil {
 		return nil, fmt.Errorf("get blog info: %w", err)
 	}
@@ -67,7 +63,7 @@ func (b *BlogService) Config(
 			Data: struct {
 				Title           string
 				UserInfo        *session.UserInfo
-				ID              int32
+				ID              string
 				Blog            BlogInfo
 				Themes          []string
 				CurrentTheme    string
@@ -76,7 +72,7 @@ func (b *BlogService) Config(
 			}{
 				Title:           "Blog Setup",
 				UserInfo:        session.ConvertSessionToUserInfo(sesh),
-				ID:              int32(intBlogID),
+				ID:              blogID,
 				Blog:            blogInfo,
 				Themes:          BuildThemes(config.Config.ProgstackSsg.Themes),
 				CurrentTheme:    string(blogInfo.Theme),
@@ -114,15 +110,10 @@ func (b *BlogService) ThemeSubmit(
 
 	r.MixpanelTrack("ThemeSubmit")
 
-	rawBlogID, ok := r.GetRouteVar("blogID")
+	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
 	}
-	intBlogID, err := strconv.ParseInt(rawBlogID, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse blogID: %w", err)
-	}
-	blogID := int32(intBlogID)
 
 	var req struct {
 		Theme string `json:"theme"`
@@ -153,7 +144,7 @@ func (b *BlogService) ThemeSubmit(
 }
 
 func updateBlogThemeTx(
-	blogID int32, theme model.BlogTheme, tx *model.Store,
+	blogID string, theme model.BlogTheme, tx *model.Store,
 ) error {
 	if err := tx.SetBlogThemeByID(
 		context.TODO(),
@@ -170,7 +161,7 @@ func updateBlogThemeTx(
 	return nil
 }
 
-func regenerateBlog(blogID int32, s *model.Store) error {
+func regenerateBlog(blogID string, s *model.Store) error {
 	if err := s.MarkBlogGenerationsStale(
 		context.TODO(), blogID,
 	); err != nil {
@@ -196,10 +187,6 @@ func (b *BlogService) LiveBranchSubmit(
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
 	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse blogID: %w", err)
-	}
 
 	/* submitted with form and no javascript */
 	var req struct {
@@ -216,7 +203,7 @@ func (b *BlogService) LiveBranchSubmit(
 	if err := b.store.ExecTx(
 		func(tx *model.Store) error {
 			return updateBlogLiveBranchTx(
-				int32(intBlogID), req.Branch, tx, b.client, sesh,
+				blogID, req.Branch, tx, b.client, sesh,
 			)
 		},
 	); err != nil {
@@ -230,7 +217,7 @@ func (b *BlogService) LiveBranchSubmit(
 }
 
 func updateBlogLiveBranchTx(
-	blogID int32, branch string,
+	blogID string, branch string,
 	tx *model.Store, c *httpclient.Client, sesh *session.Session,
 ) error {
 	/* TODO: validate input before wrinting to db */
@@ -290,10 +277,6 @@ func (b *BlogService) setStatusSubmit(
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
 	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse int: %w", err)
-	}
 
 	var req struct {
 		IsLive bool `json:"is_live"`
@@ -307,8 +290,7 @@ func (b *BlogService) setStatusSubmit(
 	}
 
 	change, err := handleStatusChange(
-		int32(intBlogID),
-		req.IsLive, r.Session().GetEmail(), b.store, sesh,
+		blogID, req.IsLive, r.Session().GetEmail(), b.store, sesh,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("handle status change: %w", err)
@@ -328,11 +310,11 @@ func (resp *statusChangeResponse) message() string {
 }
 
 func handleStatusChange(
-	blogID int32, islive bool, email string, s *model.Store, sesh *session.Session,
+	blogID string, islive bool, email string, s *model.Store, sesh *session.Session,
 ) (*statusChangeResponse, error) {
 	blog, err := s.GetBlogByID(context.TODO(), blogID)
 	if err != nil {
-		return nil, fmt.Errorf("error getting blog `%d': %w", blogID, err)
+		return nil, fmt.Errorf("error getting blog `%s': %w", blogID, err)
 	}
 	if err := validateStatusChange(blogID, islive, s); err != nil {
 		return nil, fmt.Errorf("invalid status change: %w", err)
@@ -344,7 +326,7 @@ func handleStatusChange(
 	}
 }
 
-func validateStatusChange(blogID int32, islive bool, s *model.Store) error {
+func validateStatusChange(blogID string, islive bool, s *model.Store) error {
 	blogIsLive, err := s.GetBlogIsLive(context.TODO(), blogID)
 	if err != nil {
 		return fmt.Errorf("islive error: %w", err)
@@ -391,11 +373,8 @@ func (b *BlogService) ConfigDomain(
 	if !ok {
 		return nil, fmt.Errorf("no blogID")
 	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse blogID: %w", err)
-	}
-	blogInfo, err := getBlogInfo(b.store, int32(intBlogID))
+
+	blogInfo, err := getBlogInfo(b.store, blogID)
 	if err != nil {
 		return nil, fmt.Errorf("blog info: %w", err)
 	}
@@ -405,12 +384,12 @@ func (b *BlogService) ConfigDomain(
 			Data: struct {
 				Title    string
 				UserInfo *session.UserInfo
-				ID       int32
+				ID       string
 				Blog     BlogInfo
 			}{
 				Title:    "Custom domain configuration",
 				UserInfo: session.ConvertSessionToUserInfo(sesh),
-				ID:       int32(intBlogID),
+				ID:       blogID,
 				Blog:     blogInfo,
 			},
 		},
@@ -429,14 +408,10 @@ func (b *BlogService) SyncRepository(
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
 	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse int: %w", err)
-	}
 
-	blog, err := b.store.GetBlogByID(context.TODO(), int32(intBlogID))
+	blog, err := b.store.GetBlogByID(context.TODO(), blogID)
 	if err != nil {
-		return nil, fmt.Errorf("error getting blog `%d': %w", intBlogID, err)
+		return nil, fmt.Errorf("error getting blog `%s': %w", blogID, err)
 	}
 	if err := UpdateRepositoryOnDisk(
 		b.client, &blog, sesh, b.store,
@@ -446,7 +421,7 @@ func (b *BlogService) SyncRepository(
 
 	return response.NewRedirect(
 		fmt.Sprintf(
-			"%s://%s/user/blogs/%d/config",
+			"%s://%s/user/blogs/%s/config",
 			config.Config.Progstack.Protocol,
 			config.Config.Progstack.RootDomain,
 			blog.ID,

@@ -30,9 +30,23 @@ CREATE TABLE boots (
 CREATE VIEW boot_id AS
 	SELECT id FROM boots ORDER BY id DESC LIMIT 1;
 
+-- ULIDs
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE OR REPLACE FUNCTION generate_ulid()
+RETURNS TEXT AS $$
+DECLARE
+	millis BIGINT := (extract(epoch FROM clock_timestamp()) * 1000)::BIGINT;
+	time_part TEXT := to_hex(millis);
+	random_part TEXT := encode(gen_random_bytes(10), 'hex');
+BEGIN
+	time_part := lpad(time_part, 10, '0');
+	RETURN lower(time_part || random_part);
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE TABLE users (
-	id			SERIAL				PRIMARY KEY,
+	id			TEXT				PRIMARY KEY	DEFAULT(generate_ulid()),
 	username		VARCHAR(255)	NOT NULL	UNIQUE,
 	email			VARCHAR(255)	NOT NULL	UNIQUE,		-- Login email
 	gh_awaiting_update	BOOLEAN		NOT NULL			DEFAULT(false),
@@ -44,7 +58,7 @@ CREATE TABLE users (
 
 CREATE TABLE github_accounts (
 	id		SERIAL				PRIMARY KEY,
-	user_id		INTEGER		NOT NULL,
+	user_id		TEXT		NOT NULL,
 	gh_user_id	BIGINT		NOT NULL	UNIQUE,				-- Github userID
 	gh_email	VARCHAR(255)	NOT NULL	UNIQUE,				-- Github email
 	gh_username	VARCHAR(255)	NOT NULL	UNIQUE,				-- GitHub username
@@ -71,7 +85,7 @@ CREATE TABLE magic (
 
 CREATE TABLE auth_sessions (
 	id		UUID				PRIMARY KEY	DEFAULT(uuid_generate_v4()),
-	user_id		INTEGER		NOT NULL,
+	user_id		TEXT		NOT NULL,
 	created_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	expires_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now() + INTERVAL '1 month'), -- XXX: set from configuration on creation
 	active		BOOLEAN		NOT NULL			DEFAULT(true),
@@ -92,7 +106,7 @@ CREATE TABLE unauth_sessions (
 CREATE TABLE installations (
 	id			SERIAL					PRIMARY KEY,
 	gh_installation_id	BIGINT			NOT NULL	UNIQUE,
-	user_id			INTEGER			NOT NULL,
+	user_id			TEXT			NOT NULL,
 	active			BOOLEAN			NOT NULL			DEFAULT(true),
 	created_at		TIMESTAMPTZ		NOT NULL			DEFAULT(now()),
 	deleted_at		TIMESTAMPTZ,
@@ -123,11 +137,11 @@ CREATE TYPE blog_theme AS ENUM ('lit', 'latex');
 CREATE TYPE email_mode AS ENUM ('plaintext', 'html');
 
 CREATE TABLE blogs (
-	id 			SERIAL				PRIMARY KEY,
+	id			TEXT				PRIMARY KEY	DEFAULT(generate_ulid()),
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	name			VARCHAR(1000),
-	user_id			INTEGER		NOT NULL,
+	user_id			TEXT		NOT NULL,
 	theme			blog_theme	NOT NULL			DEFAULT('lit'),
 
 	subdomain		VARCHAR(255)	NOT NULL
@@ -230,7 +244,7 @@ CREATE TABLE post_email_bindings (
 
 CREATE TABLE _r_posts (
 	url		VARCHAR(1000)	NOT NULL,
-	blog		INTEGER		NOT NULL	REFERENCES blogs,
+	blog		TEXT		NOT NULL	REFERENCES blogs,
 	published_at	TIMESTAMPTZ,
 	title		VARCHAR(1000)	NOT NULL,
 
@@ -265,7 +279,7 @@ CREATE VIEW posts AS
 CREATE TABLE visits (
 	id	SERIAL		PRIMARY KEY,
 	url	VARCHAR(1000)	NOT NULL,
-	blog	INTEGER		NOT NULL	REFERENCES blogs ON DELETE CASCADE,
+	blog	TEXT		NOT NULL	REFERENCES blogs ON DELETE CASCADE,
 	time	TIMESTAMPTZ	NOT NULL	DEFAULT(now())
 );
 CREATE INDEX ON visits(url);
@@ -279,7 +293,7 @@ CREATE TYPE subscription_status AS ENUM ('active', 'unsubscribed');
 
 CREATE TABLE subscribers (
 	id			SERIAL					PRIMARY KEY,
-	blog_id			INTEGER			NOT NULL,
+	blog_id			TEXT			NOT NULL,
 	email			VARCHAR(255)		NOT NULL,
 	unsubscribe_token 	UUID			NOT NULL	UNIQUE		DEFAULT uuid_generate_v4(),
 	status			subscription_status	NOT NULL			DEFAULT('active'),
@@ -302,7 +316,7 @@ CREATE TABLE subscriber_emails (
 	subscriber	INTEGER		NOT NULL	REFERENCES subscribers,
 
 	url		VARCHAR(1000)	NOT NULL,
-	blog		INTEGER		NOT NULL, 	FOREIGN KEY (url, blog)
+	blog		TEXT		NOT NULL, 	FOREIGN KEY (url, blog)
 							REFERENCES _r_posts (url, blog),
 	clicked 	BOOLEAN		NOT NULL	DEFAULT(false),
 
@@ -322,7 +336,7 @@ CREATE TABLE stripe_subscriptions (
 	stripe_status		VARCHAR(255)		NOT NULL,
 	sub_name		sub_name		NOT NULL,
 
-	user_id			INTEGER			NOT NULL	REFERENCES users,
+	user_id			TEXT			NOT NULL	REFERENCES users,
 	created_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now()),
 	updated_at		TIMESTAMPTZ		NOT NULL	DEFAULT(now())
 );

@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
@@ -274,14 +273,14 @@ func (a *AuthNService) LinkGithubAccount(
 	return response.NewRedirect(linkUrl, http.StatusFound), nil
 }
 
-func buildGithubLinkUrl(userID int32) (string, error) {
+func buildGithubLinkUrl(userID string) (string, error) {
 	u, err := url.Parse(ghAuthUrl)
 	if err != nil {
 		return "", err
 	}
 	params := url.Values{}
 	params.Add("client_id", config.Config.Github.ClientID)
-	params.Add("state", strconv.Itoa(int(userID)))
+	params.Add("state", userID)
 	params.Add("redirect_uri", config.Config.Github.LinkCallback)
 	u.RawQuery = params.Encode()
 	return u.String(), nil
@@ -321,12 +320,8 @@ func (a *AuthNService) githubLinkCallback(r request.Request) error {
 		return err
 	}
 	/* XXX: extract user from state, state == userID currently  */
-	uID, err := strconv.ParseInt(r.GetURLQueryValue("state"), 10, 32)
-	if err != nil {
-		return fmt.Errorf("could not parse userID from state: %w", err)
-	}
+	userID := r.GetURLQueryValue("state")
 	/* Validate that user exists */
-	userID := int32(uID)
 	_, err = a.store.GetUserByID(context.TODO(), userID)
 	if err != nil {
 		return fmt.Errorf("could not get get user: %w", err)
@@ -339,7 +334,7 @@ func (a *AuthNService) githubLinkCallback(r request.Request) error {
 		GhUsername: ghUser.Username,
 	})
 	if err != nil {
-		return fmt.Errorf("error linking github account to user with ID `%d': %w", userID, err)
+		return fmt.Errorf("error linking github account to user with ID `%s': %w", userID, err)
 	}
 	return nil
 }

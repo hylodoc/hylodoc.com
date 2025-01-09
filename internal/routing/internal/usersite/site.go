@@ -18,7 +18,7 @@ import (
 )
 
 type Site struct {
-	blogID int32
+	blogID string
 }
 
 var ErrIsService = errors.New("host is service name")
@@ -36,48 +36,48 @@ func GetSite(host string, s *model.Store) (*Site, error) {
 	return &Site{blog}, nil
 }
 
-func getBlog(host string, s *model.Store) (int32, error) {
+func getBlog(host string, s *model.Store) (string, error) {
 	/* check for subdomain first because it's the more common case */
 	blogID, err := getBlogBySubdomain(host, s)
 	if err == nil {
 		return blogID, nil
 	}
 	if !errors.Is(err, errNotSubdomainForm) {
-		return -1, fmt.Errorf("subdomain: %w", err)
+		return "", fmt.Errorf("subdomain: %w", err)
 	}
 	assert.Assert(errors.Is(err, errNotSubdomainForm))
 
 	blog, err := s.GetBlogByDomain(context.TODO(), host)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return -1, ErrUnknownDomain
+			return "", ErrUnknownDomain
 		}
-		return -1, fmt.Errorf("domain: %w", err)
+		return "", fmt.Errorf("domain: %w", err)
 	}
 	return blog.ID, nil
 }
 
 var errNotSubdomainForm = errors.New("not subdomain form")
 
-func getBlogBySubdomain(host string, s *model.Store) (int32, error) {
+func getBlogBySubdomain(host string, s *model.Store) (string, error) {
 	/* `.hylodoc.com' (dot followed by service name) must follow host */
 	subdomain, found := strings.CutSuffix(
 		host,
 		fmt.Sprintf(".%s", config.Config.Progstack.RootDomain),
 	)
 	if !found {
-		return -1, errNotSubdomainForm
+		return "", errNotSubdomainForm
 	}
 	sub, err := dns.ParseSubdomain(subdomain)
 	if err != nil {
-		return -1, fmt.Errorf("parse: %w", err)
+		return "", fmt.Errorf("parse: %w", err)
 	}
 	blog, err := s.GetBlogBySubdomain(context.TODO(), sub)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return -1, ErrUnknownSubdomain
+			return "", ErrUnknownSubdomain
 		}
-		return -1, fmt.Errorf("query error: %w", err)
+		return "", fmt.Errorf("query error: %w", err)
 	}
 	return blog.ID, nil
 }

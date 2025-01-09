@@ -2,7 +2,7 @@ package session
 
 /* struct used to pass session info to pages */
 type UserInfo struct {
-	UserID       *int32
+	UserID       *string
 	Email        *string
 	Username     *string
 	GithubLinked bool

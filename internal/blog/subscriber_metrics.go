@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
@@ -45,11 +44,8 @@ func (b *BlogService) SubscriberMetrics(
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
 	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse int: %w", err)
-	}
-	data, err := b.subscriberMetrics(int32(intBlogID))
+
+	data, err := b.subscriberMetrics(blogID)
 	if err != nil {
 		return nil, fmt.Errorf("subscriber metrics: %w", err)
 	}
@@ -69,9 +65,9 @@ func (b *BlogService) SubscriberMetrics(
 	), nil
 }
 
-func (b *BlogService) subscriberMetrics(intBlogID int32) (SubscriberData, error) {
+func (b *BlogService) subscriberMetrics(blogID string) (SubscriberData, error) {
 	subs, err := b.store.ListActiveSubscribersByBlogID(
-		context.TODO(), intBlogID,
+		context.TODO(), blogID,
 	)
 	if err != nil {
 		return SubscriberData{}, fmt.Errorf(

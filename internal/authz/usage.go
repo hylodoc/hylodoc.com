@@ -12,7 +12,7 @@ import (
 	"github.com/xr0-org/progstack/internal/model"
 )
 
-func UserStorageUsed(s *model.Store, userID int32) (size.Size, error) {
+func UserStorageUsed(s *model.Store, userID string) (size.Size, error) {
 	paths, err := s.ListRepositoriesGitdirPathsByUserID(
 		context.TODO(), userID,
 	)

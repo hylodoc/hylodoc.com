@@ -48,15 +48,12 @@ func (b *BlogService) SubscribeToBlog(
 		return nil, fmt.Errorf("get email: %w", err)
 	}
 
-	blogIDRaw, ok := r.GetRouteVar("blogID")
+	blogID, ok := r.GetRouteVar("blogID")
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
 	}
-	blogID, err := strconv.ParseInt(blogIDRaw, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse blogID: %w", err)
-	}
-	blog, err := b.store.GetBlogByID(context.TODO(), int32(blogID))
+
+	blog, err := b.store.GetBlogByID(context.TODO(), blogID)
 	if err != nil {
 		return nil, fmt.Errorf("get blog: %w", err)
 	}
@@ -109,9 +106,9 @@ func getsitename(blog *model.Blog) string {
 }
 
 func (b *BlogService) createsubscriber(
-	email string, blog int32, sesh *session.Session,
+	email string, blog string, sesh *session.Session,
 ) (string, error) {
-	sesh.Printf("subscribing email `%s' to blog %d\n", email, blog)
+	sesh.Printf("subscribing email `%s' to blog %s\n", email, blog)
 	tk, err := b.createorgetsubscriber(email, blog, sesh)
 	if err != nil {
 		return "", fmt.Errorf("cannot create or get subscriber: %w", err)
@@ -120,7 +117,7 @@ func (b *BlogService) createsubscriber(
 }
 
 func (b *BlogService) createorgetsubscriber(
-	email string, blog int32, sesh *session.Session,
+	email string, blog string, sesh *session.Session,
 ) (*uuid.UUID, error) {
 	tk, err := b.store.CreateSubscriber(
 		context.TODO(),
@@ -256,14 +253,11 @@ func (b *BlogService) DeleteSubscriber(
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
 	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse int: %w", err)
-	}
+
 	if err := b.store.DeleteSubscriberByEmail(
 		context.TODO(),
 		model.DeleteSubscriberByEmailParams{
-			BlogID: int32(intBlogID),
+			BlogID: blogID,
 			Email:  email,
 		},
 	); err != nil {
@@ -271,7 +265,7 @@ func (b *BlogService) DeleteSubscriber(
 	}
 
 	return response.NewRedirect(
-		buildSubscriberMetricsUrl(int32(intBlogID)),
+		buildSubscriberMetricsUrl(blogID),
 		http.StatusSeeOther,
 	), nil
 }
@@ -288,13 +282,9 @@ func (b *BlogService) ExportSubscribers(
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
 	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse int: %w", err)
-	}
 
 	subs, err := b.store.ListActiveSubscribersByBlogID(
-		context.TODO(), int32(intBlogID),
+		context.TODO(), blogID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list subscribers: %w", err)

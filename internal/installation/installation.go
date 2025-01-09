@@ -153,7 +153,7 @@ func handleInstallationAction(
 
 func handleInstallationCreated(
 	c *httpclient.Client, s *model.Store, ghInstallationID int64,
-	userID int32, ghEmail string, sesh *session.Session,
+	userID string, ghEmail string, sesh *session.Session,
 ) error {
 	sesh.Println("handling installation created event...")
 	/* get access token */
@@ -188,7 +188,7 @@ func handleInstallationCreated(
 }
 
 func buildCreateinstallationTxParams(
-	installationID int64, userID int32, ghEmail string, repos []Repository,
+	installationID int64, userID string, ghEmail string, repos []Repository,
 ) *installationTxParams {
 	var iTxParams installationTxParams
 	iTxParams.InstallationID = installationID
@@ -218,7 +218,7 @@ type repositoryTxParams struct {
 
 type installationTxParams struct {
 	InstallationID       int64
-	UserID               int32
+	UserID               string
 	Email                string
 	RepositoriesTxParams []repositoryTxParams
 }
@@ -296,7 +296,7 @@ func getReposDetails(
 
 func handleInstallationDeleted(
 	c *httpclient.Client, s *model.Store, ghInstallationID int64,
-	userID int32, sesh *session.Session,
+	userID string, sesh *session.Session,
 ) error {
 	sesh.Println("handling installation deleted event...")
 	assert.Assert(false)
@@ -391,7 +391,7 @@ func handleInstallationRepositoriesAction(
 
 func handleInstallationRepositoriesAdded(
 	c *httpclient.Client, s *model.Store, ghInstallationID int64,
-	repos []Repository, userID int32, email string, sesh *session.Session,
+	repos []Repository, userID string, email string, sesh *session.Session,
 ) error {
 	sesh.Println("handling repositories added event...")
 

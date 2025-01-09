@@ -95,7 +95,7 @@ func (u *UserService) GithubInstallation(
 	), nil
 }
 
-func (u *UserService) awaitupdate(userID int32) error {
+func (u *UserService) awaitupdate(userID string) error {
 	/* TODO: get from config */
 	var (
 		timeout = 5 * time.Second

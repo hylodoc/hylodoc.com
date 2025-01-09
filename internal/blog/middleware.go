@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/xr0-org/progstack/internal/app/handler"
@@ -34,11 +33,10 @@ func (b *BlogService) middleware(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("get user id: %w", err)
 	}
 
-	intBlogID, err := strconv.ParseInt(mux.Vars(r)["blogID"], 10, 32)
-	if err != nil {
-		return fmt.Errorf("parse blogID: %w", err)
+	blogID, ok := mux.Vars(r)["blogID"]
+	if !ok {
+		return createCustomError("", http.StatusNotFound)
 	}
-	blogID := int32(intBlogID)
 
 	userOwnsBlog, err := b.store.CheckBlogOwnership(
 		context.TODO(), model.CheckBlogOwnershipParams{
@@ -50,7 +48,7 @@ func (b *BlogService) middleware(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("check user owns blog: %w", err)
 	}
 	if !userOwnsBlog {
-		sesh.Printf("user `%d' does not own blog `%d'\n", userID, blogID)
+		sesh.Printf("user `%s' does not own blog `%s'\n", userID, blogID)
 		return createCustomError("", http.StatusNotFound)
 	}
 

@@ -125,7 +125,7 @@ func (b *BlogService) SendPostEmail(
 	}
 	return response.NewRedirect(
 		fmt.Sprintf(
-			"%s://%s/user/blogs/%d/metrics",
+			"%s://%s/user/blogs/%s/metrics",
 			config.Config.Progstack.Protocol,
 			config.Config.Progstack.RootDomain,
 			blog.ID,

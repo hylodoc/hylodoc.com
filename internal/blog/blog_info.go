@@ -12,7 +12,7 @@ import (
 )
 
 type BlogInfo struct {
-	ID                       int32
+	ID                       string
 	Name                     string
 	Subdomain                string
 	Domain                   *string
@@ -33,7 +33,7 @@ type BlogInfo struct {
 	SyncUrl                  string
 }
 
-func GetBlogsInfo(s *model.Store, userID int32) ([]BlogInfo, error) {
+func GetBlogsInfo(s *model.Store, userID string) ([]BlogInfo, error) {
 	ids, err := s.ListBlogIDsByUserID(context.TODO(), userID)
 	if err != nil {
 		/* should not be possible to have an installation with no repositories */
@@ -83,49 +83,49 @@ func buildUrl(subdomain string) string {
 	)
 }
 
-func buildConfigureCustomDomainUrl(blogID int32) string {
+func buildConfigureCustomDomainUrl(blogID string) string {
 	return fmt.Sprintf(
-		"/user/blogs/%d/config-domain",
+		"/user/blogs/%s/config-domain",
 		blogID,
 	)
 }
 
-func buildSetDomainUrl(blogID int32) string {
+func buildSetDomainUrl(blogID string) string {
 	return fmt.Sprintf(
-		"/user/blogs/%d/set-domain",
+		"/user/blogs/%s/set-domain",
 		blogID,
 	)
 }
 
-func buildSubscriberMetricsUrl(blogID int32) string {
+func buildSubscriberMetricsUrl(blogID string) string {
 	return fmt.Sprintf(
-		"/user/blogs/%d/subscriber/metrics",
+		"/user/blogs/%s/subscriber/metrics",
 		blogID,
 	)
 }
 
-func buildMetricsUrl(blogID int32) string {
+func buildMetricsUrl(blogID string) string {
 	return fmt.Sprintf(
-		"/user/blogs/%d/metrics",
+		"/user/blogs/%s/metrics",
 		blogID,
 	)
 }
 
-func buildConfigUrl(blogID int32) string {
+func buildConfigUrl(blogID string) string {
 	return fmt.Sprintf(
-		"/user/blogs/%d/config",
+		"/user/blogs/%s/config",
 		blogID,
 	)
 }
 
-func buildSyncUrl(blogID int32) string {
+func buildSyncUrl(blogID string) string {
 	return fmt.Sprintf(
-		"/user/blogs/%d/sync",
+		"/user/blogs/%s/sync",
 		blogID,
 	)
 }
 
-func getBlogInfo(s *model.Store, blogID int32) (BlogInfo, error) {
+func getBlogInfo(s *model.Store, blogID string) (BlogInfo, error) {
 	blog, err := s.GetBlogByID(context.TODO(), blogID)
 	if err != nil {
 		return BlogInfo{}, fmt.Errorf("query error: %w", err)

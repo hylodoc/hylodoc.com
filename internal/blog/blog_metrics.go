@@ -7,7 +7,6 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
@@ -36,11 +35,8 @@ func (b *BlogService) SiteMetrics(
 	if !ok {
 		return nil, createCustomError("", http.StatusNotFound)
 	}
-	intBlogID, err := strconv.ParseInt(blogID, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("parse int: %w", err)
-	}
-	blog, err := b.store.GetBlogByID(context.TODO(), int32(intBlogID))
+
+	blog, err := b.store.GetBlogByID(context.TODO(), blogID)
 	if err != nil {
 		return nil, fmt.Errorf("get blog: %w", err)
 	}
@@ -97,7 +93,7 @@ type postdata struct {
 	Email   emaildata.EmailData
 }
 
-func (b *BlogService) getSiteMetrics(blogid int32) ([]postdata, error) {
+func (b *BlogService) getSiteMetrics(blogid string) ([]postdata, error) {
 	blog, err := b.store.GetBlogByID(context.TODO(), blogid)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get blog: %w", err)
@@ -158,7 +154,7 @@ func getemaildata(post *model.Post, clicks int) emaildata.EmailData {
 	return emaildata.NewUnsent(
 		template.URL(
 			fmt.Sprintf(
-				"%s://%s/user/blogs/%d/email?token=%s",
+				"%s://%s/user/blogs/%s/email?token=%s",
 				config.Config.Progstack.Protocol,
 				config.Config.Progstack.RootDomain,
 				post.Blog,
