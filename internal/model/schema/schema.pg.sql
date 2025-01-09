@@ -143,6 +143,7 @@ CREATE TABLE blogs (
 	name			VARCHAR(1000),
 	user_id			TEXT		NOT NULL,
 	theme			blog_theme	NOT NULL			DEFAULT('lit'),
+	custom_theme		VARCHAR(1000)	NOT NULL			DEFAULT(''),
 
 	subdomain		VARCHAR(255)	NOT NULL
 		CONSTRAINT unique_blog_subdomain UNIQUE,

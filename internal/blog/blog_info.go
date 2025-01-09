@@ -18,12 +18,14 @@ type BlogInfo struct {
 	Domain                   *string
 	Url                      string
 	ConfigureCustomDomainUrl string
+	ConfigureCustomThemeUrl  string
 	SetDomainUrl             string
 	RepositoryUrl            string
 	SubscriberMetricsUrl     string
 	MetricsUrl               string
 	ConfigUrl                string
 	Theme                    string
+	CustomTheme              string
 	Status                   string
 	LiveBranch               string
 	UpdatedAt                time.Time
@@ -90,6 +92,13 @@ func buildConfigureCustomDomainUrl(blogID string) string {
 	)
 }
 
+func buildConfigureCustomThemeUrl(blogID string) string {
+	return fmt.Sprintf(
+		"/user/blogs/%s/config-custom-theme",
+		blogID,
+	)
+}
+
 func buildSetDomainUrl(blogID string) string {
 	return fmt.Sprintf(
 		"/user/blogs/%s/set-domain",
@@ -145,6 +154,7 @@ func getBlogInfo(s *model.Store, blogID string) (BlogInfo, error) {
 		Subdomain:                blog.Subdomain.String(),
 		Url:                      buildUrl(blog.Subdomain.String()),
 		ConfigureCustomDomainUrl: buildConfigureCustomDomainUrl(blog.ID),
+		ConfigureCustomThemeUrl:  buildConfigureCustomThemeUrl(blog.ID),
 		SetDomainUrl:             buildSetDomainUrl(blog.ID),
 		RepositoryUrl:            ghurl.String(),
 		SubscriberMetricsUrl:     buildSubscriberMetricsUrl(blog.ID),
@@ -152,6 +162,7 @@ func getBlogInfo(s *model.Store, blogID string) (BlogInfo, error) {
 		ConfigUrl:                buildConfigUrl(blog.ID),
 		LiveBranch:               blog.LiveBranch,
 		Theme:                    string(blog.Theme),
+		CustomTheme:              blog.CustomTheme,
 		UpdatedAt:                blog.UpdatedAt,
 		IsLive:                   isLive,
 		SyncUrl:                  buildSyncUrl(blog.ID),

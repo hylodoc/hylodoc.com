@@ -61,22 +61,22 @@ func (b *BlogService) Config(
 		[]string{"blog_config.html"},
 		util.PageInfo{
 			Data: struct {
-				Title           string
-				UserInfo        *session.UserInfo
-				ID              string
-				Blog            BlogInfo
-				Themes          []string
-				CurrentTheme    string
-				CanCustomDomain bool
-				UpgradeURL      string
+				Title              string
+				UserInfo           *session.UserInfo
+				ID                 string
+				Blog               BlogInfo
+				Themes             []string
+				CurrentTheme       string
+				CanCustomConfigure bool
+				UpgradeURL         string
 			}{
-				Title:           "Blog Setup",
-				UserInfo:        session.ConvertSessionToUserInfo(sesh),
-				ID:              blogID,
-				Blog:            blogInfo,
-				Themes:          BuildThemes(config.Config.ProgstackSsg.Themes),
-				CurrentTheme:    string(blogInfo.Theme),
-				CanCustomDomain: canConfigure,
+				Title:              "Blog Setup",
+				UserInfo:           session.ConvertSessionToUserInfo(sesh),
+				ID:                 blogID,
+				Blog:               blogInfo,
+				Themes:             BuildThemes(config.Config.ProgstackSsg.Themes),
+				CurrentTheme:       string(blogInfo.Theme),
+				CanCustomConfigure: canConfigure,
 				UpgradeURL: fmt.Sprintf(
 					"%s://%s/pricing",
 					config.Config.Progstack.Protocol,
