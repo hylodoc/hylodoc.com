@@ -13,6 +13,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/xr0-org/progstack-ssg/pkg/ssg"
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authn"
@@ -79,6 +80,8 @@ func (b *BlogService) CreateRepositoryBlog(
 			)
 		},
 	); err != nil {
+		if errors.Is(err, ssg.ErrTheme) {
+		}
 		return nil, fmt.Errorf("create blog tx: %w", err)
 	}
 	return response.NewRedirect(
@@ -192,8 +195,6 @@ func UpdateRepositoryOnDisk(
 	return nil
 }
 
-var branchError = errors.New("branch error")
-
 // updateAndCheckout clones the repo at the given URL into a bare git dir as
 // provided, and then clones and checks out locally the branch given by its
 // latest hash into config.Config.Progstack.CheckoutsPath. It returns this
@@ -204,24 +205,28 @@ func updateAndCheckout(repoURL, gitdir, branch, token string) (string, error) {
 	if err := removeDirIfExists(gitdir); err != nil {
 		return "", fmt.Errorf("remove gitdir if exists: %w", err)
 	}
-	auth := &githttp.BasicAuth{Username: "github", Password: token}
+	refname := plumbing.NewBranchReferenceName(branch)
 	repo, err := git.PlainClone(
 		gitdir,
 		true,
 		&git.CloneOptions{
-			URL:  repoURL,
-			Auth: auth,
+			URL: repoURL,
+			Auth: &githttp.BasicAuth{
+				Username: "github", Password: token,
+			},
+			ReferenceName: refname,
 		},
 	)
 	if err != nil {
 		return "", fmt.Errorf("bare clone: %w", err)
 	}
-	refname := plumbing.NewRemoteReferenceName("origin", branch)
+
 	ref, err := repo.Reference(refname, true)
 	if err != nil {
 		return "", fmt.Errorf("reference: %w", err)
 	}
 	h := ref.Hash().String()
+
 	checkoutdir := filepath.Join(config.Config.Progstack.CheckoutsPath, h)
 	if err := removeDirIfExists(checkoutdir); err != nil {
 		return "", fmt.Errorf("remove checkoutdir if exists: %w", err)
@@ -236,6 +241,7 @@ func updateAndCheckout(repoURL, gitdir, branch, token string) (string, error) {
 	); err != nil {
 		return "", fmt.Errorf("checkout clone: %w", err)
 	}
+
 	return h, nil
 }
 
