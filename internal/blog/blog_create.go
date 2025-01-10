@@ -2,6 +2,7 @@ package blog
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -17,17 +19,15 @@ import (
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
 	"github.com/xr0-org/progstack/internal/authn"
+	"github.com/xr0-org/progstack/internal/blog/internal/errorset"
+	"github.com/xr0-org/progstack/internal/blog/internal/valueset"
 	"github.com/xr0-org/progstack/internal/config"
 	"github.com/xr0-org/progstack/internal/dns"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
+	"github.com/xr0-org/progstack/internal/util"
 )
-
-type CreateBlogResponse struct {
-	Url     string `json:"url"`
-	Message string `json:"message"`
-}
 
 func (b *BlogService) CreateRepositoryBlog(
 	r request.Request,
@@ -36,6 +36,138 @@ func (b *BlogService) CreateRepositoryBlog(
 	sesh.Println("CreateRepositoryBlog handler...")
 
 	r.MixpanelTrack("CreateRepositoryBlog")
+
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
+	if err := b.awaitupdate(userid); err != nil {
+		return nil, fmt.Errorf("await update: %w", err)
+	}
+	return b.createBlogPage(r, valueset.NewEmpty(), errorset.NewEmpty())
+}
+
+func (b *BlogService) createBlogPage(
+	r request.Request, values valueset.Set, errors errorset.Set,
+) (response.Response, error) {
+	sesh := r.Session()
+	userid, err := sesh.GetUserID()
+	if err != nil {
+		return nil, fmt.Errorf("get user id: %w", err)
+	}
+
+	repos, err := b.store.ListOrderedRepositoriesByUserID(
+		context.TODO(), userid,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get repositories: %w", err)
+	}
+	hasinstallation, err := b.store.InstallationExistsForUserID(
+		context.TODO(), userid,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("has installation: %w", err)
+	}
+	islinked, err := userIsLinked(userid, b.store)
+	if err != nil {
+		return nil, fmt.Errorf("user is linked: %w", err)
+	}
+
+	return response.NewTemplate(
+		[]string{"blog_repository_flow.html"},
+		util.PageInfo{
+			Data: struct {
+				Title           string
+				UserInfo        *session.UserInfo
+				HasInstallation bool
+				IsLinked        bool
+				RootDomain      string
+				Repositories    []repository
+				Themes          []string
+				Values          valueset.Set
+				Errors          errorset.Set
+			}{
+				Title:           "Create new blog",
+				UserInfo:        session.ConvertSessionToUserInfo(sesh),
+				HasInstallation: hasinstallation,
+				IsLinked:        islinked,
+				RootDomain:      config.Config.Progstack.RootDomain,
+				Repositories:    buildRepositories(repos),
+				Themes:          BuildThemes(config.Config.ProgstackSsg.Themes),
+				Values:          values,
+				Errors:          errors,
+			},
+		},
+	), nil
+}
+
+func (b *BlogService) awaitupdate(userID int32) error {
+	/* TODO: get from config */
+	var (
+		timeout = 5 * time.Second
+		step    = 100 * time.Millisecond
+	)
+	now := time.Now
+	for until := now().Add(timeout); now().Before(until); time.Sleep(step) {
+		awaiting, err := b.store.IsAwaitingGithubUpdate(
+			context.TODO(), userID,
+		)
+		if err != nil {
+			return fmt.Errorf("check if awaiting: %w", err)
+		}
+		if !awaiting {
+			return nil
+		}
+	}
+	if err := b.store.UpdateAwaitingGithubUpdate(
+		context.TODO(),
+		model.UpdateAwaitingGithubUpdateParams{
+			ID:               userID,
+			GhAwaitingUpdate: false,
+		},
+	); err != nil {
+		return fmt.Errorf("update github update: %w", err)
+	}
+	return fmt.Errorf("timeout")
+}
+
+type repository struct {
+	Value int64
+	Name  string
+}
+
+func buildRepositories(dbrepos []model.Repository) []repository {
+	res := make([]repository, len(dbrepos))
+	for i, dbrepo := range dbrepos {
+		res[i] = repository{dbrepo.RepositoryID, dbrepo.FullName}
+	}
+	return res
+}
+
+func userIsLinked(userid int32, s *model.Store) (bool, error) {
+	if _, err := s.GetGithubAccountByUserID(
+		context.TODO(), userid,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, fmt.Errorf("get github account: %w", err)
+	}
+	return true, nil
+}
+
+type CreateBlogResponse struct {
+	Url     string `json:"url"`
+	Message string `json:"message"`
+}
+
+func (b *BlogService) SubmitRepositoryBlog(
+	r request.Request,
+) (response.Response, error) {
+	sesh := r.Session()
+	sesh.Println("SubmitRepositoryBlog handler...")
+
+	r.MixpanelTrack("SubmitRepositoryBlog")
 
 	rawRepoID, err := r.GetPostFormValue("repositoriesDropdown")
 	if err != nil {
@@ -81,6 +213,16 @@ func (b *BlogService) CreateRepositoryBlog(
 		},
 	); err != nil {
 		if errors.Is(err, ssg.ErrTheme) {
+			return b.createBlogPage(
+				r,
+				valueset.New(
+					intRepoID,
+					sub.String(),
+					rawTheme,
+					branch,
+				),
+				errorset.NewTheme("Theme is broken"),
+			)
 		}
 		return nil, fmt.Errorf("create blog tx: %w", err)
 	}

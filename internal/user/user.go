@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
@@ -93,106 +92,6 @@ func (u *UserService) GithubInstallation(
 		),
 		http.StatusTemporaryRedirect,
 	), nil
-}
-
-func (u *UserService) awaitupdate(userID int32) error {
-	/* TODO: get from config */
-	var (
-		timeout = 5 * time.Second
-		step    = 100 * time.Millisecond
-	)
-	for until := time.Now().Add(timeout); time.Now().Before(until); time.Sleep(step) {
-		awaiting, err := u.store.IsAwaitingGithubUpdate(
-			context.TODO(), userID,
-		)
-		if err != nil {
-			return fmt.Errorf("error checking if awaiting: %w", err)
-		}
-		if !awaiting {
-			return nil
-		}
-	}
-	if err := u.store.UpdateAwaitingGithubUpdate(
-		context.TODO(),
-		model.UpdateAwaitingGithubUpdateParams{
-			ID:               userID,
-			GhAwaitingUpdate: false,
-		},
-	); err != nil {
-		return fmt.Errorf("error updating awaitingGithubUpdate: %w", err)
-	}
-	return fmt.Errorf("timeout")
-}
-
-type Repository struct {
-	Value int64
-	Name  string
-}
-
-func (u *UserService) RepositoryFlow(
-	r request.Request,
-) (response.Response, error) {
-	sesh := r.Session()
-	sesh.Println("RepositoryFlow handler...")
-
-	r.MixpanelTrack("RepositoryFlow")
-
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return nil, fmt.Errorf("get user id: %w", err)
-	}
-	if err := u.awaitupdate(userid); err != nil {
-		return nil, fmt.Errorf("await update: %w", err)
-	}
-
-	repos, err := u.store.ListOrderedRepositoriesByUserID(
-		context.TODO(), userid,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("get repositories: %w", err)
-	}
-
-	details, err := getAccountDetails(u.store, sesh)
-	if err != nil {
-		return nil, fmt.Errorf("account details: %w", err)
-	}
-
-	return response.NewTemplate(
-		[]string{"blog_repository_flow.html"},
-		util.PageInfo{
-			Data: struct {
-				Title          string
-				UserInfo       *session.UserInfo
-				AccountDetails AccountDetails
-				RootDomain     string
-				Repositories   []Repository
-				Themes         []string
-
-				RepositoryError string
-				SubdomainError  string
-				ThemeError      string
-				BranchError     string
-			}{
-				Title:          "Create new blog",
-				UserInfo:       session.ConvertSessionToUserInfo(sesh),
-				AccountDetails: details,
-				RootDomain:     config.Config.Progstack.RootDomain,
-				Repositories:   buildRepositoriesInfo(repos),
-				Themes:         blog.BuildThemes(config.Config.ProgstackSsg.Themes),
-			},
-		},
-	), nil
-}
-
-func buildRepositoriesInfo(repos []model.Repository) []Repository {
-	var res []Repository
-	for _, repo := range repos {
-		res = append(res, Repository{
-			Value: repo.RepositoryID,
-			Name:  repo.FullName,
-		})
-	}
-	return res
 }
 
 type AccountDetails struct {

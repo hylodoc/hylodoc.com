@@ -9,39 +9,35 @@
 <section>
 	<div class="container">
 		<form id="blogForm" action="/user/create-new-blog" method="POST">
-			{{ if not .Data.AccountIsLinked }}
+			{{ if not .Data.IsLinked }}
 				<p>
 					To create a repository based site, you need to link a Github Account.
 					<a href="gh/linkgithub">Link GitHub Account</a>
 				</p>
 			{{ end }}
-			{{ if not .Data.AccountHasInstallation }}
-				<p>
-					To use the repository flow, you need to
-					install our GitHub App and grant us
-					access to the relevent repositories <a
-					href="github-installation">Install
-				GitHub App</a>
-				</p>
-			{{ else }}
-				<p>
-					To manage your Github Installations, add/remove repositories.
-					<a href="github-installation">Manage Installations</a>
-				</p>
-			{{ end }}
+			<p>
+				<a href="github-installation">Link a repo on GitHub</a> to see it below.
+			</p>
 
 			<!-- Select repository -->
 			<div class="row">
 				<div class="four columns">
 					<label for="repositoriesDropdown">Select a repository</label>
 					<select class="u-full-width" id="repositoriesDropdown" name="repositoriesDropdown" required>
-						<option value="" disabled selected>···</option>
-						{{ range .Data.Repositories }}
-							<option value="{{ .Value }}">{{ .Name }}</option>
+						{{ if .Data.Values.HasRepository }}
+							<option value="" disabled>···</option>
+							{{ range .Data.Repositories }}
+								<option value="{{ .Value }}" {{ if eq .Value $.Data.Values.Repository }}selected{{ end }}>{{ .Name }}</option>
+							{{ end }}
+						{{ else }}
+							<option value="" disabled selected>···</option>
+							{{ range .Data.Repositories }}
+								<option value="{{ .Value }}">{{ .Name }}</option>
+							{{ end }}
 						{{ end }}
 					</select>
 					<div id="repositoryError" class="error-div">
-						{{ .Data.RepositoryError }}
+						{{ .Data.Errors.Repository }}
 					</div>
 				</div>
 			</div>
@@ -52,12 +48,13 @@
 				<div class="row">
 					<div class="four columns">
 					<input class="u-full-width"
-					autocomplete="off" type="text" id="subdomainInput" name="subdomainInput" placeholder="Enter subdomain" required/>
+					       autocomplete="off" type="text" id="subdomainInput" name="subdomainInput" placeholder="Enter subdomain"
+															value="{{ .Data.Values.Subdomain }}" required/>
 					</div>
 					<span> .{{ .Data.RootDomain }}</span>
 				</div>
 				<div id="subdomainError" class="error-div">
-					{{ .Data.SubdomainError }}
+					{{ .Data.Errors.Subdomain }}
 				</div>
 			</div>
 
@@ -66,13 +63,20 @@
 				<div class="four columns">
 					<label for="themesDropdown">Select a theme</label>
 					<select id="themesDropdown" name="themesDropdown" class="u-full-width" required>
-						<option value="" disabled selected>···</option>
-						{{ range .Data.Themes }}
-							<option value="{{ . }}">{{ . }}</option>
+						{{ if .Data.Values.Theme }}
+							<option value="" disabled>···</option>
+							{{ range .Data.Themes }}
+								<option value="{{ . }}" {{ if eq . $.Data.Values.Theme }}selected{{ end }}>{{ . }}</option>
+							{{ end }}
+						{{ else }}
+							<option value="" disabled selected>···</option>
+							{{ range .Data.Themes }}
+								<option value="{{ . }}">{{ . }}</option>
+							{{ end }}
 						{{ end }}
 					</select>
 					<div id="themeErrror" class="error-div">
-						{{ .Data.ThemeError }}
+						{{ .Data.Errors.Theme }}
 					</div>
 				</div>
 			</div>
@@ -82,11 +86,15 @@
 				<label for="liveBranchInput">Set branch</label>
 				<div class="row">
 					<div class="four columns">
-						<input class="u-full-width" type="text" id="liveBranchInput" name="liveBranchInput" placeholder="Enter branch" required/>
+						<input class="u-full-width"
+						type="text" id="liveBranchInput"
+						name="liveBranchInput"
+						placeholder="Enter branch"
+						value="{{ .Data.Values.Branch }}" required/>
 					</div>
 				</div>
 				<div id="branchError" class="error-div">
-					{{ .Data.BranchError }}
+					{{ .Data.Errors.Branch }}
 				</div>
 			</div>
 
