@@ -3,7 +3,7 @@ services:
     container_name: progstack_container
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.app
     ports:
       - '7980:80'
       - '7999:443'
@@ -27,7 +27,7 @@ services:
     volumes:
       - './prometheus.yml:/etc/prometheus/prometheus.yml'
     ports:
-      - "9090:9090"
+      - '9090:9090'
     networks:
       - monitor-network
 
@@ -36,7 +36,7 @@ services:
     logging:
       driver: none
     ports:
-      - "3000:3000"
+      - '3000:3000'
     networks:
       - monitor-network
     depends_on:
@@ -51,7 +51,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secret
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: ['CMD', 'pg_isready', '-U', 'postgres']
       interval: 5s
       retries: 5
     volumes:
@@ -59,6 +59,25 @@ services:
     restart: unless-stopped
     networks:
       - monitor-network
+
+  backup:
+    container_name: backup
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    environment:
+      AWS_ACCESS_KEY_ID: key
+      AWS_SECRET_ACCESS_KEY: secret
+      S3_PATH: path # s3 path beginning with "s3://" and no trailing slash
+      PGUSER: postgres # postgres user above
+      PGPASSWORD: secret # postgres password above
+      PGDATABASE: progstack_db # postgres database in init file in internal/model
+      PGHOST: postgres # postgres host name above
+      PGPORT: 5432 # same as postgres (internal) port above
+    networks:
+      - monitor-network
+    depends_on:
+      - postgres
 
 volumes:
   certs:

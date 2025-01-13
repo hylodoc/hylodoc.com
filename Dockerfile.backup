@@ -1,0 +1,17 @@
+FROM ubuntu
+
+RUN apt update && apt install -y postgresql-client cron unzip curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o \
+	"awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install \
+    && rm -rf awscliv2.zip
+RUN aws --version
+
+COPY scripts/backup.sh /usr/local/bin/backup.sh
+RUN chmod +x /usr/local/bin/backup.sh
+COPY scripts/backup-cron /etc/cron.d/backup-cron
+RUN chmod 644 /etc/cron.d/backup-cron && crontab /etc/cron.d/backup-cron
+CMD ["cron", "-f"]
