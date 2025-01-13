@@ -17,6 +17,8 @@ services:
         condition: service_healthy
     networks:
       - monitor-network
+    restart:
+      always
 
   prometheus:
     image: prom/prometheus
