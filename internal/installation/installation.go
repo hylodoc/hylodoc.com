@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -299,7 +300,66 @@ func handleInstallationDeleted(
 	userID string, sesh *session.Session,
 ) error {
 	sesh.Println("handling installation deleted event...")
-	assert.Assert(false)
+
+	repoblogs, err := s.ListBlogsForInstallationByGhInstallationID(
+		context.TODO(), ghInstallationID,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"error getting repositories for installation %d: %w",
+			ghInstallationID, err,
+		)
+	}
+	sesh.Printf("repoblogs: %v\n", repoblogs)
+
+	/* delete repostories removed from disk */
+	sesh.Println("deleting repositories from disk...")
+	for _, repoblog := range repoblogs {
+		path := fmt.Sprintf(
+			"%s/%s",
+			config.Config.Progstack.GitdirsPath, repoblog.FullName,
+		)
+		if err := os.RemoveAll(path); err != nil {
+			return fmt.Errorf(
+				"error deleting repo `%s' from disk: %w",
+				path, err,
+			)
+		}
+	}
+
+	/* delete checkout branch */
+	sesh.Println("deleting checkout branch from disk...")
+	for _, repoblog := range repoblogs {
+		assert.Assert(repoblog.LiveHash.Valid)
+		path := fmt.Sprintf(
+			"%s/%s",
+			config.Config.Progstack.CheckoutsPath,
+			repoblog.LiveHash.String,
+		)
+		if err := os.RemoveAll(path); err != nil {
+			return fmt.Errorf(
+				"error deleting repo `%s' from disk: %w",
+				path, err,
+			)
+		}
+	}
+
+	/* XXX: delete website from disk, how to get the path on disko from
+	 * the generation? */
+
+	/* delete repostory (and assiciated blogs via cascade) from db */
+	sesh.Println("deleting repository and blog from db...")
+	for _, repoblog := range repoblogs {
+		if err := s.DeleteRepositoryWithGhRepositoryID(
+			context.TODO(), repoblog.RepositoryID,
+		); err != nil {
+			return fmt.Errorf(
+				"delete repo with gh id `%s': %w",
+				repoblog.ID, err,
+			)
+		}
+	}
+
 	return nil
 }
 
