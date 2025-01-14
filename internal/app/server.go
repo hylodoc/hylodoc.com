@@ -157,6 +157,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	handler.Handle(blogR, "/set-status", blogService.SetStatusSubmit)
 	handler.Handle(blogR, "/sync", blogService.SyncRepository)
 	handler.Handle(blogR, "/email", blogService.SendPostEmail)
+	handler.Handle(blogR, "/delete", blogService.Delete)
 
 	handler.Handle(blogR, "/metrics", blogService.SiteMetrics)
 	handler.Handle(blogR, "/subscriber/metrics", blogService.SubscriberMetrics)

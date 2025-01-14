@@ -23,6 +23,7 @@ type BlogInfo struct {
 	SubscriberMetricsUrl     string
 	MetricsUrl               string
 	ConfigUrl                string
+	DeleteUrl                string
 	Theme                    string
 	Status                   string
 	LiveBranch               string
@@ -31,6 +32,7 @@ type BlogInfo struct {
 	Hash                     string
 	HashUrl                  string
 	SyncUrl                  string
+	DeleteMessage            string
 }
 
 func GetBlogsInfo(s *model.Store, userID string) ([]BlogInfo, error) {
@@ -64,7 +66,7 @@ func getghurl(blog *model.Blog, s *model.Store) (*url.URL, error) {
 	return u, nil
 }
 
-func getname(blog model.Blog) string {
+func getname(blog *model.Blog) string {
 	if blog.Name.Valid {
 		return blog.Name.String
 	}
@@ -118,6 +120,13 @@ func buildConfigUrl(blogID string) string {
 	)
 }
 
+func buildDeleteUrl(blogID string) string {
+	return fmt.Sprintf(
+		"/user/blogs/%s/delete",
+		blogID,
+	)
+}
+
 func buildSyncUrl(blogID string) string {
 	return fmt.Sprintf(
 		"/user/blogs/%s/sync",
@@ -140,7 +149,7 @@ func getBlogInfo(s *model.Store, blogID string) (BlogInfo, error) {
 	}
 	return BlogInfo{
 		ID:                       blog.ID,
-		Name:                     getname(blog),
+		Name:                     getname(&blog),
 		Domain:                   unwrapsqlnullstr(blog.Domain),
 		Subdomain:                blog.Subdomain.String(),
 		Url:                      buildUrl(blog.Subdomain.String()),
@@ -150,6 +159,7 @@ func getBlogInfo(s *model.Store, blogID string) (BlogInfo, error) {
 		SubscriberMetricsUrl:     buildSubscriberMetricsUrl(blog.ID),
 		MetricsUrl:               buildMetricsUrl(blog.ID),
 		ConfigUrl:                buildConfigUrl(blog.ID),
+		DeleteUrl:                buildDeleteUrl(blog.ID),
 		LiveBranch:               blog.LiveBranch,
 		Theme:                    string(blog.Theme),
 		UpdatedAt:                blog.UpdatedAt,
@@ -159,7 +169,12 @@ func getBlogInfo(s *model.Store, blogID string) (BlogInfo, error) {
 		HashUrl: ghurl.JoinPath(
 			"commit", blog.LiveHash.String,
 		).String(),
+		DeleteMessage: blogDeleteMessage(&blog),
 	}, nil
+}
+
+func blogDeleteMessage(b *model.Blog) string {
+	return fmt.Sprintf("I am certain, delete %s.", getname(b))
 }
 
 func unwrapsqlnullstr(s sql.NullString) *string {

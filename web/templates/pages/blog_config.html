@@ -148,6 +148,26 @@
 	</div>
 </section>
 
+<section>
+	<div class="container">
+		<h3>Delete blog</h3>
+		<p>To delete your blog, type '{{ .Data.Blog.DeleteMessage }}'
+		into the box below and then hit Delete. This action is
+		irrevesrsible.</p>
+		<form method="POST" action="{{ .Data.Blog.DeleteUrl }}">
+			<input class=""
+					autocomplete="off"
+					type="text"
+					id="message"
+					name="message"
+					placeholder= "Type '{{ .Data.Blog.DeleteMessage }}'" />
+			<input class="button" type="submit" value="Confirm">
+		</form>
+	</div>
+</section>
+
+
+
 <script>
 	let debounceTimer;
 

@@ -119,7 +119,7 @@ SET
 	live_branch = $1
 WHERE id = $2;
 
--- name: DeleteBlogWithGhRepositoryID :exec
+-- name: DeleteBlogByID :exec
 DELETE
 FROM blogs
-WHERE gh_repository_id = $1;
+WHERE id = $1;

@@ -429,3 +429,60 @@ func (b *BlogService) SyncRepository(
 		http.StatusTemporaryRedirect,
 	), nil
 }
+
+func (b *BlogService) Delete(
+	r request.Request,
+) (response.Response, error) {
+	sesh := r.Session()
+	sesh.Println("Blog Delete handler...")
+
+	r.MixpanelTrack("BlogDelete")
+
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return nil, createCustomError("", http.StatusNotFound)
+	}
+
+	blog, err := b.store.GetBlogByID(context.TODO(), blogID)
+	if err != nil {
+		return nil, fmt.Errorf("get blog: %w", err)
+	}
+
+	message, err := r.GetPostFormValue("message")
+	if err != nil {
+		sesh.Printf("cannot get post form value: %v\n", err)
+		return nil, createCustomError(
+			"Error parsing form", http.StatusBadRequest,
+		)
+	}
+	if message != blogDeleteMessage(&blog) {
+		sesh.Printf("wrong delete message %q\n", message)
+		return response.NewRedirect(
+			fmt.Sprintf(
+				"%s://%s/user/blogs/%s/config",
+				config.Config.Progstack.Protocol,
+				config.Config.Progstack.RootDomain,
+				blogID,
+			),
+			http.StatusTemporaryRedirect,
+		), nil
+	}
+	if err := b.store.MarkBlogGenerationsStale(
+		context.TODO(), blog.ID,
+	); err != nil {
+		return nil, fmt.Errorf("mark blog generations stale: %w", err)
+	}
+	if err := b.store.DeleteBlogByID(context.TODO(), blog.ID); err != nil {
+		return nil, fmt.Errorf("delete blog: %w", err)
+	}
+
+	/* redirect to /home */
+	return response.NewRedirect(
+		fmt.Sprintf(
+			"%s://%s/user/",
+			config.Config.Progstack.Protocol,
+			config.Config.Progstack.RootDomain,
+		),
+		http.StatusTemporaryRedirect,
+	), nil
+}

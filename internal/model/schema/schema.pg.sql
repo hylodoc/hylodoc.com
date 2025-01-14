@@ -244,7 +244,7 @@ CREATE TABLE post_email_bindings (
 
 CREATE TABLE _r_posts (
 	url		VARCHAR(1000)	NOT NULL,
-	blog		TEXT		NOT NULL	REFERENCES blogs,
+	blog		TEXT		NOT NULL	REFERENCES blogs ON DELETE CASCADE,
 	published_at	TIMESTAMPTZ,
 	title		VARCHAR(1000)	NOT NULL,
 
