@@ -96,7 +96,7 @@ SET is_live = false
 WHERE id = $1;
 
 -- name: ListBlogsForInstallationByGhInstallationID :many
-SELECT *
+SELECT b.*
 FROM blogs b
 INNER JOIN repositories r
 ON b.gh_repository_id = r.id

@@ -13,7 +13,7 @@ SELECT EXISTS (
 	WHERE user_id = $1
 ) AS installation_exists;
 
--- name: GetInstallationByGithubInstallationID :one
+-- name: GetInstallationByGhInstallationID :one
 SELECT *
 FROM installations
 WHERE gh_installation_id = $1 AND active = true;
@@ -23,7 +23,7 @@ SELECT *
 FROM installations
 WHERE user_id = $1 AND active = true;
 
--- name: DeleteInstallationWithGithubInstallationID :exec
+-- name: DeleteInstallationWithGhInstallationID :exec
 DELETE
 FROM installations
 WHERE gh_installation_id = $1;

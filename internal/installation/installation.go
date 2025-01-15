@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/authn"
 	"github.com/xr0-org/progstack/internal/blog"
 	"github.com/xr0-org/progstack/internal/config"
@@ -299,7 +299,28 @@ func handleInstallationDeleted(
 	userID string, sesh *session.Session,
 ) error {
 	sesh.Println("handling installation deleted event...")
-	assert.Assert(false)
+
+	blogs, err := s.ListBlogsForInstallationByGhInstallationID(
+		context.TODO(), ghInstallationID,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"list blogs for ghinstallationID `%d': %w",
+			ghInstallationID, err,
+		)
+	}
+	for _, blog := range blogs {
+		if err := s.MarkBlogGenerationsStale(
+			context.TODO(), blog.ID,
+		); err != nil {
+			return fmt.Errorf("mark blog generations stale: %w", err)
+		}
+	}
+	if err := s.DeleteInstallationWithGhInstallationID(
+		context.TODO(), ghInstallationID,
+	); err != nil {
+		return fmt.Errorf("delete installation: %w", err)
+	}
 	return nil
 }
 
@@ -316,7 +337,7 @@ func handleInstallationRepositories(
 	sesh.Printf("installationRepositoriesEvent: %s\n", str)
 
 	/* check that installation exists */
-	_, err := s.GetInstallationByGithubInstallationID(
+	_, err := s.GetInstallationByGhInstallationID(
 		context.TODO(), event.Installation.ID,
 	)
 	if err != nil {
@@ -420,7 +441,30 @@ func handleInstallationRepositoriesRemoved(
 	repos []Repository, sesh *session.Session,
 ) error {
 	sesh.Println("handling repositories removed event...")
-	assert.Assert(false)
+
+	for _, repo := range repos {
+		/* mark blog stale if exists */
+		if blog, err := s.GetBlogByGhRepositoryID(
+			context.TODO(), repo.ID,
+		); err == nil {
+			if err := s.MarkBlogGenerationsStale(
+				context.TODO(), blog.ID,
+			); err != nil {
+				return fmt.Errorf(
+					"mark blog generations stale: %w", err,
+				)
+			}
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("get blog by ghRepositoryID: %w", err)
+		}
+
+		if err := s.DeleteRepositoryWithGhRepositoryID(
+			context.TODO(), repo.ID,
+		); err != nil {
+			return fmt.Errorf("delete repo %d: %w", repo.ID, err)
+		}
+	}
+
 	return nil
 }
 
