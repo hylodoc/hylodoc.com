@@ -1,8 +1,8 @@
 -- name: CreateUser :one
 INSERT INTO users (
-	email, username
+	gh_user_id, email, username
 ) VALUES (
-	$1, $2
+	$1, $2, $3
 )
 RETURNING *;
 
@@ -10,6 +10,11 @@ RETURNING *;
 SELECT *
 FROM users
 WHERE id = $1;
+
+-- name: GetUserByGhUserID :one
+SELECT *
+FROM users
+WHERE gh_user_id = $1;
 
 -- name: GetUserByEmail :one
 SELECT *

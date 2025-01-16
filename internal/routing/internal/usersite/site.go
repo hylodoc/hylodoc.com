@@ -22,6 +22,7 @@ type Site struct {
 }
 
 var ErrIsService = errors.New("host is service name")
+var ErrPageNotFound = errors.New("page not found")
 var ErrUnknownSubdomain = errors.New("unknown subdomain")
 var ErrUnknownDomain = errors.New("unknown domain")
 
@@ -99,6 +100,9 @@ func (site *Site) GetBinding(path string, store *model.Store) (string, error) {
 		model.GetBindingParams{Generation: gen, Url: path},
 	)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrPageNotFound
+		}
 		return "", fmt.Errorf("query: %w", err)
 	}
 	return binding, nil

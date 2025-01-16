@@ -26,8 +26,6 @@ type Session struct {
 	userID          *string
 	email           *string
 	username        *string
-	githubLinked    bool
-	githubEmail     *string
 	expiresAt       time.Time
 	isAuthenticated bool
 
@@ -57,8 +55,8 @@ func CreateUnauthSession(
 
 	return &Session{
 		unauthSession.ID,
-		nil, nil, nil,
-		false,
+		nil,
+		nil,
 		nil,
 		unauthSession.ExpiresAt,
 		false,
@@ -118,8 +116,6 @@ func convertRowToSession(
 		&row.UserID,
 		&row.Email,
 		&row.Username,
-		row.GhEmail.Valid,
-		&row.GhEmail.String,
 		row.ExpiresAt,
 		true,
 		logger,
@@ -160,8 +156,8 @@ func GetSession(
 		logger.Printf("Found unauth session\n")
 		return &Session{
 			unauth.ID,
-			nil, nil, nil,
-			false,
+			nil,
+			nil,
 			nil,
 			unauth.ExpiresAt,
 			false,
@@ -187,10 +183,6 @@ func (s *Session) GetExpiresAt() time.Time {
 	return s.expiresAt
 }
 
-func (s *Session) IsGithubLinked() bool {
-	return s.githubLinked
-}
-
 /* auth session */
 func (s *Session) GetEmail() string {
 	if s.IsAuthenticated() {
@@ -209,13 +201,6 @@ func (s *Session) GetUserID() (string, error) {
 func (s *Session) GetUsername() string {
 	if s.IsAuthenticated() {
 		return *s.username
-	}
-	return ""
-}
-
-func (s *Session) GetGithubEmail() string {
-	if s.IsAuthenticated() {
-		return *s.githubEmail
 	}
 	return ""
 }

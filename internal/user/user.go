@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"time"
@@ -193,9 +192,7 @@ func buildRepositoriesInfo(repos []model.Repository) []Repository {
 type AccountDetails struct {
 	Username        string
 	Email           string
-	IsLinked        bool
 	HasInstallation bool
-	GithubEmail     string
 	Subscription    Subscription
 	StorageUsed     string
 	StorageLimit    string
@@ -270,28 +267,11 @@ func getAccountDetails(s *model.Store, sesh *session.Session) (AccountDetails, e
 	accountDetails := AccountDetails{
 		Username:        sesh.GetUsername(),
 		Email:           sesh.GetEmail(),
-		IsLinked:        false,
 		HasInstallation: false,
-		GithubEmail:     "",
 	}
-	linked := true
 	userid, err := sesh.GetUserID()
 	if err != nil {
 		return AccountDetails{}, fmt.Errorf("get user id: %w", err)
-	}
-	ghAccount, err := s.GetGithubAccountByUserID(context.TODO(), userid)
-	if err != nil {
-		if err != sql.ErrNoRows {
-			return AccountDetails{}, fmt.Errorf(
-				"error getting account details: %w", err,
-			)
-		}
-		/* no linked Github account*/
-		linked = false
-	}
-	if linked {
-		accountDetails.IsLinked = true
-		accountDetails.GithubEmail = ghAccount.GhEmail
 	}
 
 	hasInstallation, err := s.InstallationExistsForUserID(

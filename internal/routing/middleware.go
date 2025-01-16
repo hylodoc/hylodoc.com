@@ -23,37 +23,40 @@ func NewRoutingService(s *model.Store) *RoutingService {
 
 func (s *RoutingService) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := s.tryRenderUsersite(w, r); err != nil {
-			if errors.Is(err, usersite.ErrIsService) {
-				next.ServeHTTP(w, r)
-			} else {
-				sesh, ok := r.Context().Value(
-					session.CtxSessionKey,
-				).(*session.Session)
-				assert.Assert(ok)
-				assert.Assert(sesh != nil)
-				switch {
-				case errors.Is(err, usersite.ErrUnknownSubdomain):
-					handler.NotFoundSubdomain(w, r)
-					break
-				case errors.Is(err, usersite.ErrUnknownDomain):
-					handler.NotFoundDomain(w, r)
-					break
-				default:
-					sesh.Println("unknown host error:", err)
-					handler.HandleError(w, r, err)
-					break
-				}
+		if err := s.tryRoute(w, r, next); err != nil {
+			sesh, ok := r.Context().Value(
+				session.CtxSessionKey,
+			).(*session.Session)
+			assert.Assert(ok)
+			assert.Assert(sesh != nil)
+			switch {
+			case errors.Is(err, usersite.ErrPageNotFound):
+				handler.NotFound(w, r)
+				break
+			case errors.Is(err, usersite.ErrUnknownSubdomain):
+				handler.NotFoundSubdomain(w, r)
+				break
+			case errors.Is(err, usersite.ErrUnknownDomain):
+				handler.NotFoundDomain(w, r)
+				break
+			default:
+				sesh.Println("unknown host error:", err)
+				handler.HandleError(w, r, err)
+				break
 			}
 		}
 	})
 }
 
-func (s *RoutingService) tryRenderUsersite(
-	w http.ResponseWriter, r *http.Request,
+func (s *RoutingService) tryRoute(
+	w http.ResponseWriter, r *http.Request, progstack http.Handler,
 ) error {
 	site, err := usersite.GetSite(r.Host, s.store)
 	if err != nil {
+		if errors.Is(err, usersite.ErrIsService) {
+			progstack.ServeHTTP(w, r)
+			return nil
+		}
 		return fmt.Errorf("get site: %w", err)
 	}
 	/* site visit is only recorded after checking for email token because

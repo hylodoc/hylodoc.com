@@ -14,11 +14,8 @@ import (
 
 	"github.com/xr0-org/progstack/internal/app/handler/request"
 	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/assert"
 	"github.com/xr0-org/progstack/internal/billing"
 	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/email"
-	"github.com/xr0-org/progstack/internal/email/emailaddr"
 	"github.com/xr0-org/progstack/internal/httpclient"
 	"github.com/xr0-org/progstack/internal/model"
 	"github.com/xr0-org/progstack/internal/session"
@@ -139,13 +136,13 @@ func (a *AuthNService) getOrCreateGhUser(
 		}
 		/* new user signing in with github, create with github account */
 		sesh.Println("creating user and linking to github account in db...")
-		newu, err := createUserWithGithubAccount(
-			&model.CreateGithubAccountParams{
-				GhUserID:   ghUser.ID,
-				GhEmail:    ghUser.Email,
-				GhUsername: ghUser.Username,
+		newu, err := a.store.CreateUser(
+			context.TODO(),
+			model.CreateUserParams{
+				Email:    ghUser.Email,
+				Username: ghUser.Username,
+				GhUserID: ghUser.ID,
 			},
-			a.store,
 		)
 		if err != nil {
 			return nil, fmt.Errorf(
@@ -154,60 +151,13 @@ func (a *AuthNService) getOrCreateGhUser(
 		}
 		/* autosubscribe user to stripe */
 		if err = billing.AutoSubscribeToFreePlan(
-			newu, a.store, sesh,
+			&newu, a.store, sesh,
 		); err != nil {
 			return nil, fmt.Errorf(
 				"auto subscribe to free plan: %w", err,
 			)
 		}
-		return newu, nil
-	}
-	return &u, nil
-}
-
-func createUserWithGithubAccount(
-	arg *model.CreateGithubAccountParams, s *model.Store,
-) (*model.User, error) {
-	var res *model.User
-	if err := s.ExecTx(
-		func(tx *model.Store) error {
-			u, err := createUserWithGithubAccountTx(arg, tx)
-			if err != nil {
-				return err
-			}
-			res = u
-			return nil
-		},
-	); err != nil {
-		return nil, err
-	}
-	assert.Assert(res != nil)
-	return res, nil
-}
-
-func createUserWithGithubAccountTx(
-	arg *model.CreateGithubAccountParams, tx *model.Store,
-) (*model.User, error) {
-	u, err := tx.CreateUser(
-		context.TODO(),
-		model.CreateUserParams{
-			Email:    arg.GhEmail,
-			Username: arg.GhUsername, /* we use github username */
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create user: %w", err)
-	}
-	if _, err := tx.CreateGithubAccount(
-		context.TODO(),
-		model.CreateGithubAccountParams{
-			UserID:     u.ID,
-			GhUserID:   arg.GhUserID,
-			GhEmail:    arg.GhEmail,
-			GhUsername: arg.GhUsername,
-		},
-	); err != nil {
-		return nil, fmt.Errorf("create github account: %w", err)
+		return &newu, nil
 	}
 	return &u, nil
 }
@@ -247,96 +197,6 @@ func getOauthAccessToken(
 		return "", fmt.Errorf("error getting accesstoken: %w", err)
 	}
 	return accessToken, nil
-}
-
-/* Github account linking */
-
-func (a *AuthNService) LinkGithubAccount(
-	r request.Request,
-) (response.Response, error) {
-	sesh := r.Session()
-	sesh.Println("LinkGithubAccount handler...")
-
-	r.MixpanelTrack("LinkGithubAccount")
-	userid, err := sesh.GetUserID()
-	if err != nil {
-		return nil, fmt.Errorf("get user id: %w", err)
-	}
-	linkUrl, err := buildGithubLinkUrl(userid)
-	if err != nil {
-		return nil, fmt.Errorf("GithubLinkUrl: %w", err)
-	}
-	sesh.Printf("linkUrl: %s\n", linkUrl)
-
-	/* redirect user to GitHub for OAuth linking accounts */
-	sesh.Println("Redirecting to Githbub for OAuth linking...")
-	return response.NewRedirect(linkUrl, http.StatusFound), nil
-}
-
-func buildGithubLinkUrl(userID string) (string, error) {
-	u, err := url.Parse(ghAuthUrl)
-	if err != nil {
-		return "", err
-	}
-	params := url.Values{}
-	params.Add("client_id", config.Config.Github.ClientID)
-	params.Add("state", userID)
-	params.Add("redirect_uri", config.Config.Github.LinkCallback)
-	u.RawQuery = params.Encode()
-	return u.String(), nil
-}
-
-func (a *AuthNService) GithubLinkCallback(
-	r request.Request,
-) (response.Response, error) {
-	sesh := r.Session()
-	sesh.Println("GithubLinkCallback handler...")
-
-	r.MixpanelTrack("GithubLinkCallback")
-
-	if err := a.githubLinkCallback(r); err != nil {
-		/* XXX: shouldn't render link option (should show unlink
-		 * option) but should also show error nicely */
-		return nil, fmt.Errorf("githubOAuthLinkCallback: %w", err)
-	}
-	sesh.Println("Redirecting user home...")
-	return response.NewRedirect("/user/", http.StatusTemporaryRedirect), nil
-}
-
-func (a *AuthNService) githubLinkCallback(r request.Request) error {
-	/* get accessToken */
-	accessToken, err := getOauthAccessToken(
-		a.client,
-		r.GetURLQueryValue("code"),
-		config.Config.Github.ClientID,
-		config.Config.Github.ClientSecret,
-	)
-	if err != nil {
-		return err
-	}
-	/* get user info using token */
-	ghUser, err := getGithubUserInfo(a.client, accessToken)
-	if err != nil {
-		return err
-	}
-	/* XXX: extract user from state, state == userID currently  */
-	userID := r.GetURLQueryValue("state")
-	/* Validate that user exists */
-	_, err = a.store.GetUserByID(context.TODO(), userID)
-	if err != nil {
-		return fmt.Errorf("could not get get user: %w", err)
-	}
-	/* Link github account to user */
-	_, err = a.store.CreateGithubAccount(context.TODO(), model.CreateGithubAccountParams{
-		UserID:     userID,
-		GhUserID:   ghUser.ID,
-		GhEmail:    ghUser.Email,
-		GhUsername: ghUser.Username,
-	})
-	if err != nil {
-		return fmt.Errorf("error linking github account to user with ID `%s': %w", userID, err)
-	}
-	return nil
 }
 
 /* json tags for unmarshalling of Github userinfo during OAuth */
@@ -447,198 +307,4 @@ func (a *AuthNService) Logout(r request.Request) (response.Response, error) {
 		return nil, fmt.Errorf("end session: %w", err)
 	}
 	return response.NewRedirect("/", http.StatusTemporaryRedirect), nil
-}
-
-/* Magic Link Auth */
-
-func (a *AuthNService) MagicRegister(
-	r request.Request,
-) (response.Response, error) {
-	sesh := r.Session()
-	sesh.Println("MagicRegister handler...")
-	r.MixpanelTrack("MagicRegister")
-
-	if err := a.magicRegister(r); err != nil {
-		return nil, fmt.Errorf("magic register: %w", err)
-	}
-	return response.NewRedirect("/", http.StatusTemporaryRedirect), nil
-}
-
-func (a *AuthNService) magicRegister(r request.Request) error {
-	/* read email parsed through form */
-	toaddr, err := r.GetFormValue("email")
-	if err != nil {
-		return fmt.Errorf("get email: %w", err)
-	}
-
-	/* generate token for register link */
-	token, err := GenerateToken()
-	if err != nil {
-		/* StatusInternalServerError */
-		return fmt.Errorf("error generating token: %w", err)
-	}
-	if _, err := a.store.CreateMagicRegister(
-		context.TODO(),
-		model.CreateMagicRegisterParams{
-			Token: token,
-			Email: toaddr,
-		},
-	); err != nil {
-		return fmt.Errorf("error writing magic to db: %w", err)
-	}
-
-	if err := email.NewSender(
-		emailaddr.NewAddr(toaddr),
-		emailaddr.NewAddr(
-			fmt.Sprintf(
-				"magic@%s", config.Config.Progstack.EmailDomain,
-			),
-		),
-		model.EmailModePlaintext,
-		a.store,
-	).SendRegisterLink(token); err != nil {
-		return fmt.Errorf(
-			"error sending register link to `%s': %w",
-			toaddr, err,
-		)
-	}
-	return nil
-}
-
-func (a *AuthNService) MagicRegisterCallback(
-	r request.Request,
-) (response.Response, error) {
-	sesh := r.Session()
-	sesh.Println("MagicRegisterCallback handler...")
-	r.MixpanelTrack("MagicRegisterCallback")
-
-	if err := a.magicRegisterCallback(r); err != nil {
-		return nil, fmt.Errorf("magic register callback: %w", err)
-	}
-	sesh.Println("Redirecting user to home...")
-	return response.NewRedirect("/", http.StatusTemporaryRedirect), nil
-}
-
-func (a *AuthNService) magicRegisterCallback(r request.Request) error {
-	sesh := r.Session()
-
-	/* look for magic in db */
-	magic, err := a.store.GetMagicRegisterByToken(
-		context.TODO(), r.GetURLQueryValue("token"),
-	)
-	if err != nil {
-		return fmt.Errorf("error getting magic by token: %w", err)
-	}
-
-	u, err := a.store.CreateUser(context.TODO(), model.CreateUserParams{
-		Email:    magic.Email,
-		Username: GenerateUsername(),
-	})
-	if err != nil {
-		return fmt.Errorf("error creating user: %w", err)
-	}
-	sesh.Printf("Successfully registered user `%v'\n", u)
-
-	/* autosubscribe user to stripe */
-	if err = billing.AutoSubscribeToFreePlan(&u, a.store, sesh); err != nil {
-		return fmt.Errorf("error subscribing user to free plan: %w", err)
-	}
-
-	/* create Auth Session */
-	if _, err := sesh.Authenticate(
-		a.store, r.ResponseWriter(), u.ID, authSessionDuration,
-	); err != nil {
-		return fmt.Errorf("error creating auth session: %w", err)
-	}
-	return nil
-}
-
-func (a *AuthNService) MagicLogin(r request.Request) (response.Response, error) {
-	sesh := r.Session()
-	sesh.Println("MagicLogin handler...")
-	r.MixpanelTrack("MagicLogin")
-
-	if err := a.magicLogin(r); err != nil {
-		return nil, fmt.Errorf("magic login: %w", err)
-	}
-	return response.NewRedirect("/", http.StatusTemporaryRedirect), nil
-}
-
-func (a *AuthNService) magicLogin(r request.Request) error {
-	/* read email parsed through form */
-	toaddr, err := r.GetFormValue("email")
-	if err != nil {
-		return fmt.Errorf("get email: %w", err)
-	}
-
-	/* generate token for register link */
-	token, err := GenerateToken()
-	if err != nil {
-		/* StatusInternalServerError */
-		return fmt.Errorf("error generating token: %w", err)
-	}
-	if _, err := a.store.CreateMagicLogin(
-		context.TODO(),
-		model.CreateMagicLoginParams{
-			Token: token,
-			Email: toaddr,
-		},
-	); err != nil {
-		return fmt.Errorf("error writing magic login to db: %w", err)
-	}
-
-	if err := email.NewSender(
-		emailaddr.NewAddr(toaddr),
-		emailaddr.NewAddr(
-			fmt.Sprintf(
-				"magic@%s", config.Config.Progstack.EmailDomain,
-			),
-		),
-		model.EmailModePlaintext,
-		a.store,
-	).SendLoginLink(token); err != nil {
-		return fmt.Errorf(
-			"error sending login link to `%s': %w",
-			toaddr, err,
-		)
-	}
-	return nil
-}
-
-func (a *AuthNService) MagicLoginCallback(
-	r request.Request,
-) (response.Response, error) {
-	sesh := r.Session()
-	sesh.Println("MagicLoginCallback...")
-	r.MixpanelTrack("MagicLoginCallback")
-
-	if err := a.magicLoginCallback(r); err != nil {
-		return nil, fmt.Errorf("magic login callback: %w", err)
-	}
-	sesh.Println("Redirecting user to home...")
-	return response.NewRedirect("/user/", http.StatusTemporaryRedirect), nil
-}
-
-func (a *AuthNService) magicLoginCallback(r request.Request) error {
-	/* look for magic in db */
-	magic, err := a.store.GetMagicLoginByToken(
-		context.TODO(), r.GetURLQueryValue("token"),
-	)
-	if err != nil {
-		return fmt.Errorf("error getting magic by token: %w", err)
-	}
-	/* create user */
-	u, err := a.store.GetUserByEmail(context.TODO(), magic.Email)
-	if err != nil {
-		return fmt.Errorf("error creating user: %w", err)
-	}
-	/* create Auth Session */
-	sesh := r.Session()
-	if _, err := sesh.Authenticate(
-		a.store, r.ResponseWriter(), u.ID, authSessionDuration,
-	); err != nil {
-		return fmt.Errorf("error creating auth session: %w", err)
-	}
-	sesh.Printf("Successfully logged in user `%v'\n", u)
-	return nil
 }

@@ -47,40 +47,12 @@ $$ LANGUAGE plpgsql;
 
 CREATE TABLE users (
 	id			TEXT				PRIMARY KEY	DEFAULT(generate_ulid()),
+	gh_user_id		BIGINT		NOT NULL	UNIQUE,				-- Github userID
 	username		VARCHAR(255)	NOT NULL	UNIQUE,
 	email			VARCHAR(255)	NOT NULL	UNIQUE,		-- Login email
 	gh_awaiting_update	BOOLEAN		NOT NULL			DEFAULT(false),
 	created_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
 	updated_at		TIMESTAMPTZ	NOT NULL			DEFAULT(now())
-);
-
--- users can link github accounts
-
-CREATE TABLE github_accounts (
-	id		SERIAL				PRIMARY KEY,
-	user_id		TEXT		NOT NULL,
-	gh_user_id	BIGINT		NOT NULL	UNIQUE,				-- Github userID
-	gh_email	VARCHAR(255)	NOT NULL	UNIQUE,				-- Github email
-	gh_username	VARCHAR(255)	NOT NULL	UNIQUE,				-- GitHub username
-	created_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now()),
-
-	CONSTRAINT fk_user_id
-		FOREIGN KEY (user_id)
-		REFERENCES users(id)
-		ON DELETE CASCADE -- delete github account info if user info deleted
-);
-
--- magic links
-
-CREATE TYPE link_type AS ENUM ('register', 'login');
-
-CREATE TABLE magic (
-	id		SERIAL				PRIMARY KEY,
-	token		TEXT		NOT NULL	UNIQUE,
-	email		VARCHAR(255)	NOT NULL,
-	link_type	link_type	NOT NULL,
-	active		BOOLEAN		NOT NULL			DEFAULT(true),
-	created_at	TIMESTAMPTZ	NOT NULL			DEFAULT(now())
 );
 
 CREATE TABLE auth_sessions (

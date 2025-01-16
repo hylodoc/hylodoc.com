@@ -4,7 +4,11 @@
 	<div class="container">
 		<div class="row">
 			<!-- Logo/Brand -->
-			<div class="six columns u-pull-left">
+				{{ if .Data.UserInfo.UserID }}
+			<div class="seven columns u-pull-left">
+				{{ else }}
+			<div class="nine columns u-pull-left">
+				{{ end }}
 				<h1>
 					<a href="{{ .ProgstackURL }}">Progstack</a>
 					<small style="font-size: 0.5em;">
@@ -13,23 +17,29 @@
 				</h1>
 			</div>
 
+			{{ if not .Data.UserInfo.IsErrorPage }}
 			<!-- Navigation Links -->
-			<div class="six columns u-pull-right">
 				{{ if .Data.UserInfo.UserID }}
-					<a href="{{ .ProgstackURL }}/">home</a>
-					<a href="{{ .ProgstackURL }}/pricing">pricing</a>
-					<a href="{{ .ProgstackURL }}/user/account">profile</a>
-					<span class="separator">~</span>
-					<a href="{{ .ProgstackURL }}/user/auth/logout">logout</a>
-				{{ else }}
-					<a href="{{ .ProgstackURL }}/pricing">pricing</a>
-					<a href="{{ .ProgstackURL }}/login">login</a>
-					<a href="{{ .ProgstackURL }}/register">register</a>
-				{{ end }}
+			<div class="five columns u-pull-right">
+				<a href="{{ .ProgstackURL }}/">home</a>
+				<a href="{{ .ProgstackURL }}/pricing">pricing</a>
+				<a href="{{ .ProgstackURL }}/user/account">profile</a>
+				<span class="separator">~</span>
+				<a href="{{ .ProgstackURL }}/user/auth/logout">log out</a>
 				<a href="https://discord.gg/Cvh8c7Rk">
 					<img src="{{ .CDN }}/img/discord.svg" alt="Discord">
 				</a>
 			</div>
+				{{ else }}
+			<div class="three columns u-pull-right">
+				<a href="{{ .ProgstackURL }}/pricing">pricing</a>
+				<a href="{{ .ProgstackURL }}/gh/login">log in</a>
+				<a href="https://discord.gg/Cvh8c7Rk">
+					<img src="{{ .CDN }}/img/discord.svg" alt="Discord">
+				</a>
+			</div>
+				{{ end }}
+			{{ end }}
 		</div>
 	</div>
 </div>

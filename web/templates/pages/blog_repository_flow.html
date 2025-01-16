@@ -11,12 +11,6 @@
 <section>
 	<div class="container">
 		<form id="blogForm" onsubmit="return false;">
-			{{ if not .Data.AccountDetails.IsLinked }}
-				<p>
-					To create a repository based site, you need to link a Github Account.
-					<a href="gh/linkgithub">Link GitHub Account</a>
-				</p>
-			{{ end }}
 			{{ if not .Data.AccountDetails.HasInstallation }}
 				<p>
 					To use the repository flow, you need to

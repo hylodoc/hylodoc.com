@@ -41,7 +41,7 @@ func internalServerError(w http.ResponseWriter, r *http.Request) {
 				OpenIssueURL string
 			}{
 				Title:        "Progstack – Internal server error",
-				UserInfo:     session.ConvertSessionToUserInfo(sesh),
+				UserInfo:     session.ConvertSessionToUserInfoError(sesh),
 				DiscordURL:   config.Config.Progstack.DiscordURL,
 				OpenIssueURL: config.Config.Progstack.OpenIssueURL,
 			},
@@ -66,7 +66,7 @@ func unauthorised(w http.ResponseWriter, r *http.Request) {
 				UserInfo *session.UserInfo
 			}{
 				Title:    "Progstack – Unauthorised",
-				UserInfo: session.ConvertSessionToUserInfo(sesh),
+				UserInfo: session.ConvertSessionToUserInfoError(sesh),
 			},
 		},
 	).Respond(w, r); err != nil {
@@ -90,7 +90,7 @@ func NotFound(w http.ResponseWriter, r *http.Request) {
 				UserInfo *session.UserInfo
 			}{
 				Title:    "Progstack – Page not found",
-				UserInfo: session.ConvertSessionToUserInfo(sesh),
+				UserInfo: session.ConvertSessionToUserInfoError(sesh),
 			},
 		},
 	).Respond(w, r); err != nil {
@@ -106,6 +106,7 @@ func NotFoundSubdomain(w http.ResponseWriter, r *http.Request) {
 	assert.Assert(ok)
 	sesh.Println("404 (subdomain)", r.Host, r.URL)
 	w.WriteHeader(http.StatusNotFound)
+	sesh.Println("userinfo", session.ConvertSessionToUserInfoError(sesh))
 	if err := response.NewTemplate(
 		[]string{"404_subdomain.html"},
 		util.PageInfo{
@@ -117,11 +118,11 @@ func NotFoundSubdomain(w http.ResponseWriter, r *http.Request) {
 				StartURL           string
 			}{
 				Title:              "Progstack – Site not found",
-				UserInfo:           session.ConvertSessionToUserInfo(sesh),
+				UserInfo:           session.ConvertSessionToUserInfoError(sesh),
 				Progstack:          config.Config.Progstack.Progstack,
 				RequestedSubdomain: r.Host,
 				StartURL: fmt.Sprintf(
-					"%s://%s/register",
+					"%s://%s",
 					config.Config.Progstack.Protocol,
 					config.Config.Progstack.RootDomain,
 				),
@@ -152,7 +153,7 @@ func NotFoundDomain(w http.ResponseWriter, r *http.Request) {
 				DomainGuideURL  string
 			}{
 				Title:           "Progstack – Site not found",
-				UserInfo:        session.ConvertSessionToUserInfo(sesh),
+				UserInfo:        session.ConvertSessionToUserInfoError(sesh),
 				Progstack:       config.Config.Progstack.Progstack,
 				RequestedDomain: r.Host,
 				DomainGuideURL:  config.Config.Progstack.CustomDomainGuideURL,

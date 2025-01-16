@@ -112,11 +112,6 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	handler.Handle(r, "/login", authNService.Login)
 	handler.Handle(r, "/gh/login", authNService.GithubLogin)
 	handler.Handle(r, "/gh/oauthcallback", authNService.GithubOAuthCallback)
-	handler.Handle(r, "/gh/linkcallback", authNService.GithubLinkCallback)
-	handler.Handle(r, "/magic/register", authNService.MagicRegister)
-	handler.Handle(r, "/magic/registercallback", authNService.MagicRegisterCallback)
-	handler.Handle(r, "/magic/login", authNService.MagicLogin)
-	handler.Handle(r, "/magic/logincallback", authNService.MagicLoginCallback)
 	handler.Handle(
 		r,
 		"/gh/installcallback",
@@ -136,7 +131,6 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	userService := user.NewUserService(store)
 	handler.Handle(authR, "/", userService.Home)
 	handler.Handle(authR, "/auth/logout", authNService.Logout)
-	handler.Handle(authR, "/gh/linkgithub", authNService.LinkGithubAccount)
 	handler.Handle(authR, "/account", userService.Account)
 	handler.Handle(authR, "/subdomain-check", blogService.SubdomainCheck)
 	handler.Handle(authR, "/create-new-blog", userService.RepositoryFlow)
