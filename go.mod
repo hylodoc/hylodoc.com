@@ -4,20 +4,18 @@ go 1.23
 
 toolchain go1.23.1
 
-replace github.com/xr0-org/progstack-ssg => ./progstack-ssg
-
 require (
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
+	github.com/knuthic/knu v0.0.0-20250120040956-e985ff665d7a
 	github.com/lib/pq v1.10.9
 	github.com/mixpanel/mixpanel-go v1.2.1
 	github.com/prometheus/client_golang v1.20.5
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stripe/stripe-go/v81 v81.2.0
-	github.com/xr0-org/progstack-ssg v0.0.0-00010101000000-000000000000
 	golang.org/x/crypto v0.24.0
 )
 
