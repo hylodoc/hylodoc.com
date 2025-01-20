@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/xr0-org/progstack/internal/app/handler/request"
-	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/authz"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/httpclient"
-	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/knuthic/knuthic/internal/app/handler/request"
+	"github.com/knuthic/knuthic/internal/app/handler/response"
+	"github.com/knuthic/knuthic/internal/authz"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/httpclient"
+	"github.com/knuthic/knuthic/internal/model"
+	"github.com/knuthic/knuthic/internal/session"
+	"github.com/knuthic/knuthic/internal/util"
 )
 
 type BlogService struct {
@@ -74,13 +74,13 @@ func (b *BlogService) Config(
 				UserInfo:        session.ConvertSessionToUserInfo(sesh),
 				ID:              blogID,
 				Blog:            blogInfo,
-				Themes:          BuildThemes(config.Config.ProgstackSsg.Themes),
+				Themes:          BuildThemes(config.Config.Knu.Themes),
 				CurrentTheme:    string(blogInfo.Theme),
 				CanCustomDomain: canConfigure,
 				UpgradeURL: fmt.Sprintf(
 					"%s://%s/pricing",
-					config.Config.Progstack.Protocol,
-					config.Config.Progstack.RootDomain,
+					config.Config.Knuthic.Protocol,
+					config.Config.Knuthic.RootDomain,
 				),
 			},
 		},
@@ -422,8 +422,8 @@ func (b *BlogService) SyncRepository(
 	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s/user/blogs/%s/config",
-			config.Config.Progstack.Protocol,
-			config.Config.Progstack.RootDomain,
+			config.Config.Knuthic.Protocol,
+			config.Config.Knuthic.RootDomain,
 			blog.ID,
 		),
 		http.StatusTemporaryRedirect,
@@ -460,8 +460,8 @@ func (b *BlogService) Delete(
 		return response.NewRedirect(
 			fmt.Sprintf(
 				"%s://%s/user/blogs/%s/config",
-				config.Config.Progstack.Protocol,
-				config.Config.Progstack.RootDomain,
+				config.Config.Knuthic.Protocol,
+				config.Config.Knuthic.RootDomain,
 				blogID,
 			),
 			http.StatusTemporaryRedirect,
@@ -480,8 +480,8 @@ func (b *BlogService) Delete(
 	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s/user/",
-			config.Config.Progstack.Protocol,
-			config.Config.Progstack.RootDomain,
+			config.Config.Knuthic.Protocol,
+			config.Config.Knuthic.RootDomain,
 		),
 		http.StatusTemporaryRedirect,
 	), nil

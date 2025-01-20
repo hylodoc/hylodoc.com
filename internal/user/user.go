@@ -6,15 +6,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xr0-org/progstack/internal/app/handler/request"
-	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/authz"
-	"github.com/xr0-org/progstack/internal/blog"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/installation"
-	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/knuthic/knuthic/internal/app/handler/request"
+	"github.com/knuthic/knuthic/internal/app/handler/response"
+	"github.com/knuthic/knuthic/internal/authz"
+	"github.com/knuthic/knuthic/internal/blog"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/installation"
+	"github.com/knuthic/knuthic/internal/model"
+	"github.com/knuthic/knuthic/internal/session"
+	"github.com/knuthic/knuthic/internal/util"
 )
 
 type UserService struct {
@@ -170,9 +170,9 @@ func (u *UserService) RepositoryFlow(
 				Title:          "Create new blog",
 				UserInfo:       session.ConvertSessionToUserInfo(sesh),
 				AccountDetails: details,
-				RootDomain:     config.Config.Progstack.RootDomain,
+				RootDomain:     config.Config.Knuthic.RootDomain,
 				Repositories:   buildRepositoriesInfo(repos),
-				Themes:         blog.BuildThemes(config.Config.ProgstackSsg.Themes),
+				Themes:         blog.BuildThemes(config.Config.Knu.Themes),
 			},
 		},
 	), nil

@@ -1,5 +1,5 @@
-progstack:
-  progstack: "Progstack"
+knuthic:
+  knuthic: "Knuthic"
   protocol: "http"
   root_domain: "localhost:7999"
   domain: "localhost"
@@ -14,22 +14,22 @@ progstack:
   custom_domain_guide_url: "https://google.com"
   open_issue_url: "https://github.com"
   discord_url: "https://discord.com"
-  cdn: "https://cdn.progstack.com"
+  cdn: "https://cdn.knuthic.com"
 
-progstack_ssg:
+knu:
   themes:
     lit:
       name: "lit"
       description: "pretty, simple"
-      path: "progstack-ssg/theme/lit"
+      path: "themes/lit"
     latex:
       name: "latex"
       description: "latex style"
-      path: "progstack-ssg/theme/latex"
+      path: "themes/latex"
 
 github:
   app_id: 999929
-  app_name: "progstack-dev"
+  app_name: "knuthic-dev"
   client_id: "<GithubClientID>"
   client_secret: "<GithubClientSecret>"
   webhook_secret: "<GithubWebhookSecret>"
@@ -38,7 +38,7 @@ github:
   link_callback: "http://localhost:7999/gh/linkcallback"
 
 docker:
-  container_name: "progstack_container"
+  container_name: "knuthic_container"
   postgres_image: "postgres:12-alpine"
 
 mixpanel:
@@ -46,9 +46,9 @@ mixpanel:
 
 postgres:
   host: "postgres"
-  name: "progstack_db"
+  name: "knuthic_db"
   user: "postgres"
-  schema: "progstack"
+  schema: "knuthic"
   password: "<Secret>"
   port: 5432
 

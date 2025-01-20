@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt"
-	"github.com/xr0-org/progstack/internal/httpclient"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/knuthic/knuthic/internal/httpclient"
+	"github.com/knuthic/knuthic/internal/util"
 )
 
 /* Installation AccessToken */

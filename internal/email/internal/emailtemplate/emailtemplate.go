@@ -5,7 +5,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/xr0-org/progstack/internal/model"
+	"github.com/knuthic/knuthic/internal/model"
 )
 
 type Template interface {

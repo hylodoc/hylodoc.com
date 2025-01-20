@@ -9,31 +9,24 @@
 				{{ else }}
 			<div class="nine columns u-pull-left">
 				{{ end }}
-				<h1>
-					<a href="{{ .ProgstackURL }}">Progstack</a>
-					<small style="font-size: 0.5em;">
-						blogging for devs
-					</small>
-				</h1>
+				<a href="{{ .KnuthicURL }}"><img class="logo" src="{{ .CDN }}/img/logo.svg"></a>
 			</div>
 
 			{{ if not .Data.UserInfo.IsErrorPage }}
 			<!-- Navigation Links -->
 				{{ if .Data.UserInfo.UserID }}
 			<div class="five columns u-pull-right">
-				<a href="{{ .ProgstackURL }}/">home</a>
-				<a href="{{ .ProgstackURL }}/pricing">pricing</a>
-				<a href="{{ .ProgstackURL }}/user/account">profile</a>
+				<a href="{{ .KnuthicURL }}/">home</a>
+				<a href="{{ .KnuthicURL }}/pricing">pricing</a>
+				<a href="{{ .KnuthicURL }}/user/account">profile</a>
 				<span class="separator">~</span>
-				<a href="{{ .ProgstackURL }}/user/auth/logout">log out</a>
-				<a href="https://discord.gg/Cvh8c7Rk">
-					<img src="{{ .CDN }}/img/discord.svg" alt="Discord">
-				</a>
+				<a href="{{ .KnuthicURL }}/user/auth/logout">log out</a>
+				<a href="https://discord.gg/Cvh8c7Rk"><img src="{{ .CDN }}/img/discord.svg" alt="Discord"></a>
 			</div>
 				{{ else }}
 			<div class="three columns u-pull-right">
-				<a href="{{ .ProgstackURL }}/pricing">pricing</a>
-				<a href="{{ .ProgstackURL }}/gh/login">log in</a>
+				<a href="{{ .KnuthicURL }}/pricing">pricing</a>
+				<a href="{{ .KnuthicURL }}/gh/login">log in</a>
 				<a href="https://discord.gg/Cvh8c7Rk">
 					<img src="{{ .CDN }}/img/discord.svg" alt="Discord">
 				</a>

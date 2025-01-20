@@ -10,15 +10,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/xr0-org/progstack/internal/app/handler/request"
-	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/authn"
-	"github.com/xr0-org/progstack/internal/blog"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/httpclient"
-	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/knuthic/knuthic/internal/app/handler/request"
+	"github.com/knuthic/knuthic/internal/app/handler/response"
+	"github.com/knuthic/knuthic/internal/authn"
+	"github.com/knuthic/knuthic/internal/blog"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/httpclient"
+	"github.com/knuthic/knuthic/internal/model"
+	"github.com/knuthic/knuthic/internal/session"
+	"github.com/knuthic/knuthic/internal/util"
 )
 
 const (
@@ -245,7 +245,7 @@ func createInstallationTx(arg *installationTxParams, s *model.Store) error {
 					FullName:       repositoryTxParams.FullName,
 					Url:            fmt.Sprintf("https://github.com/%s", repositoryTxParams.FullName), /* ghUrl not always in events */
 					GitdirPath: filepath.Join(
-						config.Config.Progstack.GitdirsPath,
+						config.Config.Knuthic.GitdirsPath,
 						repositoryTxParams.FullName,
 					),
 				},
@@ -424,7 +424,7 @@ func handleInstallationRepositoriesAdded(
 			FullName:       repo.FullName,
 			Url:            fmt.Sprintf("https://github.com/%s", repo.FullName),
 			GitdirPath: filepath.Join(
-				config.Config.Progstack.GitdirsPath,
+				config.Config.Knuthic.GitdirsPath,
 				repo.FullName,
 			),
 		})

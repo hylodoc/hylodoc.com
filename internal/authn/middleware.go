@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/xr0-org/progstack/internal/app/handler"
-	"github.com/xr0-org/progstack/internal/assert"
-	"github.com/xr0-org/progstack/internal/session"
+	"github.com/knuthic/knuthic/internal/app/handler"
+	"github.com/knuthic/knuthic/internal/assert"
+	"github.com/knuthic/knuthic/internal/session"
 )
 
 func Middleware(next http.Handler) http.Handler {

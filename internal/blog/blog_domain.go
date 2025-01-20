@@ -10,12 +10,12 @@ import (
 	"strings"
 
 	"github.com/lib/pq"
-	"github.com/xr0-org/progstack/internal/app/handler/request"
-	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/authz"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/dns"
-	"github.com/xr0-org/progstack/internal/model"
+	"github.com/knuthic/knuthic/internal/app/handler/request"
+	"github.com/knuthic/knuthic/internal/app/handler/response"
+	"github.com/knuthic/knuthic/internal/authz"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/dns"
+	"github.com/knuthic/knuthic/internal/model"
 )
 
 type SubdomainRequest struct {
@@ -199,8 +199,8 @@ func (b *BlogService) DomainSubmit(
 	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s/user/blogs/%s/config",
-			config.Config.Progstack.Protocol,
-			config.Config.Progstack.RootDomain,
+			config.Config.Knuthic.Protocol,
+			config.Config.Knuthic.RootDomain,
 			blogID,
 		),
 		http.StatusTemporaryRedirect,

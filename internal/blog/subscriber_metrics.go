@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xr0-org/progstack/internal/app/handler/request"
-	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/knuthic/knuthic/internal/app/handler/request"
+	"github.com/knuthic/knuthic/internal/app/handler/response"
+	"github.com/knuthic/knuthic/internal/model"
+	"github.com/knuthic/knuthic/internal/session"
+	"github.com/knuthic/knuthic/internal/util"
 )
 
 type SubscriberData struct {

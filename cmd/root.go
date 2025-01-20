@@ -9,19 +9,19 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	server "github.com/xr0-org/progstack/internal/app"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/dns"
-	"github.com/xr0-org/progstack/internal/email/emailqueue"
-	"github.com/xr0-org/progstack/internal/httpclient"
-	"github.com/xr0-org/progstack/internal/model"
+	server "github.com/knuthic/knuthic/internal/app"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/dns"
+	"github.com/knuthic/knuthic/internal/email/emailqueue"
+	"github.com/knuthic/knuthic/internal/httpclient"
+	"github.com/knuthic/knuthic/internal/model"
 )
 
 const clientTimeout = 30 * time.Second
 
 var rootCmd = &cobra.Command{
-	Use:   "progstack.com",
-	Short: "Run progstack.com",
+	Use:   "knuthic.com",
+	Short: "Run knuthic.com",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		rand.Seed(time.Now().UnixNano())
 		db, err := config.Config.Db.Connect()

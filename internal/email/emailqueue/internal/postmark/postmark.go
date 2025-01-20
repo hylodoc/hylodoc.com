@@ -7,10 +7,10 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/httpclient"
-	"github.com/xr0-org/progstack/internal/metrics"
-	"github.com/xr0-org/progstack/internal/model"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/httpclient"
+	"github.com/knuthic/knuthic/internal/metrics"
+	"github.com/knuthic/knuthic/internal/model"
 )
 
 type Email interface {

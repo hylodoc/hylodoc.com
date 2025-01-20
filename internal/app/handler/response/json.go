@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/xr0-org/progstack/internal/assert"
-	"github.com/xr0-org/progstack/internal/session"
+	"github.com/knuthic/knuthic/internal/assert"
+	"github.com/knuthic/knuthic/internal/session"
 )
 
 type jsonresponse struct {

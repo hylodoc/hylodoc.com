@@ -7,4 +7,4 @@ RUN pandoc --version
 WORKDIR /app
 COPY . .
 
-CMD ./bin/progstack
+CMD ./bin/knuthic

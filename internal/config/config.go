@@ -19,8 +19,8 @@ func init() {
 var Config Configuration
 
 type Configuration struct {
-	Progstack          ProgstackParams    `mapstructure:"progstack"`
-	ProgstackSsg       ProgstackSsgParams `mapstructure:"progstack_ssg"`
+	Knuthic          KnuthicParams    `mapstructure:"knuthic"`
+	Knu       KnuParams `mapstructure:"knu"`
 	Github             GithubParams       `mapstructure:"github"`
 	Db                 DbParams           `mapstructure:"postgres"`
 	Email              EmailParams        `mapstructure:"email"`
@@ -29,8 +29,8 @@ type Configuration struct {
 	ReservedSubdomains []string           `mapstructure:"reserved_subdomains"`
 }
 
-type ProgstackParams struct {
-	Progstack            string `mapstructure:"progstack"`
+type KnuthicParams struct {
+	Knuthic            string `mapstructure:"knuthic"`
 	Protocol             string `mapstructure:"protocol"`
 	RootDomain           string `mapstructure:"root_domain"`
 	CheckoutsPath        string `mapstructure:"checkouts_path"`
@@ -47,7 +47,7 @@ type ProgstackParams struct {
 	OpenIssueURL         string `mapstructure:"open_issue_url"`
 }
 
-type ProgstackSsgParams struct {
+type KnuParams struct {
 	Themes map[string]Theme `mapstructure:"themes"`
 }
 

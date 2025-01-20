@@ -6,10 +6,10 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/xr0-org/progstack/internal/app/handler"
-	"github.com/xr0-org/progstack/internal/assert"
-	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/session"
+	"github.com/knuthic/knuthic/internal/app/handler"
+	"github.com/knuthic/knuthic/internal/assert"
+	"github.com/knuthic/knuthic/internal/model"
+	"github.com/knuthic/knuthic/internal/session"
 )
 
 func (b *BlogService) Middleware(next http.Handler) http.Handler {

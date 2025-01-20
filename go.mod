@@ -1,4 +1,4 @@
-module github.com/xr0-org/progstack
+module github.com/knuthic/knuthic
 
 go 1.23
 

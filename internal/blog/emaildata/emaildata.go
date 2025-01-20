@@ -3,7 +3,7 @@ package emaildata
 import (
 	"html/template"
 
-	"github.com/xr0-org/progstack/internal/assert"
+	"github.com/knuthic/knuthic/internal/assert"
 )
 
 type EmailData interface {

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xr0-org/progstack/internal/metrics"
+	"github.com/knuthic/knuthic/internal/metrics"
 )
 
 /* wrapper around standard client */

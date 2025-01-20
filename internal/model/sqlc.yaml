@@ -13,12 +13,12 @@ sql:
         overrides:
           - column: blogs.subdomain
             go_type:
-              import: "github.com/xr0-org/progstack/internal/dns"
+              import: "github.com/knuthic/knuthic/internal/dns"
               type: "Subdomain"
               pointer: true
 
           - column: reserved_subdomains.subdomain
             go_type:
-              import: "github.com/xr0-org/progstack/internal/dns"
+              import: "github.com/knuthic/knuthic/internal/dns"
               type: "Subdomain"
               pointer: true

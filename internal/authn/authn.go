@@ -12,14 +12,14 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/xr0-org/progstack/internal/app/handler/request"
-	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/billing"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/httpclient"
-	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/knuthic/knuthic/internal/app/handler/request"
+	"github.com/knuthic/knuthic/internal/app/handler/response"
+	"github.com/knuthic/knuthic/internal/billing"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/httpclient"
+	"github.com/knuthic/knuthic/internal/model"
+	"github.com/knuthic/knuthic/internal/session"
+	"github.com/knuthic/knuthic/internal/util"
 )
 
 const (
@@ -267,7 +267,7 @@ func (a *AuthNService) Register(r request.Request) (response.Response, error) {
 				Title    string
 				UserInfo *session.UserInfo
 			}{
-				Title:    "Progstack - blogging for devs",
+				Title:    "Knuthic - blogging for devs",
 				UserInfo: session.ConvertSessionToUserInfo(r.Session()),
 			},
 		},
@@ -287,7 +287,7 @@ func (a *AuthNService) Login(r request.Request) (response.Response, error) {
 				Title    string
 				UserInfo *session.UserInfo
 			}{
-				Title: "Progstack - blogging for devs",
+				Title: "Knuthic - blogging for devs",
 				UserInfo: session.ConvertSessionToUserInfo(
 					r.Session(),
 				),

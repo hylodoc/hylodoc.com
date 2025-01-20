@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/xr0-org/progstack/internal/assert"
-	"github.com/xr0-org/progstack/internal/authz/internal/option"
-	"github.com/xr0-org/progstack/internal/authz/internal/size"
-	"github.com/xr0-org/progstack/internal/model"
+	"github.com/knuthic/knuthic/internal/assert"
+	"github.com/knuthic/knuthic/internal/authz/internal/option"
+	"github.com/knuthic/knuthic/internal/authz/internal/size"
+	"github.com/knuthic/knuthic/internal/model"
 )
 
 func CanCreateSite(s *model.Store, userid string) (bool, error) {

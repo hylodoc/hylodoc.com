@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" xmlns:bx="https://boxy-svg.com">
+  <defs>
+    <bx:export>
+      <bx:file format="svg" href="#object-0"/>
+    </bx:export>
+  </defs>
+  <g id="object-0">
+    <text style="fill: rgb(70, 70, 70); font-family: Geneva; font-size: 136.3px; white-space: pre;" x="10.125" y="294.954">knuthic</text>
+    <ellipse style="fill: rgb(255, 255, 255);" cx="398.359" cy="195.162" rx="14.442" ry="14.442"/>
+  </g>
+</svg>

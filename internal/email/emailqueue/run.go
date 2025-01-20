@@ -6,12 +6,12 @@ import (
 	"log"
 	"time"
 
-	"github.com/xr0-org/progstack/internal/assert"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/email/emailqueue/internal/postmark"
-	"github.com/xr0-org/progstack/internal/httpclient"
-	"github.com/xr0-org/progstack/internal/metrics"
-	"github.com/xr0-org/progstack/internal/model"
+	"github.com/knuthic/knuthic/internal/assert"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/email/emailqueue/internal/postmark"
+	"github.com/knuthic/knuthic/internal/httpclient"
+	"github.com/knuthic/knuthic/internal/metrics"
+	"github.com/knuthic/knuthic/internal/model"
 )
 
 const postmarkBatchSize = 500

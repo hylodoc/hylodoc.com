@@ -1,27 +1,27 @@
-DROP SCHEMA IF EXISTS progstack;
+DROP SCHEMA IF EXISTS knuthic;
 
-CREATE SCHEMA progstack;
+CREATE SCHEMA knuthic;
 
 -- UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Grant usage on the schema
-GRANT USAGE ON SCHEMA progstack TO progstack_user;
+GRANT USAGE ON SCHEMA knuthic TO knuthic_user;
 
 -- Grant all privileges on existing tables in the schema
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA progstack TO progstack_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA knuthic TO knuthic_user;
 -- Grant all privileges on existing sequences in the schema
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA progstack TO progstack_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA knuthic TO knuthic_user;
 
-GRANT ALL ON SCHEMA progstack TO progstack_user;
+GRANT ALL ON SCHEMA knuthic TO knuthic_user;
 
 -- Set default privileges for future tables created in the schema
-ALTER DEFAULT PRIVILEGES IN SCHEMA progstack
-	GRANT ALL PRIVILEGES ON TABLES to progstack_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA knuthic
+	GRANT ALL PRIVILEGES ON TABLES to knuthic_user;
 
 -- Set default privileges for future sequences created in the schema
-ALTER DEFAULT PRIVILEGES IN SCHEMA progstack
-	GRANT ALL PRIVILEGES ON SEQUENCES to progstack_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA knuthic
+	GRANT ALL PRIVILEGES ON SEQUENCES to knuthic_user;
 
 CREATE TABLE boots (
 	id		SERIAL		PRIMARY KEY,

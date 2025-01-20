@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/xr0-org/progstack/internal/model"
+	"github.com/knuthic/knuthic/internal/model"
 )
 
 type PostBody interface {

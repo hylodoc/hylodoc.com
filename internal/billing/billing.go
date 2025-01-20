@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/xr0-org/progstack/internal/app/handler/request"
-	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/authz"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/knuthic/knuthic/internal/app/handler/request"
+	"github.com/knuthic/knuthic/internal/app/handler/response"
+	"github.com/knuthic/knuthic/internal/authz"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/model"
+	"github.com/knuthic/knuthic/internal/session"
+	"github.com/knuthic/knuthic/internal/util"
 
 	"github.com/stripe/stripe-go/v81"
 	bSession "github.com/stripe/stripe-go/v81/billingportal/session"
@@ -155,8 +155,8 @@ func (b *BillingService) billingPortal(r request.Request) (string, error) {
 		ReturnURL: stripe.String(
 			fmt.Sprintf(
 				"%s://%s/user/account",
-				config.Config.Progstack.Protocol,
-				config.Config.Progstack.RootDomain,
+				config.Config.Knuthic.Protocol,
+				config.Config.Knuthic.RootDomain,
 			),
 		),
 	}

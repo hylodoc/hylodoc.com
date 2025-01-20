@@ -6,14 +6,14 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/xr0-org/progstack/internal/app/handler/request"
-	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/authz"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/email"
-	"github.com/xr0-org/progstack/internal/email/emailaddr"
-	"github.com/xr0-org/progstack/internal/email/postbody"
-	"github.com/xr0-org/progstack/internal/model"
+	"github.com/knuthic/knuthic/internal/app/handler/request"
+	"github.com/knuthic/knuthic/internal/app/handler/response"
+	"github.com/knuthic/knuthic/internal/authz"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/email"
+	"github.com/knuthic/knuthic/internal/email/emailaddr"
+	"github.com/knuthic/knuthic/internal/email/postbody"
+	"github.com/knuthic/knuthic/internal/model"
 )
 
 func (b *BlogService) SendPostEmail(
@@ -63,7 +63,7 @@ func (b *BlogService) SendPostEmail(
 		fmt.Sprintf(
 			"%s@%s",
 			blog.Subdomain,
-			config.Config.Progstack.EmailDomain,
+			config.Config.Knuthic.EmailDomain,
 		),
 	)
 	for _, sub := range subscribers {
@@ -92,16 +92,16 @@ func (b *BlogService) SendPostEmail(
 				/* urls in post table begin with `/' so we omit
 				 * it beneath */
 				"%s://%s.%s%s?subscriber=%s",
-				config.Config.Progstack.Protocol,
+				config.Config.Knuthic.Protocol,
 				blog.Subdomain,
-				config.Config.Progstack.RootDomain,
+				config.Config.Knuthic.RootDomain,
 				post.Url,
 				token,
 			),
 			fmt.Sprintf(
 				"%s://%s/blogs/unsubscribe?token=%s",
-				config.Config.Progstack.Protocol,
-				config.Config.Progstack.RootDomain,
+				config.Config.Knuthic.Protocol,
+				config.Config.Knuthic.RootDomain,
 				sub.UnsubscribeToken,
 			),
 			postbody.NewPostBody(
@@ -126,8 +126,8 @@ func (b *BlogService) SendPostEmail(
 	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s/user/blogs/%s/metrics",
-			config.Config.Progstack.Protocol,
-			config.Config.Progstack.RootDomain,
+			config.Config.Knuthic.Protocol,
+			config.Config.Knuthic.RootDomain,
 			blog.ID,
 		),
 		http.StatusTemporaryRedirect,

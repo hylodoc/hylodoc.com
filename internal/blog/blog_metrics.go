@@ -9,14 +9,14 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/xr0-org/progstack/internal/app/handler/request"
-	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/authz"
-	"github.com/xr0-org/progstack/internal/blog/emaildata"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/knuthic/knuthic/internal/app/handler/request"
+	"github.com/knuthic/knuthic/internal/app/handler/response"
+	"github.com/knuthic/knuthic/internal/authz"
+	"github.com/knuthic/knuthic/internal/blog/emaildata"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/model"
+	"github.com/knuthic/knuthic/internal/session"
+	"github.com/knuthic/knuthic/internal/util"
 )
 
 type SiteData struct {
@@ -76,8 +76,8 @@ func (b *BlogService) SiteMetrics(
 				CanViewAnalyticsAndSendEmails: canView,
 				UpgradeURL: fmt.Sprintf(
 					"%s://%s/pricing",
-					config.Config.Progstack.Protocol,
-					config.Config.Progstack.RootDomain,
+					config.Config.Knuthic.Protocol,
+					config.Config.Knuthic.RootDomain,
 				),
 			},
 		},
@@ -107,9 +107,9 @@ func (b *BlogService) getSiteMetrics(blogid string) ([]postdata, error) {
 		u, err := url.JoinPath(
 			fmt.Sprintf(
 				"%s://%s.%s",
-				config.Config.Progstack.Protocol,
+				config.Config.Knuthic.Protocol,
 				blog.Subdomain,
-				config.Config.Progstack.RootDomain,
+				config.Config.Knuthic.RootDomain,
 			),
 			p.Url,
 		)
@@ -155,8 +155,8 @@ func getemaildata(post *model.Post, clicks int) emaildata.EmailData {
 		template.URL(
 			fmt.Sprintf(
 				"%s://%s/user/blogs/%s/email?token=%s",
-				config.Config.Progstack.Protocol,
-				config.Config.Progstack.RootDomain,
+				config.Config.Knuthic.Protocol,
+				config.Config.Knuthic.RootDomain,
 				post.Blog,
 				post.EmailToken,
 			),

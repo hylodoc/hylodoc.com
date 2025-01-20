@@ -1,10 +1,10 @@
 package email
 
 import (
-	"github.com/xr0-org/progstack/internal/email/emailaddr"
-	"github.com/xr0-org/progstack/internal/email/emailqueue"
-	"github.com/xr0-org/progstack/internal/email/postbody"
-	"github.com/xr0-org/progstack/internal/model"
+	"github.com/knuthic/knuthic/internal/email/emailaddr"
+	"github.com/knuthic/knuthic/internal/email/emailqueue"
+	"github.com/knuthic/knuthic/internal/email/postbody"
+	"github.com/knuthic/knuthic/internal/model"
 )
 
 type Sender interface {

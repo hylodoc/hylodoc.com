@@ -3,22 +3,22 @@ package email
 import (
 	"fmt"
 
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/email/internal/emailtemplate"
-	"github.com/xr0-org/progstack/internal/model"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/email/internal/emailtemplate"
+	"github.com/knuthic/knuthic/internal/model"
 )
 
 const (
-	magicRegisterLinkSubject = "Confirm your Progstack Account"
-	magicLoginLinkSubject    = "Login to Progstack"
+	magicRegisterLinkSubject = "Confirm your Knuthic Account"
+	magicLoginLinkSubject    = "Login to Knuthic"
 )
 
 func (s *sender) SendRegisterLink(token string) error {
 	text, err := emailtemplate.NewRegisterLink(
 		fmt.Sprintf(
 			"%s://%s/%s?token=%s",
-			config.Config.Progstack.Protocol,
-			config.Config.Progstack.RootDomain,
+			config.Config.Knuthic.Protocol,
+			config.Config.Knuthic.RootDomain,
 			"magic/registercallback",
 			token,
 		),
@@ -38,8 +38,8 @@ func (s *sender) SendLoginLink(token string) error {
 	text, err := emailtemplate.NewLoginLink(
 		fmt.Sprintf(
 			"%s://%s/%s?token=%s",
-			config.Config.Progstack.Protocol,
-			config.Config.Progstack.RootDomain,
+			config.Config.Knuthic.Protocol,
+			config.Config.Knuthic.RootDomain,
 			"magic/logincallback",
 			token,
 		),

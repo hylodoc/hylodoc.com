@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/xr0-org/progstack/internal/app/handler"
-	"github.com/xr0-org/progstack/internal/assert"
-	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/routing/internal/usersite"
-	"github.com/xr0-org/progstack/internal/session"
+	"github.com/knuthic/knuthic/internal/app/handler"
+	"github.com/knuthic/knuthic/internal/assert"
+	"github.com/knuthic/knuthic/internal/model"
+	"github.com/knuthic/knuthic/internal/routing/internal/usersite"
+	"github.com/knuthic/knuthic/internal/session"
 )
 
 type RoutingService struct {
@@ -49,12 +49,12 @@ func (s *RoutingService) Middleware(next http.Handler) http.Handler {
 }
 
 func (s *RoutingService) tryRoute(
-	w http.ResponseWriter, r *http.Request, progstack http.Handler,
+	w http.ResponseWriter, r *http.Request, knuthic http.Handler,
 ) error {
 	site, err := usersite.GetSite(r.Host, s.store)
 	if err != nil {
 		if errors.Is(err, usersite.ErrIsService) {
-			progstack.ServeHTTP(w, r)
+			knuthic.ServeHTTP(w, r)
 			return nil
 		}
 		return fmt.Errorf("get site: %w", err)

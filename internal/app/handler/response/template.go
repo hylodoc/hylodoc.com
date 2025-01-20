@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/util"
 )
 
 type tmpl struct {
@@ -24,10 +24,10 @@ func (t *tmpl) Respond(w http.ResponseWriter, _ *http.Request) error {
 		&tmp, t.names, t.info,
 		fmt.Sprintf(
 			"%s://%s",
-			config.Config.Progstack.Protocol,
-			config.Config.Progstack.RootDomain,
+			config.Config.Knuthic.Protocol,
+			config.Config.Knuthic.RootDomain,
 		),
-		config.Config.Progstack.CDN,
+		config.Config.Knuthic.CDN,
 	); err != nil {
 		return err
 	}

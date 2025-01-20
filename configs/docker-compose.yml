@@ -1,6 +1,6 @@
 services:
-  progstack:
-    container_name: progstack_container
+  knuthic:
+    container_name: knuthic_container
     build:
       context: .
       dockerfile: Dockerfile.app
@@ -71,7 +71,7 @@ services:
       S3_PATH: path # s3 path beginning with "s3://" and no trailing slash
       PGUSER: postgres # postgres user above
       PGPASSWORD: secret # postgres password above
-      PGDATABASE: progstack_db # postgres database in init file in internal/model
+      PGDATABASE: knuthic_db # postgres database in init file in internal/model
       PGHOST: postgres # postgres host name above
       PGPORT: 5432 # same as postgres (internal) port above
     networks:

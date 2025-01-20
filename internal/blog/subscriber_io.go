@@ -12,14 +12,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"github.com/xr0-org/progstack/internal/app/handler/request"
-	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/email"
-	"github.com/xr0-org/progstack/internal/email/emailaddr"
-	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/knuthic/knuthic/internal/app/handler/request"
+	"github.com/knuthic/knuthic/internal/app/handler/response"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/email"
+	"github.com/knuthic/knuthic/internal/email/emailaddr"
+	"github.com/knuthic/knuthic/internal/model"
+	"github.com/knuthic/knuthic/internal/session"
+	"github.com/knuthic/knuthic/internal/util"
 )
 
 type SubscribeRequest struct {
@@ -70,7 +70,7 @@ func (b *BlogService) SubscribeToBlog(
 			fmt.Sprintf(
 				"%s@%s",
 				blog.Subdomain,
-				config.Config.Progstack.EmailDomain,
+				config.Config.Knuthic.EmailDomain,
 			),
 		),
 		blog.EmailMode,
@@ -79,8 +79,8 @@ func (b *BlogService) SubscribeToBlog(
 		sitename,
 		fmt.Sprintf(
 			"%s://%s/blogs/unsubscribe?token=%s",
-			config.Config.Progstack.Protocol,
-			config.Config.Progstack.RootDomain,
+			config.Config.Knuthic.Protocol,
+			config.Config.Knuthic.RootDomain,
 			unsubtoken,
 		),
 	); err != nil {
@@ -90,9 +90,9 @@ func (b *BlogService) SubscribeToBlog(
 	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s.%s/subscribed",
-			config.Config.Progstack.Protocol,
+			config.Config.Knuthic.Protocol,
 			blog.Subdomain,
-			config.Config.Progstack.RootDomain,
+			config.Config.Knuthic.RootDomain,
 		),
 		http.StatusTemporaryRedirect,
 	), nil
@@ -180,9 +180,9 @@ func (b *BlogService) UnsubscribeFromBlog(
 	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s.%s/unsubscribed",
-			config.Config.Progstack.Protocol,
+			config.Config.Knuthic.Protocol,
 			blog.Subdomain,
-			config.Config.Progstack.RootDomain,
+			config.Config.Knuthic.RootDomain,
 		),
 		http.StatusTemporaryRedirect,
 	), nil
@@ -233,8 +233,8 @@ func (b *BlogService) EditSubscriber(
 func buildRemoveSubscriberUrl(blogID int32, email string) string {
 	return fmt.Sprintf(
 		"%s://%s/user/blogs/%d/subscriber/delete?email=%s",
-		config.Config.Progstack.Protocol,
-		config.Config.Progstack.RootDomain,
+		config.Config.Knuthic.Protocol,
+		config.Config.Knuthic.RootDomain,
 		blogID,
 		email,
 	)

@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/assert"
-	"github.com/xr0-org/progstack/internal/authz"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/knuthic/knuthic/internal/app/handler/response"
+	"github.com/knuthic/knuthic/internal/assert"
+	"github.com/knuthic/knuthic/internal/authz"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/session"
+	"github.com/knuthic/knuthic/internal/util"
 )
 
 func HandleError(w http.ResponseWriter, r *http.Request, err error) {
@@ -40,10 +40,10 @@ func internalServerError(w http.ResponseWriter, r *http.Request) {
 				DiscordURL   string
 				OpenIssueURL string
 			}{
-				Title:        "Progstack – Internal server error",
+				Title:        "Knuthic – Internal server error",
 				UserInfo:     session.ConvertSessionToUserInfoError(sesh),
-				DiscordURL:   config.Config.Progstack.DiscordURL,
-				OpenIssueURL: config.Config.Progstack.OpenIssueURL,
+				DiscordURL:   config.Config.Knuthic.DiscordURL,
+				OpenIssueURL: config.Config.Knuthic.OpenIssueURL,
 			},
 		},
 	).Respond(w, r); err != nil {
@@ -65,7 +65,7 @@ func unauthorised(w http.ResponseWriter, r *http.Request) {
 				Title    string
 				UserInfo *session.UserInfo
 			}{
-				Title:    "Progstack – Unauthorised",
+				Title:    "Knuthic – Unauthorised",
 				UserInfo: session.ConvertSessionToUserInfoError(sesh),
 			},
 		},
@@ -89,7 +89,7 @@ func NotFound(w http.ResponseWriter, r *http.Request) {
 				Title    string
 				UserInfo *session.UserInfo
 			}{
-				Title:    "Progstack – Page not found",
+				Title:    "Knuthic – Page not found",
 				UserInfo: session.ConvertSessionToUserInfoError(sesh),
 			},
 		},
@@ -113,18 +113,18 @@ func NotFoundSubdomain(w http.ResponseWriter, r *http.Request) {
 			Data: struct {
 				Title              string
 				UserInfo           *session.UserInfo
-				Progstack          string
+				Knuthic          string
 				RequestedSubdomain string
 				StartURL           string
 			}{
-				Title:              "Progstack – Site not found",
+				Title:              "Knuthic – Site not found",
 				UserInfo:           session.ConvertSessionToUserInfoError(sesh),
-				Progstack:          config.Config.Progstack.Progstack,
+				Knuthic:          config.Config.Knuthic.Knuthic,
 				RequestedSubdomain: r.Host,
 				StartURL: fmt.Sprintf(
 					"%s://%s",
-					config.Config.Progstack.Protocol,
-					config.Config.Progstack.RootDomain,
+					config.Config.Knuthic.Protocol,
+					config.Config.Knuthic.RootDomain,
 				),
 			},
 		},
@@ -147,17 +147,17 @@ func NotFoundDomain(w http.ResponseWriter, r *http.Request) {
 			Data: struct {
 				Title           string
 				UserInfo        *session.UserInfo
-				Progstack       string
+				Knuthic       string
 				RequestedDomain string
 				DiscordURL      string
 				DomainGuideURL  string
 			}{
-				Title:           "Progstack – Site not found",
+				Title:           "Knuthic – Site not found",
 				UserInfo:        session.ConvertSessionToUserInfoError(sesh),
-				Progstack:       config.Config.Progstack.Progstack,
+				Knuthic:       config.Config.Knuthic.Knuthic,
 				RequestedDomain: r.Host,
-				DomainGuideURL:  config.Config.Progstack.CustomDomainGuideURL,
-				DiscordURL:      config.Config.Progstack.DiscordURL,
+				DomainGuideURL:  config.Config.Knuthic.CustomDomainGuideURL,
+				DiscordURL:      config.Config.Knuthic.DiscordURL,
 			},
 		},
 	).Respond(w, r); err != nil {

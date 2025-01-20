@@ -36,6 +36,11 @@
 	width: 1.2em;
 }
 
+.navbar .logo {
+	width: 6em;
+	height: 6em;
+}
+
 /* Remove underline by default */
 .navbar a {
 	text-decoration: none;

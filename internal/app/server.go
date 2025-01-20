@@ -7,21 +7,21 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/xr0-org/progstack/internal/app/handler"
-	"github.com/xr0-org/progstack/internal/app/handler/request"
-	"github.com/xr0-org/progstack/internal/app/handler/response"
-	"github.com/xr0-org/progstack/internal/authn"
-	"github.com/xr0-org/progstack/internal/billing"
-	"github.com/xr0-org/progstack/internal/blog"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/httpclient"
-	"github.com/xr0-org/progstack/internal/installation"
-	"github.com/xr0-org/progstack/internal/metrics"
-	"github.com/xr0-org/progstack/internal/model"
-	"github.com/xr0-org/progstack/internal/routing"
-	"github.com/xr0-org/progstack/internal/session"
-	"github.com/xr0-org/progstack/internal/user"
-	"github.com/xr0-org/progstack/internal/util"
+	"github.com/knuthic/knuthic/internal/app/handler"
+	"github.com/knuthic/knuthic/internal/app/handler/request"
+	"github.com/knuthic/knuthic/internal/app/handler/response"
+	"github.com/knuthic/knuthic/internal/authn"
+	"github.com/knuthic/knuthic/internal/billing"
+	"github.com/knuthic/knuthic/internal/blog"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/httpclient"
+	"github.com/knuthic/knuthic/internal/installation"
+	"github.com/knuthic/knuthic/internal/metrics"
+	"github.com/knuthic/knuthic/internal/model"
+	"github.com/knuthic/knuthic/internal/routing"
+	"github.com/knuthic/knuthic/internal/session"
+	"github.com/knuthic/knuthic/internal/user"
+	"github.com/knuthic/knuthic/internal/util"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -180,7 +180,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	)
 
 	m := &autocert.Manager{
-		Cache:  autocert.DirCache(config.Config.Progstack.CertsPath),
+		Cache:  autocert.DirCache(config.Config.Knuthic.CertsPath),
 		Prompt: autocert.AcceptTOS,
 		Email:  "tls@hylo.lbnz.dev",
 		HostPolicy: func(ctx context.Context, host string) error {
@@ -192,7 +192,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 		TLSConfig: m.TLSConfig(),
 		Handler:   r,
 	}
-	switch config.Config.Progstack.Protocol {
+	switch config.Config.Knuthic.Protocol {
 	case "https":
 		log.Printf("listening at https://localhost:%d...\n", httpsPort)
 		return s.ListenAndServeTLS("", "")
@@ -224,7 +224,7 @@ func index(r request.Request) (response.Response, error) {
 				Title    string
 				UserInfo *session.UserInfo
 			}{
-				Title:    "Progstack - blogging for devs",
+				Title:    "Knuthic - blogging for devs",
 				UserInfo: session.ConvertSessionToUserInfo(sesh),
 			},
 		},

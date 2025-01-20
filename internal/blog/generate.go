@@ -9,10 +9,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/knuthic/knu/pkg/ssg"
-	"github.com/xr0-org/progstack/internal/assert"
-	"github.com/xr0-org/progstack/internal/authz"
-	"github.com/xr0-org/progstack/internal/config"
-	"github.com/xr0-org/progstack/internal/model"
+	"github.com/knuthic/knuthic/internal/assert"
+	"github.com/knuthic/knuthic/internal/authz"
+	"github.com/knuthic/knuthic/internal/config"
+	"github.com/knuthic/knuthic/internal/model"
 )
 
 func GetFreshGeneration(blogid string, s *model.Store) (int32, error) {
@@ -100,11 +100,11 @@ func ssgGenerateWithAuthZRestrictions(
 	}
 	assert.Assert(b.LiveHash.Valid)
 	src := filepath.Join(
-		config.Config.Progstack.CheckoutsPath,
+		config.Config.Knuthic.CheckoutsPath,
 		b.LiveHash.String,
 	)
 	dst := filepath.Join(
-		config.Config.Progstack.WebsitesPath,
+		config.Config.Knuthic.WebsitesPath,
 		b.Subdomain.String(),
 		uuid.New().String(),
 	)
@@ -112,7 +112,7 @@ func ssgGenerateWithAuthZRestrictions(
 		return ssg.GenerateSiteWithBindings(
 			src,
 			dst,
-			config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
+			config.Config.Knu.Themes[string(b.Theme)].Path,
 			"algol_nu", "", "",
 			map[string]ssg.CustomPage{
 				"/unsubscribed": ssg.NewMessagePage(
@@ -128,7 +128,7 @@ func ssgGenerateWithAuthZRestrictions(
 	return ssg.GenerateSiteWithBindings(
 		src,
 		dst,
-		config.Config.ProgstackSsg.Themes[string(b.Theme)].Path,
+		config.Config.Knu.Themes[string(b.Theme)].Path,
 		"algol_nu",
 		"",
 		"<p>Subscribe via <a href=\"/subscribe\">email</a>.</p>",
@@ -136,8 +136,8 @@ func ssgGenerateWithAuthZRestrictions(
 			"/subscribe": ssg.NewSubscriberPage(
 				fmt.Sprintf(
 					"%s://%s/blogs/%s/subscribe",
-					config.Config.Progstack.Protocol,
-					config.Config.Progstack.RootDomain,
+					config.Config.Knuthic.Protocol,
+					config.Config.Knuthic.RootDomain,
 					b.ID,
 				),
 			),

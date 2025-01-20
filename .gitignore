@@ -5,6 +5,7 @@ websites/
 certs/
 letsencrypt/
 .DS_Store
+/themes
 /conf.yml
 /docker-compose.yml
 /prometheus.yml

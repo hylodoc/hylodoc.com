@@ -1,13 +1,13 @@
 -- intialise table
-DROP DATABASE IF EXISTS progstack_db;
-CREATE DATABASE progstack_db;
+DROP DATABASE IF EXISTS knuthic_db;
+CREATE DATABASE knuthic_db;
 -- connect to db
-\c progstack_db
+\c knuthic_db
 
-DROP USER IF EXISTS progstack_user;
-CREATE USER progstack_user with encrypted password 'secret';
+DROP USER IF EXISTS knuthic_user;
+CREATE USER knuthic_user with encrypted password 'secret';
 
-GRANT ALL PRIVILEGES ON DATABASE progstack_db TO progstack_user;
+GRANT ALL PRIVILEGES ON DATABASE knuthic_db TO knuthic_user;
 
 SET bytea_output = 'hex';
 
