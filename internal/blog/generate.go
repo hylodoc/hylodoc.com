@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	"github.com/hylodoc/hylodoc/pkg/ssg"
 	"github.com/hylodoc/hylodoc.com/internal/assert"
 	"github.com/hylodoc/hylodoc.com/internal/authz"
 	"github.com/hylodoc/hylodoc.com/internal/config"
 	"github.com/hylodoc/hylodoc.com/internal/model"
+	"github.com/hylodoc/hylodoc/pkg/ssg"
 )
 
 func GetFreshGeneration(blogid string, s *model.Store) (int32, error) {
@@ -108,12 +108,22 @@ func ssgGenerateWithAuthZRestrictions(
 		b.Subdomain.String(),
 		uuid.New().String(),
 	)
+	link := fmt.Sprintf(
+		"%s://%s",
+		config.Config.Hylodoc.Protocol,
+		config.Config.Hylodoc.RootDomain,
+	)
 	if !canHaveSubs {
 		return ssg.GenerateSiteWithBindings(
 			src,
 			dst,
 			config.Config.SSG.Themes[string(b.Theme)].Path,
-			"algol_nu", "", "",
+			"algol_nu",
+			"",
+			fmt.Sprintf(
+				"<div style=\"text-align: center; padding: 20px;\">Powered by <a href=\"%s\" target=\"_blank\">Hylodoc</a></div>",
+				link,
+			),
 			map[string]ssg.CustomPage{
 				"/unsubscribed": ssg.NewMessagePage(
 					"Unsubscribed",
@@ -131,7 +141,10 @@ func ssgGenerateWithAuthZRestrictions(
 		config.Config.SSG.Themes[string(b.Theme)].Path,
 		"algol_nu",
 		"",
-		"<p>Subscribe via <a href=\"/subscribe\">email</a>.</p>",
+		fmt.Sprintf(
+			"<p>Subscribe via <a href=\"/subscribe\">email</a>.</p><div style=\"text-align: center; padding: 20px;\">Powered by <a href=\"%s\" target=\"_blank\">Hylodoc</a></div>",
+			link,
+		),
 		map[string]ssg.CustomPage{
 			"/subscribe": ssg.NewSubscriberPage(
 				fmt.Sprintf(
