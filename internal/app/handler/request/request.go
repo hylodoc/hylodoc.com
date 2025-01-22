@@ -7,9 +7,9 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/knuthic/knuthic/internal/analytics"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/analytics"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/session"
 )
 
 type Request interface {

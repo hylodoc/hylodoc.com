@@ -3,7 +3,7 @@ package emaildata
 import (
 	"html/template"
 
-	"github.com/knuthic/knuthic/internal/assert"
+	"github.com/hylodoc/hylodoc.com/internal/assert"
 )
 
 type EmailData interface {

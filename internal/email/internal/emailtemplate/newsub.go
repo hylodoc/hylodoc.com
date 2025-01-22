@@ -3,7 +3,7 @@ package emailtemplate
 import (
 	"fmt"
 
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 const (

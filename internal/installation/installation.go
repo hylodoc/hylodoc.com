@@ -10,15 +10,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/knuthic/knuthic/internal/app/handler/request"
-	"github.com/knuthic/knuthic/internal/app/handler/response"
-	"github.com/knuthic/knuthic/internal/authn"
-	"github.com/knuthic/knuthic/internal/blog"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/httpclient"
-	"github.com/knuthic/knuthic/internal/model"
-	"github.com/knuthic/knuthic/internal/session"
-	"github.com/knuthic/knuthic/internal/util"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/request"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/response"
+	"github.com/hylodoc/hylodoc.com/internal/authn"
+	"github.com/hylodoc/hylodoc.com/internal/blog"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/httpclient"
+	"github.com/hylodoc/hylodoc.com/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/util"
 )
 
 const (
@@ -245,7 +245,7 @@ func createInstallationTx(arg *installationTxParams, s *model.Store) error {
 					FullName:       repositoryTxParams.FullName,
 					Url:            fmt.Sprintf("https://github.com/%s", repositoryTxParams.FullName), /* ghUrl not always in events */
 					GitdirPath: filepath.Join(
-						config.Config.Knuthic.GitdirsPath,
+						config.Config.Hylodoc.GitdirsPath,
 						repositoryTxParams.FullName,
 					),
 				},
@@ -424,7 +424,7 @@ func handleInstallationRepositoriesAdded(
 			FullName:       repo.FullName,
 			Url:            fmt.Sprintf("https://github.com/%s", repo.FullName),
 			GitdirPath: filepath.Join(
-				config.Config.Knuthic.GitdirsPath,
+				config.Config.Hylodoc.GitdirsPath,
 				repo.FullName,
 			),
 		})

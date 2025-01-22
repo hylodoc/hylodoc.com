@@ -10,12 +10,12 @@ import (
 	"strings"
 
 	"github.com/lib/pq"
-	"github.com/knuthic/knuthic/internal/app/handler/request"
-	"github.com/knuthic/knuthic/internal/app/handler/response"
-	"github.com/knuthic/knuthic/internal/authz"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/dns"
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/request"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/response"
+	"github.com/hylodoc/hylodoc.com/internal/authz"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/dns"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 type SubdomainRequest struct {
@@ -199,8 +199,8 @@ func (b *BlogService) DomainSubmit(
 	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s/user/blogs/%s/config",
-			config.Config.Knuthic.Protocol,
-			config.Config.Knuthic.RootDomain,
+			config.Config.Hylodoc.Protocol,
+			config.Config.Hylodoc.RootDomain,
 			blogID,
 		),
 		http.StatusTemporaryRedirect,

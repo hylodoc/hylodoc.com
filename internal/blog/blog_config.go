@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/knuthic/knuthic/internal/app/handler/request"
-	"github.com/knuthic/knuthic/internal/app/handler/response"
-	"github.com/knuthic/knuthic/internal/authz"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/httpclient"
-	"github.com/knuthic/knuthic/internal/model"
-	"github.com/knuthic/knuthic/internal/session"
-	"github.com/knuthic/knuthic/internal/util"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/request"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/response"
+	"github.com/hylodoc/hylodoc.com/internal/authz"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/httpclient"
+	"github.com/hylodoc/hylodoc.com/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/util"
 )
 
 type BlogService struct {
@@ -79,8 +79,8 @@ func (b *BlogService) Config(
 				CanCustomDomain: canConfigure,
 				UpgradeURL: fmt.Sprintf(
 					"%s://%s/pricing",
-					config.Config.Knuthic.Protocol,
-					config.Config.Knuthic.RootDomain,
+					config.Config.Hylodoc.Protocol,
+					config.Config.Hylodoc.RootDomain,
 				),
 			},
 		},
@@ -422,8 +422,8 @@ func (b *BlogService) SyncRepository(
 	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s/user/blogs/%s/config",
-			config.Config.Knuthic.Protocol,
-			config.Config.Knuthic.RootDomain,
+			config.Config.Hylodoc.Protocol,
+			config.Config.Hylodoc.RootDomain,
 			blog.ID,
 		),
 		http.StatusTemporaryRedirect,
@@ -460,8 +460,8 @@ func (b *BlogService) Delete(
 		return response.NewRedirect(
 			fmt.Sprintf(
 				"%s://%s/user/blogs/%s/config",
-				config.Config.Knuthic.Protocol,
-				config.Config.Knuthic.RootDomain,
+				config.Config.Hylodoc.Protocol,
+				config.Config.Hylodoc.RootDomain,
 				blogID,
 			),
 			http.StatusTemporaryRedirect,
@@ -480,8 +480,8 @@ func (b *BlogService) Delete(
 	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s/user/",
-			config.Config.Knuthic.Protocol,
-			config.Config.Knuthic.RootDomain,
+			config.Config.Hylodoc.Protocol,
+			config.Config.Hylodoc.RootDomain,
 		),
 		http.StatusTemporaryRedirect,
 	), nil

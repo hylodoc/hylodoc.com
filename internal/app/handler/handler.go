@@ -5,10 +5,10 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/knuthic/knuthic/internal/app/handler/request"
-	"github.com/knuthic/knuthic/internal/app/handler/response"
-	"github.com/knuthic/knuthic/internal/assert"
-	"github.com/knuthic/knuthic/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/request"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/response"
+	"github.com/hylodoc/hylodoc.com/internal/assert"
+	"github.com/hylodoc/hylodoc.com/internal/session"
 )
 
 func Handle(r *mux.Router, pattern string, h handlerfunc) *mux.Route {

@@ -6,12 +6,12 @@ import (
 	"log"
 	"time"
 
-	"github.com/knuthic/knuthic/internal/assert"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/email/emailqueue/internal/postmark"
-	"github.com/knuthic/knuthic/internal/httpclient"
-	"github.com/knuthic/knuthic/internal/metrics"
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/assert"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/email/emailqueue/internal/postmark"
+	"github.com/hylodoc/hylodoc.com/internal/httpclient"
+	"github.com/hylodoc/hylodoc.com/internal/metrics"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 const postmarkBatchSize = 500

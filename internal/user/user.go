@@ -6,15 +6,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/knuthic/knuthic/internal/app/handler/request"
-	"github.com/knuthic/knuthic/internal/app/handler/response"
-	"github.com/knuthic/knuthic/internal/authz"
-	"github.com/knuthic/knuthic/internal/blog"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/installation"
-	"github.com/knuthic/knuthic/internal/model"
-	"github.com/knuthic/knuthic/internal/session"
-	"github.com/knuthic/knuthic/internal/util"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/request"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/response"
+	"github.com/hylodoc/hylodoc.com/internal/authz"
+	"github.com/hylodoc/hylodoc.com/internal/blog"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/installation"
+	"github.com/hylodoc/hylodoc.com/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/util"
 )
 
 type UserService struct {
@@ -170,7 +170,7 @@ func (u *UserService) RepositoryFlow(
 				Title:          "Create new blog",
 				UserInfo:       session.ConvertSessionToUserInfo(sesh),
 				AccountDetails: details,
-				RootDomain:     config.Config.Knuthic.RootDomain,
+				RootDomain:     config.Config.Hylodoc.RootDomain,
 				Repositories:   buildRepositoriesInfo(repos),
 				Themes:         blog.BuildThemes(config.Config.Knu.Themes),
 			},

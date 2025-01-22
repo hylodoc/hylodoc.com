@@ -7,9 +7,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/knuthic/knuthic/internal/assert"
-	"github.com/knuthic/knuthic/internal/model"
-	"github.com/knuthic/knuthic/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/assert"
+	"github.com/hylodoc/hylodoc.com/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/session"
 )
 
 var (

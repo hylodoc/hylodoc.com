@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/knuthic/knuthic/internal/metrics"
+	"github.com/hylodoc/hylodoc.com/internal/metrics"
 )
 
 /* wrapper around standard client */

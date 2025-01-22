@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/knuthic/knuthic/internal/app/handler"
-	"github.com/knuthic/knuthic/internal/assert"
-	"github.com/knuthic/knuthic/internal/model"
-	"github.com/knuthic/knuthic/internal/routing/internal/usersite"
-	"github.com/knuthic/knuthic/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler"
+	"github.com/hylodoc/hylodoc.com/internal/assert"
+	"github.com/hylodoc/hylodoc.com/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/routing/internal/usersite"
+	"github.com/hylodoc/hylodoc.com/internal/session"
 )
 
 type RoutingService struct {
@@ -49,12 +49,12 @@ func (s *RoutingService) Middleware(next http.Handler) http.Handler {
 }
 
 func (s *RoutingService) tryRoute(
-	w http.ResponseWriter, r *http.Request, knuthic http.Handler,
+	w http.ResponseWriter, r *http.Request, hylodoc http.Handler,
 ) error {
 	site, err := usersite.GetSite(r.Host, s.store)
 	if err != nil {
 		if errors.Is(err, usersite.ErrIsService) {
-			knuthic.ServeHTTP(w, r)
+			hylodoc.ServeHTTP(w, r)
 			return nil
 		}
 		return fmt.Errorf("get site: %w", err)

@@ -7,21 +7,21 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/knuthic/knuthic/internal/app/handler"
-	"github.com/knuthic/knuthic/internal/app/handler/request"
-	"github.com/knuthic/knuthic/internal/app/handler/response"
-	"github.com/knuthic/knuthic/internal/authn"
-	"github.com/knuthic/knuthic/internal/billing"
-	"github.com/knuthic/knuthic/internal/blog"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/httpclient"
-	"github.com/knuthic/knuthic/internal/installation"
-	"github.com/knuthic/knuthic/internal/metrics"
-	"github.com/knuthic/knuthic/internal/model"
-	"github.com/knuthic/knuthic/internal/routing"
-	"github.com/knuthic/knuthic/internal/session"
-	"github.com/knuthic/knuthic/internal/user"
-	"github.com/knuthic/knuthic/internal/util"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/request"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/response"
+	"github.com/hylodoc/hylodoc.com/internal/authn"
+	"github.com/hylodoc/hylodoc.com/internal/billing"
+	"github.com/hylodoc/hylodoc.com/internal/blog"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/httpclient"
+	"github.com/hylodoc/hylodoc.com/internal/installation"
+	"github.com/hylodoc/hylodoc.com/internal/metrics"
+	"github.com/hylodoc/hylodoc.com/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/routing"
+	"github.com/hylodoc/hylodoc.com/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/user"
+	"github.com/hylodoc/hylodoc.com/internal/util"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -180,7 +180,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 	)
 
 	m := &autocert.Manager{
-		Cache:  autocert.DirCache(config.Config.Knuthic.CertsPath),
+		Cache:  autocert.DirCache(config.Config.Hylodoc.CertsPath),
 		Prompt: autocert.AcceptTOS,
 		Email:  "tls@hylo.lbnz.dev",
 		HostPolicy: func(ctx context.Context, host string) error {
@@ -192,7 +192,7 @@ func Serve(httpClient *httpclient.Client, store *model.Store) error {
 		TLSConfig: m.TLSConfig(),
 		Handler:   r,
 	}
-	switch config.Config.Knuthic.Protocol {
+	switch config.Config.Hylodoc.Protocol {
 	case "https":
 		log.Printf("listening at https://localhost:%d...\n", httpsPort)
 		return s.ListenAndServeTLS("", "")
@@ -224,7 +224,7 @@ func index(r request.Request) (response.Response, error) {
 				Title    string
 				UserInfo *session.UserInfo
 			}{
-				Title:    "Knuthic - blogging for devs",
+				Title:    "Hylodoc - blogging for devs",
 				UserInfo: session.ConvertSessionToUserInfo(sesh),
 			},
 		},

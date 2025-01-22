@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 type BlogInfo struct {
@@ -79,9 +79,9 @@ func getname(blog *model.Blog) string {
 func buildUrl(subdomain string) string {
 	return fmt.Sprintf(
 		"%s://%s.%s",
-		config.Config.Knuthic.Protocol,
+		config.Config.Hylodoc.Protocol,
 		subdomain,
-		config.Config.Knuthic.RootDomain,
+		config.Config.Hylodoc.RootDomain,
 	)
 }
 

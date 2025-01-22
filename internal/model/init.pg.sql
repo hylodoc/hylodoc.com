@@ -1,13 +1,13 @@
 -- intialise table
-DROP DATABASE IF EXISTS knuthic_db;
-CREATE DATABASE knuthic_db;
+DROP DATABASE IF EXISTS hylodoc_db;
+CREATE DATABASE hylodoc_db;
 -- connect to db
-\c knuthic_db
+\c hylodoc_db
 
-DROP USER IF EXISTS knuthic_user;
-CREATE USER knuthic_user with encrypted password 'secret';
+DROP USER IF EXISTS hylodoc_user;
+CREATE USER hylodoc_user with encrypted password 'secret';
 
-GRANT ALL PRIVILEGES ON DATABASE knuthic_db TO knuthic_user;
+GRANT ALL PRIVILEGES ON DATABASE hylodoc_db TO hylodoc_user;
 
 SET bytea_output = 'hex';
 

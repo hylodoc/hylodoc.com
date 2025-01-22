@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/knuthic/knuthic/internal/app/handler/request"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/request"
 )
 
 /* validates that an event actually comes from our GithubApp by using the webhook

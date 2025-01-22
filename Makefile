@@ -1,12 +1,12 @@
-.PHONY: $(KNUTHIC) $(REPOSITORIES) $(DB) $(BIN) 
+.PHONY: $(HYLODOC) $(REPOSITORIES) $(DB) $(BIN) 
 
 DOCKER = $(SUDO) docker
 GO = go
 BIN = ${CURDIR}/bin
 SOURCES := $(shell find $(CURDIR) -name '*.go')
-KNUTHIC = $(BIN)/knuthic
+HYLODOC = $(BIN)/hylodoc
 
-$(KNUTHIC): $(BIN) $(SOURCES) db get build.sh
+$(HYLODOC): $(BIN) $(SOURCES) db get build.sh
 	@printf 'BUILD\t$@\n'
 	@./build.sh $@
 
@@ -27,7 +27,7 @@ db: $(DBDIR)/sqlc.yaml $(dbfiles)
 	@printf 'SQLC\t$<\n'
 	@sqlc generate -f $<
 
-up: $(KNUTHIC) test
+up: $(HYLODOC) test
 	@echo 'launching docker containers...'
 	$(DOCKER) compose up --build
 

@@ -10,11 +10,11 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/knuthic/knuthic/internal/assert"
-	"github.com/knuthic/knuthic/internal/blog"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/dns"
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/assert"
+	"github.com/hylodoc/hylodoc.com/internal/blog"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/dns"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 type Site struct {
@@ -27,7 +27,7 @@ var ErrUnknownSubdomain = errors.New("unknown subdomain")
 var ErrUnknownDomain = errors.New("unknown domain")
 
 func GetSite(host string, s *model.Store) (*Site, error) {
-	if host == config.Config.Knuthic.RootDomain {
+	if host == config.Config.Hylodoc.RootDomain {
 		return nil, ErrIsService
 	}
 	blog, err := getBlog(host, s)
@@ -64,7 +64,7 @@ func getBlogBySubdomain(host string, s *model.Store) (string, error) {
 	/* `.hylodoc.com' (dot followed by service name) must follow host */
 	subdomain, found := strings.CutSuffix(
 		host,
-		fmt.Sprintf(".%s", config.Config.Knuthic.RootDomain),
+		fmt.Sprintf(".%s", config.Config.Hylodoc.RootDomain),
 	)
 	if !found {
 		return "", errNotSubdomainForm

@@ -8,8 +8,8 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/knuthic/knuthic/internal/httpclient"
-	"github.com/knuthic/knuthic/internal/util"
+	"github.com/hylodoc/hylodoc.com/internal/httpclient"
+	"github.com/hylodoc/hylodoc.com/internal/util"
 )
 
 const (

@@ -1,4 +1,4 @@
-module github.com/knuthic/knuthic
+module github.com/hylodoc/hylodoc.com
 
 go 1.23
 
@@ -9,7 +9,7 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
-	github.com/knuthic/knu v0.0.0-20250120040956-e985ff665d7a
+	github.com/hylodoc/hylodoc v0.0.0-20250122041752-8c112714f1c0
 	github.com/lib/pq v1.10.9
 	github.com/mixpanel/mixpanel-go v1.2.1
 	github.com/prometheus/client_golang v1.20.5

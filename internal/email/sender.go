@@ -1,10 +1,10 @@
 package email
 
 import (
-	"github.com/knuthic/knuthic/internal/email/emailaddr"
-	"github.com/knuthic/knuthic/internal/email/emailqueue"
-	"github.com/knuthic/knuthic/internal/email/postbody"
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/email/emailaddr"
+	"github.com/hylodoc/hylodoc.com/internal/email/emailqueue"
+	"github.com/hylodoc/hylodoc.com/internal/email/postbody"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 type Sender interface {

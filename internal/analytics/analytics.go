@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/mixpanel/mixpanel-go"
-	"github.com/knuthic/knuthic/internal/assert"
-	"github.com/knuthic/knuthic/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/assert"
+	"github.com/hylodoc/hylodoc.com/internal/session"
 )
 
 type MixpanelClientWrapper struct {

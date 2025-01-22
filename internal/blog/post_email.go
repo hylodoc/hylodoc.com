@@ -6,14 +6,14 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/knuthic/knuthic/internal/app/handler/request"
-	"github.com/knuthic/knuthic/internal/app/handler/response"
-	"github.com/knuthic/knuthic/internal/authz"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/email"
-	"github.com/knuthic/knuthic/internal/email/emailaddr"
-	"github.com/knuthic/knuthic/internal/email/postbody"
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/request"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/response"
+	"github.com/hylodoc/hylodoc.com/internal/authz"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/email"
+	"github.com/hylodoc/hylodoc.com/internal/email/emailaddr"
+	"github.com/hylodoc/hylodoc.com/internal/email/postbody"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 func (b *BlogService) SendPostEmail(
@@ -63,7 +63,7 @@ func (b *BlogService) SendPostEmail(
 		fmt.Sprintf(
 			"%s@%s",
 			blog.Subdomain,
-			config.Config.Knuthic.EmailDomain,
+			config.Config.Hylodoc.EmailDomain,
 		),
 	)
 	for _, sub := range subscribers {
@@ -92,16 +92,16 @@ func (b *BlogService) SendPostEmail(
 				/* urls in post table begin with `/' so we omit
 				 * it beneath */
 				"%s://%s.%s%s?subscriber=%s",
-				config.Config.Knuthic.Protocol,
+				config.Config.Hylodoc.Protocol,
 				blog.Subdomain,
-				config.Config.Knuthic.RootDomain,
+				config.Config.Hylodoc.RootDomain,
 				post.Url,
 				token,
 			),
 			fmt.Sprintf(
 				"%s://%s/blogs/unsubscribe?token=%s",
-				config.Config.Knuthic.Protocol,
-				config.Config.Knuthic.RootDomain,
+				config.Config.Hylodoc.Protocol,
+				config.Config.Hylodoc.RootDomain,
 				sub.UnsubscribeToken,
 			),
 			postbody.NewPostBody(
@@ -126,8 +126,8 @@ func (b *BlogService) SendPostEmail(
 	return response.NewRedirect(
 		fmt.Sprintf(
 			"%s://%s/user/blogs/%s/metrics",
-			config.Config.Knuthic.Protocol,
-			config.Config.Knuthic.RootDomain,
+			config.Config.Hylodoc.Protocol,
+			config.Config.Hylodoc.RootDomain,
 			blog.ID,
 		),
 		http.StatusTemporaryRedirect,
