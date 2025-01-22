@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	"github.com/hylodoc/hylodoc/pkg/ssg"
 	"github.com/hylodoc/hylodoc.com/internal/assert"
 	"github.com/hylodoc/hylodoc.com/internal/authz"
 	"github.com/hylodoc/hylodoc.com/internal/config"
 	"github.com/hylodoc/hylodoc.com/internal/model"
+	"github.com/hylodoc/hylodoc/pkg/ssg"
 )
 
 func GetFreshGeneration(blogid string, s *model.Store) (int32, error) {
@@ -113,7 +113,9 @@ func ssgGenerateWithAuthZRestrictions(
 			src,
 			dst,
 			config.Config.Knu.Themes[string(b.Theme)].Path,
-			"algol_nu", "", "",
+			"algol_nu",
+			"",
+			"<div style=\"text-align: center; padding: 20px;\">Powered by <a href=\"https://www.hylodoc.com\" target=\"_blank\">Hylodoc</a></div>",
 			map[string]ssg.CustomPage{
 				"/unsubscribed": ssg.NewMessagePage(
 					"Unsubscribed",
@@ -131,7 +133,7 @@ func ssgGenerateWithAuthZRestrictions(
 		config.Config.Knu.Themes[string(b.Theme)].Path,
 		"algol_nu",
 		"",
-		"<p>Subscribe via <a href=\"/subscribe\">email</a>.</p>",
+		"<p>Subscribe via <a href=\"/subscribe\">email</a>.</p><div style=\"text-align: center; padding: 20px;\">Powered by <a href=\"https://www.hylodoc.com\" target=\"_blank\">Hylodoc</a></div>",
 		map[string]ssg.CustomPage{
 			"/subscribe": ssg.NewSubscriberPage(
 				fmt.Sprintf(
