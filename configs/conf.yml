@@ -2,7 +2,6 @@ knuthic:
   knuthic: "Knuthic"
   protocol: "http"
   root_domain: "localhost:7999"
-  domain: "localhost"
   checkouts_path: "./checkouts"
   gitdirs_path: "./gitdirs"
   websites_path: "./websites"

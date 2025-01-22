@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	"github.com/knuthic/knu/pkg/ssg"
+	"github.com/hylodoc/hylodoc/pkg/ssg"
 	"github.com/knuthic/knuthic/internal/assert"
 	"github.com/knuthic/knuthic/internal/authz"
 	"github.com/knuthic/knuthic/internal/config"
