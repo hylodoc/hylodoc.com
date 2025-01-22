@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/knuthic/knuthic/internal/app/handler/response"
-	"github.com/knuthic/knuthic/internal/assert"
-	"github.com/knuthic/knuthic/internal/authz"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/session"
-	"github.com/knuthic/knuthic/internal/util"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/response"
+	"github.com/hylodoc/hylodoc.com/internal/assert"
+	"github.com/hylodoc/hylodoc.com/internal/authz"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/util"
 )
 
 func HandleError(w http.ResponseWriter, r *http.Request, err error) {
@@ -40,10 +40,10 @@ func internalServerError(w http.ResponseWriter, r *http.Request) {
 				DiscordURL   string
 				OpenIssueURL string
 			}{
-				Title:        "Knuthic – Internal server error",
+				Title:        "Hylodoc – Internal server error",
 				UserInfo:     session.ConvertSessionToUserInfoError(sesh),
-				DiscordURL:   config.Config.Knuthic.DiscordURL,
-				OpenIssueURL: config.Config.Knuthic.OpenIssueURL,
+				DiscordURL:   config.Config.Hylodoc.DiscordURL,
+				OpenIssueURL: config.Config.Hylodoc.OpenIssueURL,
 			},
 		},
 	).Respond(w, r); err != nil {
@@ -65,7 +65,7 @@ func unauthorised(w http.ResponseWriter, r *http.Request) {
 				Title    string
 				UserInfo *session.UserInfo
 			}{
-				Title:    "Knuthic – Unauthorised",
+				Title:    "Hylodoc – Unauthorised",
 				UserInfo: session.ConvertSessionToUserInfoError(sesh),
 			},
 		},
@@ -89,7 +89,7 @@ func NotFound(w http.ResponseWriter, r *http.Request) {
 				Title    string
 				UserInfo *session.UserInfo
 			}{
-				Title:    "Knuthic – Page not found",
+				Title:    "Hylodoc – Page not found",
 				UserInfo: session.ConvertSessionToUserInfoError(sesh),
 			},
 		},
@@ -113,18 +113,18 @@ func NotFoundSubdomain(w http.ResponseWriter, r *http.Request) {
 			Data: struct {
 				Title              string
 				UserInfo           *session.UserInfo
-				Knuthic          string
+				Hylodoc          string
 				RequestedSubdomain string
 				StartURL           string
 			}{
-				Title:              "Knuthic – Site not found",
+				Title:              "Hylodoc – Site not found",
 				UserInfo:           session.ConvertSessionToUserInfoError(sesh),
-				Knuthic:          config.Config.Knuthic.Knuthic,
+				Hylodoc:          config.Config.Hylodoc.Hylodoc,
 				RequestedSubdomain: r.Host,
 				StartURL: fmt.Sprintf(
 					"%s://%s",
-					config.Config.Knuthic.Protocol,
-					config.Config.Knuthic.RootDomain,
+					config.Config.Hylodoc.Protocol,
+					config.Config.Hylodoc.RootDomain,
 				),
 			},
 		},
@@ -147,17 +147,17 @@ func NotFoundDomain(w http.ResponseWriter, r *http.Request) {
 			Data: struct {
 				Title           string
 				UserInfo        *session.UserInfo
-				Knuthic       string
+				Hylodoc       string
 				RequestedDomain string
 				DiscordURL      string
 				DomainGuideURL  string
 			}{
-				Title:           "Knuthic – Site not found",
+				Title:           "Hylodoc – Site not found",
 				UserInfo:        session.ConvertSessionToUserInfoError(sesh),
-				Knuthic:       config.Config.Knuthic.Knuthic,
+				Hylodoc:       config.Config.Hylodoc.Hylodoc,
 				RequestedDomain: r.Host,
-				DomainGuideURL:  config.Config.Knuthic.CustomDomainGuideURL,
-				DiscordURL:      config.Config.Knuthic.DiscordURL,
+				DomainGuideURL:  config.Config.Hylodoc.CustomDomainGuideURL,
+				DiscordURL:      config.Config.Hylodoc.DiscordURL,
 			},
 		},
 	).Respond(w, r); err != nil {

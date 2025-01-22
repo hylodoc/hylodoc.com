@@ -3,9 +3,9 @@ package email
 import (
 	"fmt"
 
-	"github.com/knuthic/knuthic/internal/email/internal/emailtemplate"
-	"github.com/knuthic/knuthic/internal/email/postbody"
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/email/internal/emailtemplate"
+	"github.com/hylodoc/hylodoc.com/internal/email/postbody"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 func (s *sender) SendNewSubscriberEmail(sitename, unsublink string) error {

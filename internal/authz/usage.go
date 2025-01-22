@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/knuthic/knuthic/internal/authz/internal/size"
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/authz/internal/size"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 func UserStorageUsed(s *model.Store, userID string) (size.Size, error) {

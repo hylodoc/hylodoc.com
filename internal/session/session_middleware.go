@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 const (

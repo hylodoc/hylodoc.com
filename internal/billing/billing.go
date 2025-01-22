@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/knuthic/knuthic/internal/app/handler/request"
-	"github.com/knuthic/knuthic/internal/app/handler/response"
-	"github.com/knuthic/knuthic/internal/authz"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/model"
-	"github.com/knuthic/knuthic/internal/session"
-	"github.com/knuthic/knuthic/internal/util"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/request"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/response"
+	"github.com/hylodoc/hylodoc.com/internal/authz"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/util"
 
 	"github.com/stripe/stripe-go/v81"
 	bSession "github.com/stripe/stripe-go/v81/billingportal/session"
@@ -155,8 +155,8 @@ func (b *BillingService) billingPortal(r request.Request) (string, error) {
 		ReturnURL: stripe.String(
 			fmt.Sprintf(
 				"%s://%s/user/account",
-				config.Config.Knuthic.Protocol,
-				config.Config.Knuthic.RootDomain,
+				config.Config.Hylodoc.Protocol,
+				config.Config.Hylodoc.RootDomain,
 			),
 		),
 	}

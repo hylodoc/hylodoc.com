@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/knuthic/knuthic/internal/assert"
-	"github.com/knuthic/knuthic/internal/authz/internal/option"
-	"github.com/knuthic/knuthic/internal/authz/internal/size"
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/assert"
+	"github.com/hylodoc/hylodoc.com/internal/authz/internal/option"
+	"github.com/hylodoc/hylodoc.com/internal/authz/internal/size"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 func CanCreateSite(s *model.Store, userid string) (bool, error) {

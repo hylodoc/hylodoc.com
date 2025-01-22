@@ -5,7 +5,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 type Template interface {

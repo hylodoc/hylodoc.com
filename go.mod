@@ -1,4 +1,4 @@
-module github.com/knuthic/knuthic
+module github.com/hylodoc/hylodoc.com
 
 go 1.23
 

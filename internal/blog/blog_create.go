@@ -14,14 +14,14 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
-	"github.com/knuthic/knuthic/internal/app/handler/request"
-	"github.com/knuthic/knuthic/internal/app/handler/response"
-	"github.com/knuthic/knuthic/internal/authn"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/dns"
-	"github.com/knuthic/knuthic/internal/httpclient"
-	"github.com/knuthic/knuthic/internal/model"
-	"github.com/knuthic/knuthic/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/request"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/response"
+	"github.com/hylodoc/hylodoc.com/internal/authn"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/dns"
+	"github.com/hylodoc/hylodoc.com/internal/httpclient"
+	"github.com/hylodoc/hylodoc.com/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/session"
 )
 
 type CreateBlogResponse struct {
@@ -112,7 +112,7 @@ func createBlogTx(
 			EmailMode:      model.EmailModeHtml,
 			FromAddress: fmt.Sprintf(
 				"%s@%s",
-				sub, config.Config.Knuthic.EmailDomain,
+				sub, config.Config.Hylodoc.EmailDomain,
 			),
 		},
 	)
@@ -199,7 +199,7 @@ func UpdateRepositoryOnDisk(
 
 // updateAndCheckout clones the repo at the given URL into a bare git dir as
 // provided, and then clones and checks out locally the branch given by its
-// latest hash into config.Config.Knuthic.CheckoutsPath. It returns this
+// latest hash into config.Config.Hylodoc.CheckoutsPath. It returns this
 // latest hash.
 //
 // If gitdir already exists, it is removed before the cloning.
@@ -229,7 +229,7 @@ func updateAndCheckout(repoURL, gitdir, branch, token string) (string, error) {
 	}
 	h := ref.Hash().String()
 
-	checkoutdir := filepath.Join(config.Config.Knuthic.CheckoutsPath, h)
+	checkoutdir := filepath.Join(config.Config.Hylodoc.CheckoutsPath, h)
 	if err := removeDirIfExists(checkoutdir); err != nil {
 		return "", fmt.Errorf("remove checkoutdir if exists: %w", err)
 	}

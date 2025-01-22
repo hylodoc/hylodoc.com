@@ -1,5 +1,5 @@
-knuthic:
-  knuthic: "Knuthic"
+hylodoc:
+  hylodoc: "Hylodoc"
   protocol: "http"
   root_domain: "localhost:7999"
   checkouts_path: "./checkouts"
@@ -13,7 +13,7 @@ knuthic:
   custom_domain_guide_url: "https://google.com"
   open_issue_url: "https://github.com"
   discord_url: "https://discord.com"
-  cdn: "https://cdn.knuthic.com"
+  cdn: "https://cdn.hylodoc.com"
 
 knu:
   themes:
@@ -28,7 +28,7 @@ knu:
 
 github:
   app_id: 999929
-  app_name: "knuthic-dev"
+  app_name: "hylodoc-dev"
   client_id: "<GithubClientID>"
   client_secret: "<GithubClientSecret>"
   webhook_secret: "<GithubWebhookSecret>"
@@ -37,7 +37,7 @@ github:
   link_callback: "http://localhost:7999/gh/linkcallback"
 
 docker:
-  container_name: "knuthic_container"
+  container_name: "hylodoc_container"
   postgres_image: "postgres:12-alpine"
 
 mixpanel:
@@ -45,9 +45,9 @@ mixpanel:
 
 postgres:
   host: "postgres"
-  name: "knuthic_db"
+  name: "hylodoc_db"
   user: "postgres"
-  schema: "knuthic"
+  schema: "hylodoc"
   password: "<Secret>"
   port: 5432
 

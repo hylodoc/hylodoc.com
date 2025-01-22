@@ -9,10 +9,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hylodoc/hylodoc/pkg/ssg"
-	"github.com/knuthic/knuthic/internal/assert"
-	"github.com/knuthic/knuthic/internal/authz"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/assert"
+	"github.com/hylodoc/hylodoc.com/internal/authz"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/model"
 )
 
 func GetFreshGeneration(blogid string, s *model.Store) (int32, error) {
@@ -100,11 +100,11 @@ func ssgGenerateWithAuthZRestrictions(
 	}
 	assert.Assert(b.LiveHash.Valid)
 	src := filepath.Join(
-		config.Config.Knuthic.CheckoutsPath,
+		config.Config.Hylodoc.CheckoutsPath,
 		b.LiveHash.String,
 	)
 	dst := filepath.Join(
-		config.Config.Knuthic.WebsitesPath,
+		config.Config.Hylodoc.WebsitesPath,
 		b.Subdomain.String(),
 		uuid.New().String(),
 	)
@@ -136,8 +136,8 @@ func ssgGenerateWithAuthZRestrictions(
 			"/subscribe": ssg.NewSubscriberPage(
 				fmt.Sprintf(
 					"%s://%s/blogs/%s/subscribe",
-					config.Config.Knuthic.Protocol,
-					config.Config.Knuthic.RootDomain,
+					config.Config.Hylodoc.Protocol,
+					config.Config.Hylodoc.RootDomain,
 					b.ID,
 				),
 			),

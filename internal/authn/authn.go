@@ -12,14 +12,14 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/knuthic/knuthic/internal/app/handler/request"
-	"github.com/knuthic/knuthic/internal/app/handler/response"
-	"github.com/knuthic/knuthic/internal/billing"
-	"github.com/knuthic/knuthic/internal/config"
-	"github.com/knuthic/knuthic/internal/httpclient"
-	"github.com/knuthic/knuthic/internal/model"
-	"github.com/knuthic/knuthic/internal/session"
-	"github.com/knuthic/knuthic/internal/util"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/request"
+	"github.com/hylodoc/hylodoc.com/internal/app/handler/response"
+	"github.com/hylodoc/hylodoc.com/internal/billing"
+	"github.com/hylodoc/hylodoc.com/internal/config"
+	"github.com/hylodoc/hylodoc.com/internal/httpclient"
+	"github.com/hylodoc/hylodoc.com/internal/model"
+	"github.com/hylodoc/hylodoc.com/internal/session"
+	"github.com/hylodoc/hylodoc.com/internal/util"
 )
 
 const (
@@ -267,7 +267,7 @@ func (a *AuthNService) Register(r request.Request) (response.Response, error) {
 				Title    string
 				UserInfo *session.UserInfo
 			}{
-				Title:    "Knuthic - blogging for devs",
+				Title:    "Hylodoc - blogging for devs",
 				UserInfo: session.ConvertSessionToUserInfo(r.Session()),
 			},
 		},
@@ -287,7 +287,7 @@ func (a *AuthNService) Login(r request.Request) (response.Response, error) {
 				Title    string
 				UserInfo *session.UserInfo
 			}{
-				Title: "Knuthic - blogging for devs",
+				Title: "Hylodoc - blogging for devs",
 				UserInfo: session.ConvertSessionToUserInfo(
 					r.Session(),
 				),

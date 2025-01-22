@@ -19,7 +19,7 @@ func init() {
 var Config Configuration
 
 type Configuration struct {
-	Knuthic          KnuthicParams    `mapstructure:"knuthic"`
+	Hylodoc          HylodocParams    `mapstructure:"hylodoc"`
 	Knu       KnuParams `mapstructure:"knu"`
 	Github             GithubParams       `mapstructure:"github"`
 	Db                 DbParams           `mapstructure:"postgres"`
@@ -29,8 +29,8 @@ type Configuration struct {
 	ReservedSubdomains []string           `mapstructure:"reserved_subdomains"`
 }
 
-type KnuthicParams struct {
-	Knuthic            string `mapstructure:"knuthic"`
+type HylodocParams struct {
+	Hylodoc            string `mapstructure:"hylodoc"`
 	Protocol             string `mapstructure:"protocol"`
 	RootDomain           string `mapstructure:"root_domain"`
 	CheckoutsPath        string `mapstructure:"checkouts_path"`

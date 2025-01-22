@@ -4,7 +4,7 @@ DOCKER = $(SUDO) docker
 GO = go
 BIN = ${CURDIR}/bin
 SOURCES := $(shell find $(CURDIR) -name '*.go')
-HYLODOC = $(BIN)/hylodoc.com
+HYLODOC = $(BIN)/hylodoc
 
 $(HYLODOC): $(BIN) $(SOURCES) db get build.sh
 	@printf 'BUILD\t$@\n'
