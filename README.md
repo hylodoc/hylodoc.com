@@ -1,5 +1,20 @@
 # Hylodoc
 
+## Building
+
+Some of the Make targets require sudo on Ubuntu, which is supplied in the
+following way:
+
+```bash
+make up SUDO=sudo
+```
+
+To build statically: 
+
+```bash
+make up SUDO=sudo BUILDARGS=--static
+```
+
 ## License and trademark
 
 This repository contains the Hylodoc software, covered under the 

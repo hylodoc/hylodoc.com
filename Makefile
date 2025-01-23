@@ -8,7 +8,7 @@ HYLODOC = $(BIN)/hylodoc
 
 $(HYLODOC): $(BIN) $(SOURCES) db get build.sh
 	@printf 'BUILD\t$@\n'
-	@./build.sh $@
+	@./build.sh $@ $(BUILDARGS)
 
 get: go.mod go.sum
 	@printf 'GO\tmod tidy\n'
