@@ -74,7 +74,7 @@ func (b *BlogService) Config(
 				UserInfo:        session.ConvertSessionToUserInfo(sesh),
 				ID:              blogID,
 				Blog:            blogInfo,
-				Themes:          BuildThemes(config.Config.Knu.Themes),
+				Themes:          BuildThemes(config.Config.SSG.Themes),
 				CurrentTheme:    string(blogInfo.Theme),
 				CanCustomDomain: canConfigure,
 				UpgradeURL: fmt.Sprintf(

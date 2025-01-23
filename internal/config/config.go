@@ -20,7 +20,7 @@ var Config Configuration
 
 type Configuration struct {
 	Hylodoc          HylodocParams    `mapstructure:"hylodoc"`
-	Knu       KnuParams `mapstructure:"knu"`
+	SSG       SSGParams `mapstructure:"ssg"`
 	Github             GithubParams       `mapstructure:"github"`
 	Db                 DbParams           `mapstructure:"postgres"`
 	Email              EmailParams        `mapstructure:"email"`
@@ -47,7 +47,7 @@ type HylodocParams struct {
 	OpenIssueURL         string `mapstructure:"open_issue_url"`
 }
 
-type KnuParams struct {
+type SSGParams struct {
 	Themes map[string]Theme `mapstructure:"themes"`
 }
 

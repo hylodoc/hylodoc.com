@@ -172,7 +172,7 @@ func (u *UserService) RepositoryFlow(
 				AccountDetails: details,
 				RootDomain:     config.Config.Hylodoc.RootDomain,
 				Repositories:   buildRepositoriesInfo(repos),
-				Themes:         blog.BuildThemes(config.Config.Knu.Themes),
+				Themes:         blog.BuildThemes(config.Config.SSG.Themes),
 			},
 		},
 	), nil

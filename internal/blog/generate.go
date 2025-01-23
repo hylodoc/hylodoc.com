@@ -112,7 +112,7 @@ func ssgGenerateWithAuthZRestrictions(
 		return ssg.GenerateSiteWithBindings(
 			src,
 			dst,
-			config.Config.Knu.Themes[string(b.Theme)].Path,
+			config.Config.SSG.Themes[string(b.Theme)].Path,
 			"algol_nu", "", "",
 			map[string]ssg.CustomPage{
 				"/unsubscribed": ssg.NewMessagePage(
@@ -128,7 +128,7 @@ func ssgGenerateWithAuthZRestrictions(
 	return ssg.GenerateSiteWithBindings(
 		src,
 		dst,
-		config.Config.Knu.Themes[string(b.Theme)].Path,
+		config.Config.SSG.Themes[string(b.Theme)].Path,
 		"algol_nu",
 		"",
 		"<p>Subscribe via <a href=\"/subscribe\">email</a>.</p>",

@@ -15,7 +15,7 @@ hylodoc:
   discord_url: "https://discord.com"
   cdn: "https://cdn.hylodoc.com"
 
-knu:
+ssg:
   themes:
     lit:
       name: "lit"
