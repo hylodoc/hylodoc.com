@@ -222,11 +222,17 @@ func index(r request.Request) (response.Response, error) {
 		[]string{"index.html"},
 		util.PageInfo{
 			Data: struct {
-				Title    string
-				UserInfo *session.UserInfo
+				Title       string
+				UserInfo    *session.UserInfo
+				HylodocLink string
 			}{
 				Title:    "Hylodoc - blogging for devs",
 				UserInfo: session.ConvertSessionToUserInfo(sesh),
+				HylodocLink: fmt.Sprintf(
+					"%s://%s",
+					config.Config.Hylodoc.Protocol,
+					config.Config.Hylodoc.RootDomain,
+				),
 			},
 		},
 	), nil
