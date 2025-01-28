@@ -29,6 +29,7 @@ type BlogInfo struct {
 	LiveBranch               string
 	UpdatedAt                time.Time
 	IsLive                   bool
+	IsEmailModeHtml          bool
 	Hash                     string
 	HashUrl                  string
 	SyncUrl                  string
@@ -143,6 +144,10 @@ func getBlogInfo(s *model.Store, blogID string) (BlogInfo, error) {
 	if err != nil {
 		return BlogInfo{}, fmt.Errorf("islive error: %w", err)
 	}
+	isEmailModeHtml, err := blogEmailModeIsHtml(blog.EmailMode)
+	if err != nil {
+		return BlogInfo{}, fmt.Errorf("blog email mode is html: %w", err)
+	}
 	ghurl, err := getghurl(&blog, s)
 	if err != nil {
 		return BlogInfo{}, fmt.Errorf("ghurl: %w", err)
@@ -164,6 +169,7 @@ func getBlogInfo(s *model.Store, blogID string) (BlogInfo, error) {
 		Theme:                    string(blog.Theme),
 		UpdatedAt:                blog.UpdatedAt,
 		IsLive:                   isLive,
+		IsEmailModeHtml:          isEmailModeHtml,
 		SyncUrl:                  buildSyncUrl(blog.ID),
 		Hash:                     blog.LiveHash.String,
 		HashUrl: ghurl.JoinPath(
@@ -171,6 +177,19 @@ func getBlogInfo(s *model.Store, blogID string) (BlogInfo, error) {
 		).String(),
 		DeleteMessage: blogDeleteMessage(&blog),
 	}, nil
+}
+
+func blogEmailModeIsHtml(emailMode model.EmailMode) (bool, error) {
+	switch emailMode {
+	case model.EmailModeHtml:
+		return true, nil
+	case model.EmailModePlaintext:
+		return false, nil
+	default:
+		return false, fmt.Errorf(
+			"invalid email mode: %s", string(emailMode),
+		)
+	}
 }
 
 func blogDeleteMessage(b *model.Blog) string {

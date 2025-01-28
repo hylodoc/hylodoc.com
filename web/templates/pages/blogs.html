@@ -7,6 +7,7 @@
 			<th>Repo link</th>
 			<th>Subscribers</th>
 			<th>Posts</th>
+			<th>Email Mode</th>
 			<th>Status</th>
 			<th>Last update</th>
 			<th>Configuration</th>
@@ -27,6 +28,13 @@
 				</td>
 				<td><a href="{{ .SubscriberMetricsUrl }}">manage</a></td>
 				<td><a href="{{ .MetricsUrl }}">manage</a></td>
+				<td>
+					{{ if .IsEmailModeHtml }}
+						html
+					{{ else }}
+						plaintext
+					{{ end }}
+				</td>
 				<td>{{ if .IsLive }}live{{ else }}offline{{end}}</td>
 				<td>{{ .UpdatedAt.Format "2006-01-02 15:04:05 UTC-07:00" }}</td>
 				<td><a href="{{ .ConfigUrl }}" class="button-primary">edit</a> </td>

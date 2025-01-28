@@ -78,8 +78,6 @@
 	</div>
 </section>
 
-
-
 <!-- Configure git -->
 <section>
 	<div class="container">
@@ -148,6 +146,37 @@
 	</div>
 </section>
 
+<!-- Toggle site between plainttext and html emails -->
+<section>
+	<div class="container">
+		<h3>Emails</h3>
+		<form id="email-mode-form">
+			<label for="emailModeInput">Set emails</label>
+			<div class="row">
+				<div class="two columns">
+					<label>
+						<input type="radio"
+						name="emailmode" value="html"
+						{{ if .Data.Blog.IsEmailModeHtml }}checked{{ end }}/>
+						Html
+					</label>
+				</div>
+				<div class="two columns">
+					<label>
+						<input type="radio"
+						name="emailmode" value="plaintext"
+						{{ if not .Data.Blog.IsEmailModeHtml }}checked{{ end }}/>
+						Plaintext
+					</label>
+				</div>
+				<div class="two columns">
+					<button type="submit">Save</button>
+				</div>
+			</div>
+		</form>
+	</div>
+</section>
+
 <section>
 	<div class="container">
 		<h3>Delete blog</h3>
@@ -166,8 +195,6 @@
 	</div>
 </section>
 
-
-
 <script>
 	let debounceTimer;
 
@@ -179,12 +206,14 @@
 		const themeForm = document.getElementById("theme-form")
 		const liveBranchInputForm = document.getElementById("live-branch-form")
 		const statusForm = document.getElementById("status-form")
+		const emailModeForm = document.getElementById("email-mode-form")
 
 		subdomainInput.addEventListener("input", handleInput);
 		subdomainForm.addEventListener("submit", handleSubdomainFormSubmit);
 		themeForm.addEventListener("submit", handleThemeFormSubmit);
 		liveBranchInputForm.addEventListener("submit", handleLiveBranchFormSubmit)
 		statusForm.addEventListener("submit", handleStatusFormSubmit)
+		emailModeForm.addEventListener("submit", handleEmailModeFormSubmit)
 	}
 
 	/* handle input event with debounce */
@@ -353,6 +382,32 @@
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ is_live: is_live })
+		})
+		.then(response => response.json().then(data => {
+			/* check for http errors */
+			if (!response.ok) {
+				throw new Error(data.message || "Error submitting status");
+			}
+			showToast(data.message); /* show success status */
+		}))
+		.catch(error => {
+			showToast(error.message || "An unknown error occurred");
+		});	
+	}
+
+	function handleEmailModeFormSubmit(event) {
+		event.preventDefault();
+
+		const emailMode = document.querySelector('input[name="emailmode"]:checked');
+		console.log(emailMode.value);
+		submitEmailMode(emailMode.value);
+	}
+
+	function submitEmailMode(email_mode) {
+		fetch("set-email-mode", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ email_mode: email_mode })
 		})
 		.then(response => response.json().then(data => {
 			/* check for http errors */

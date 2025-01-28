@@ -95,6 +95,11 @@ UPDATE blogs
 SET is_live = false
 WHERE id = $1;
 
+-- name: SetBlogEmailMode :exec
+UPDATE blogs
+SET email_mode = $1
+WHERE id = $2;
+
 -- name: ListBlogsForInstallationByGhInstallationID :many
 SELECT b.*
 FROM blogs b

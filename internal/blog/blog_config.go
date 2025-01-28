@@ -361,6 +361,113 @@ func setBlogToOffline(
 	return &statusChangeResponse{false}, nil
 }
 
+func (b *BlogService) SetEmailModeSubmit(
+	r request.Request,
+) (response.Response, error) {
+	sesh := r.Session()
+	sesh.Println("SetEmailModeSubmit handler...")
+
+	r.MixpanelTrack("SetEmailModeSubmit")
+
+	type resp struct {
+		Message string `json:"message"`
+	}
+
+	change, err := b.setEmailModeSubmit(r)
+	if err != nil {
+		var customErr *customError
+		if errors.As(err, &customErr) {
+			return response.NewJson(&resp{customErr.Error()})
+		} else {
+			return nil, fmt.Errorf("set email type submit: %w", err)
+		}
+	}
+
+	return response.NewJson(&resp{change})
+}
+
+func (b *BlogService) setEmailModeSubmit(
+	r request.Request,
+) (string, error) {
+	blogID, ok := r.GetRouteVar("blogID")
+	if !ok {
+		return "", createCustomError("", http.StatusNotFound)
+	}
+
+	var req struct {
+		EmailMode string `json:"email_mode"`
+	}
+	body, err := r.ReadBody()
+	if err != nil {
+		return "", fmt.Errorf("read body: %w", err)
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return "", fmt.Errorf("decode body: %w", err)
+	}
+
+	change, err := handleEmailModeChange(
+		blogID, req.EmailMode, b.store,
+	)
+	if err != nil {
+		return "", fmt.Errorf("handle status change: %w", err)
+	}
+	return change, nil
+}
+
+func handleEmailModeChange(
+	blogID string, emailMode string, s *model.Store,
+) (string, error) {
+	blog, err := s.GetBlogByID(context.TODO(), blogID)
+	if err != nil {
+		return "", fmt.Errorf(
+			"error getting blog `%s': %w", blogID, err,
+		)
+	}
+	if err := validateEmailModeChange(
+		emailMode, string(blog.EmailMode),
+	); err != nil {
+		return "", fmt.Errorf("invalid status change: %w", err)
+	}
+	mode, err := getEmailMode(emailMode)
+	if err != nil {
+		return "", fmt.Errorf("get email mode: %w", err)
+	}
+	if err := s.SetBlogEmailMode(
+		context.TODO(),
+		model.SetBlogEmailModeParams{
+			EmailMode: mode,
+			ID:        blogID,
+		},
+	); err != nil {
+		return "", fmt.Errorf("set blog email mode: %w", err)
+	}
+	return fmt.Sprintf("Email mode is set to `%s'", emailMode), nil
+}
+
+func validateEmailModeChange(emailMode, blogEmailMode string) error {
+	if emailMode == blogEmailMode {
+		return createCustomError(
+			"cannot update to same email type",
+			http.StatusBadRequest,
+		)
+	}
+	return nil
+}
+
+func getEmailMode(emailMode string) (model.EmailMode, error) {
+	switch emailMode {
+	case string(model.EmailModePlaintext):
+		return model.EmailModePlaintext, nil
+	case string(model.EmailModeHtml):
+		return model.EmailModeHtml, nil
+	default:
+		return "", createCustomError(
+			fmt.Sprintf("invalid email mode: `%s'", emailMode),
+			http.StatusBadRequest,
+		)
+	}
+}
+
 func (b *BlogService) ConfigDomain(
 	r request.Request,
 ) (response.Response, error) {
