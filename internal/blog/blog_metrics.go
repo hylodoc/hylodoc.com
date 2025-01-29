@@ -98,7 +98,7 @@ func (b *BlogService) getSiteMetrics(blogid string) ([]postdata, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot get blog: %w", err)
 	}
-	posts, err := b.store.ListPostsByBlog(context.TODO(), blogid)
+	posts, err := b.store.ListActivePostsByBlog(context.TODO(), blogid)
 	if err != nil {
 		return nil, fmt.Errorf("cannot list posts: %w", err)
 	}

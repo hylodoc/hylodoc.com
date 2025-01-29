@@ -75,10 +75,10 @@ INSERT INTO visits (
 	$1, $2
 );
 
--- name: ListPostsByBlog :many
+-- name: ListActivePostsByBlog :many
 SELECT *
 FROM posts
-WHERE blog = $1
+WHERE blog = $1 AND is_active = true
 ORDER BY published_at DESC;
 
 -- name: CountVisits :one
